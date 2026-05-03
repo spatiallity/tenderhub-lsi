@@ -1,3 +1,4 @@
+import ssl
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
@@ -11,8 +12,11 @@ if is_sqlite:
         connect_args={"check_same_thread": False},
     )
 else:
-    # For Supabase: use direct connection (port 5432) with SSL
-    # Add ssl=require via connect_args for asyncpg
+    # Create SSL context for Supabase direct connection
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
@@ -20,7 +24,7 @@ else:
         pool_size=5,
         max_overflow=10,
         connect_args={
-            "ssl": "require",
+            "ssl": ssl_ctx,
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0,
         },
