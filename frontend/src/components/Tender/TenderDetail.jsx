@@ -10,7 +10,7 @@ export default function TenderDetail({ tender }) {
   const {
     tenderNotes, setTenderNotes,
     noteSaved, setNoteSaved,
-    internalStatuses, setInternalStatuses,
+    internalStatuses, updateTenderStatus,
     assignedPICs, setAssignedPICs,
     users, showToast
   } = useAppContext();
@@ -19,7 +19,7 @@ export default function TenderDetail({ tender }) {
 
 
   const status = internalStatuses[tender.id] || tender.internalStatus || 'Dipantau';
-  const setStatus = (val) => setInternalStatuses(prev => ({ ...prev, [tender.id]: val }));
+  const setStatus = (val) => updateTenderStatus(tender.id, val);
   const assignedPIC = assignedPICs[tender.id] || '';
   const assignPIC = (userId) => setAssignedPICs(prev => ({ ...prev, [tender.id]: userId }));
 
