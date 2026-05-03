@@ -1,3 +1,6 @@
+// TenderHub LSIv2 - Deployment Version: 2026-05-03 19:19
+import { subDays, subMonths, format } from 'date-fns';
+
 // Helper function to generate stage deadlines based on current stage
 // LOGIC: Current stage END DATE determines the deadline badge
 const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null) => {
