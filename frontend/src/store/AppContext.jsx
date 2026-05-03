@@ -114,19 +114,18 @@ export const AppProvider = ({ children }) => {
     (toastConfig[type] || toastConfig.info)();
   }, [toast]);
 
-  // Load data from API
-  useEffect(() => {
+  // ─── Reusable fetch functions ──────────────────────────────────────────────
+
+  const fetchTenders = useCallback(() => {
     api.get('/tender/search', { params: { limit: 200 } })
       .then(res => {
         setTendersRaw(res.data || []);
-        // Merge API statuses with localStorage — localStorage takes priority (user changes)
         const localStatuses = (() => {
           try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
         })();
         const localNotes = (() => {
           try { return JSON.parse(localStorage.getItem('lsi-tender-notes') || '{}'); } catch { return {}; }
         })();
-        
         const statusMap = {};
         const notesMap = {};
         (res.data || []).forEach(t => {
@@ -134,20 +133,17 @@ export const AppProvider = ({ children }) => {
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          // localStorage overrides API (user's local changes take priority)
           statusMap[t.id] = localStatuses[t.id] || s;
           if (t.catatan_internal) {
             try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
           }
-          // localStorage notes override API notes
           if (localNotes[t.id]) notesMap[t.id] = localNotes[t.id];
         });
-        setInternalStatuses(prev => ({ ...statusMap, ...localStatuses }));
-        setTenderNotes(prev => ({ ...notesMap, ...localNotes }));
+        setInternalStatuses(() => ({ ...statusMap, ...localStatuses }));
+        setTenderNotes(() => ({ ...notesMap, ...localNotes }));
       })
       .catch(() => {
         setTendersRaw(FALLBACK_TENDERS);
-        // Load statuses from localStorage, fallback to dummy data defaults
         const localStatuses = (() => {
           try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
         })();
@@ -159,11 +155,45 @@ export const AppProvider = ({ children }) => {
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
           statusMap[t.id] = localStatuses[t.id] || s;
         });
-        setInternalStatuses(prev => ({ ...statusMap, ...localStatuses }));
-        showToast('API tender belum tersambung. Dummy tender lokal dimuat.', 'error');
+        setInternalStatuses(() => ({ ...statusMap, ...localStatuses }));
       })
       .finally(() => setLoadingTenders(false));
   }, []);
+
+  const fetchExperts = useCallback(() => {
+    api.get('/experts')
+      .then(res => {
+        const apiExperts = (res.data || []).map(e => ({
+          ...e,
+          noHp: e.no_hp || '',
+          portofolio: e.subporto || [],
+          rating: e.rating_avg || 0,
+          proyek: e.jumlah_proyek || 0,
+          history: (e.projects || []).map(p => ({
+            id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
+            peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
+          })),
+          reviews: (e.reviews || []).map(r => ({
+            id: r.id, reviewer: r.reviewer_nama, rating: r.rating, komentar: r.komentar,
+            tanggal: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : ''
+          }))
+        }));
+        setExpertsRaw(prev => {
+          const localOnly = prev.filter(e => e.id > 1000000000000);
+          return [...localOnly, ...apiExperts];
+        });
+      })
+      .catch(() => {
+        setExpertsRaw(prev => prev.length > 0 ? prev : FALLBACK_EXPERTS);
+      })
+      .finally(() => setLoadingExperts(false));
+  }, []);
+
+  // ─── Initial data load ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetchTenders();
+  }, [fetchTenders]);
 
   useEffect(() => {
     api.get('/rup/search', { params: { limit: 100 } })
@@ -176,52 +206,75 @@ export const AppProvider = ({ children }) => {
   }, [showToast]);
 
   useEffect(() => {
-    // Only load once - use ref to prevent re-loading
-    if (expertsLoadedRef.current) {
-      console.log('Experts already loaded, skipping API call');
-      return;
-    }
-    
+    if (expertsLoadedRef.current) return;
     expertsLoadedRef.current = true;
-    console.log('Loading experts from API...');
-    
-    api.get('/experts')
-      .then(res => {
-        console.log('API response:', res.data);
-        const apiExperts = (res.data || []).map(e => ({
-          ...e,
-          noHp: e.no_hp || '',
-          portofolio: e.subporto || [],
-          rating: e.rating_avg || 0,
-          proyek: e.jumlah_proyek || 0,
-          history: (e.projects || []).map(p => ({
-             id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun, peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
-          })),
-          reviews: (e.reviews || []).map(r => ({
-             id: r.id, reviewer: r.reviewer_nama, rating: r.rating, komentar: r.komentar, tanggal: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : ''
-          }))
-        }));
-        
-        // Merge with localStorage (in case there are local-only experts)
-        setExpertsRaw(prev => {
-          // Keep local experts that are not in API (ID > 1000000000000 are local)
-          const localOnly = prev.filter(e => e.id > 1000000000000);
-          const merged = [...localOnly, ...apiExperts];
-          console.log('Merged experts (local + API):', merged);
-          return merged;
-        });
-      })
-      .catch((err) => {
-        console.log('API failed, keeping localStorage data:', err);
-        // Don't overwrite localStorage data if API fails
-        if (expertsRaw.length === 0) {
-          setExpertsRaw(FALLBACK_EXPERTS);
-          showToast('API expert belum tersambung. Dummy tenaga ahli lokal dimuat.', 'error');
-        }
-      })
-      .finally(() => setLoadingExperts(false));
-  }, []); // Empty dependency - only run once on mount
-  
+    fetchExperts();
+  }, [fetchExperts]);
+
+  // ─── Refresh on tab focus (sync changes from other users) ─────────────────
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Silently re-fetch when user returns to tab
+        api.get('/tender/search', { params: { limit: 200 } })
+          .then(res => {
+            setTendersRaw(res.data || []);
+            // Merge: API data wins for statuses (reflects other users' changes)
+            // but keep local-only entries that haven't been synced yet
+            const localStatuses = (() => {
+              try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
+            })();
+            const statusMap = {};
+            const notesMap = {};
+            (res.data || []).forEach(t => {
+              t.id = t.kd_tender || t.id;
+              let s = t.internalStatus || 'Dipantau';
+              if (t.won === true) s = 'Menang';
+              else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
+              // API wins on focus refresh (to pick up other users' changes)
+              statusMap[t.id] = s;
+              if (t.catatan_internal) {
+                try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
+              }
+            });
+            // Merge: keep local statuses for tenders not in API response
+            setInternalStatuses(prev => ({ ...prev, ...statusMap }));
+            setTenderNotes(prev => ({ ...prev, ...notesMap }));
+          })
+          .catch(() => { /* silent fail on focus refresh */ });
+
+        // Also refresh experts
+        api.get('/experts')
+          .then(res => {
+            const apiExperts = (res.data || []).map(e => ({
+              ...e,
+              noHp: e.no_hp || '',
+              portofolio: e.subporto || [],
+              rating: e.rating_avg || 0,
+              proyek: e.jumlah_proyek || 0,
+              history: (e.projects || []).map(p => ({
+                id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
+                peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
+              })),
+              reviews: (e.reviews || []).map(r => ({
+                id: r.id, reviewer: r.reviewer_nama, rating: r.rating, komentar: r.komentar,
+                tanggal: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : ''
+              }))
+            }));
+            setExpertsRaw(prev => {
+              const localOnly = prev.filter(e => e.id > 1000000000000);
+              return [...localOnly, ...apiExperts];
+            });
+          })
+          .catch(() => { /* silent fail */ });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   // Save experts to localStorage whenever it changes
   useEffect(() => {
     if (expertsRaw.length > 0) {
