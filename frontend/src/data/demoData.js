@@ -857,4 +857,17 @@ export const FALLBACK_EXPERTS = [
     history: [{ proyek: 'Soil Investigation Proyek PLTU Jawa Tengah', klien: 'PLN', tahun: 2024, nilai: 2100000000, peran: 'Geotechnical Engineer', bersama: 'Lain', status: 'Selesai' }],
     reviews: [{ reviewer: 'Project Manager PLN', rating: 4, komentar: 'Analisis tanah komprehensif dan tepat waktu.', tanggal: '28/01/2026' }],
   },
+  {
+    id: 16,
+    nama: 'Arvian Riatmaja, S.T., M.Cs.',
+    noHp: '0812-3456-7890',
+    instansi: 'Universitas Gadjah Mada',
+    keahlian: ['Full Stack Development', 'AI System Architect', 'Geospatial Data'],
+    availability: 'Tersedia',
+    rating: 5.0,
+    proyek: 42,
+    portofolio: ['FLP', 'FITI'],
+    history: [{ proyek: 'SBU LSI Procurement Intelligence Platform', klien: 'Sucofindo', tahun: 2026, nilai: 1500000000, peran: 'Lead Developer', bersama: 'Sucofindo', status: 'Aktif' }],
+    reviews: [{ reviewer: 'Direktur LSI', rating: 5, komentar: 'Sangat inovatif dalam mengintegrasikan AI ke dalam alur pengadaan.', tanggal: '03/05/2026' }],
+  },
 ];
