@@ -114,30 +114,49 @@ export default function ExpertPage() {
             <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
               <Btn className="ghost" onClick={() => setShowForm(false)}>Batal</Btn>
               <Btn className="primary" onClick={async () => {
-                const history = [];
-                if (draft.historyProyek) {
-                  history.push({
-                    proyek: draft.historyProyek,
-                    klien: draft.historyKlien,
-                    tahun: draft.historyTahun,
-                    peran: draft.historyPeran,
-                    nilai: 0,
-                    bersama: 'Sucofindo',
-                    status: 'Selesai'
-                  });
-                }
-                const newExpert = {
-                  ...draft,
-                  keahlian: draft.keahlian.split(',').map(s => s.trim()).filter(Boolean),
-                  history
-                };
-                const success = await addExpert(newExpert);
-                if (success) {
-                  setDraft({ 
-                    nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
-                    historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
-                  });
-                  setShowForm(false);
+                try {
+                  const history = [];
+                  if (draft.historyProyek) {
+                    history.push({
+                      proyek: draft.historyProyek,
+                      klien: draft.historyKlien,
+                      tahun: draft.historyTahun,
+                      peran: draft.historyPeran,
+                      nilai: 0,
+                      bersama: 'Sucofindo',
+                      status: 'Selesai'
+                    });
+                  }
+                  
+                  const newExpert = {
+                    ...draft,
+                    keahlian: draft.keahlian.split(',').map(s => s.trim()).filter(Boolean),
+                    history
+                  };
+                  
+                  console.log('Submitting expert:', newExpert);
+                  const success = await addExpert(newExpert);
+                  console.log('Add expert result:', success);
+                  
+                  if (success) {
+                    // Reset form
+                    setDraft({ 
+                      nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
+                      historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
+                    });
+                    
+                    // Reset filters to show new expert
+                    setExpertSearch('');
+                    setAvailFilter('Semua');
+                    setPortFilter('Semua');
+                    setSortKey('');
+                    
+                    // Close form
+                    setShowForm(false);
+                  }
+                } catch (error) {
+                  console.error('Error adding expert:', error);
+                  showToast('Terjadi kesalahan saat menambah tenaga ahli', 'error');
                 }
               }}>Simpan</Btn>
             </div>

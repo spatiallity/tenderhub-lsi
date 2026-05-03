@@ -71,6 +71,7 @@ async def add_project(expert_id: int, project_in: ExpertProjectCreate, db: Async
         expert.jumlah_proyek += 1
         
     await db.commit()
+    await db.refresh(project)
     return project
 
 @router.post("/{expert_id}/reviews")
@@ -89,6 +90,7 @@ async def add_review(expert_id: int, review_in: ExpertReviewCreate, db: AsyncSes
         expert.rating_avg = round(total_rating / count, 1)
         
     await db.commit()
+    await db.refresh(review)
     return review
 
 @router.delete("/{expert_id}")
