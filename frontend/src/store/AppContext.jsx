@@ -91,13 +91,18 @@ export const AppProvider = ({ children }) => {
         setTendersRaw(res.data || []);
         // Initialize internalStatuses — normalize won/followed flags
         const statusMap = {};
+        const notesMap = {};
         (res.data || []).forEach(t => {
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
           statusMap[t.id] = s;
+          if (t.catatan_internal) {
+            try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
+          }
         });
         setInternalStatuses(statusMap);
+        setTenderNotes(notesMap);
       })
       .catch(() => {
         setTendersRaw(FALLBACK_TENDERS);
@@ -126,7 +131,19 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     api.get('/experts')
-      .then(res => setExpertsRaw(res.data || []))
+      .then(res => setExpertsRaw((res.data || []).map(e => ({
+        ...e,
+        noHp: e.no_hp || '',
+        portofolio: e.subporto || [],
+        rating: e.rating_avg || 0,
+        proyek: e.jumlah_proyek || 0,
+        history: (e.projects || []).map(p => ({
+           id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun, peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
+        })),
+        reviews: (e.reviews || []).map(r => ({
+           id: r.id, reviewer: r.reviewer_nama, rating: r.rating, komentar: r.komentar, tanggal: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : ''
+        }))
+      }))))
       .catch(() => {
         setExpertsRaw(FALLBACK_EXPERTS);
         showToast('API expert belum tersambung. Dummy tenaga ahli lokal dimuat.', 'error');
@@ -223,6 +240,19 @@ export const AppProvider = ({ children }) => {
     }
   }, [tenders, showToast]);
 
+  const addTenderNote = useCallback(async (tenderId, noteObj) => {
+    setTenderNotes(prev => {
+      const updatedNotes = [...(prev[tenderId] || []), noteObj];
+      // Persist to DB async
+      api.post('/watchlist', {
+        kd_tender: parseInt(tenderId),
+        catatan_internal: JSON.stringify(updatedNotes)
+      }).catch(e => console.error("Failed to sync notes", e));
+      return { ...prev, [tenderId]: updatedNotes };
+    });
+    showToast('Catatan ditambahkan');
+  }, [showToast]);
+
   const openTender = useCallback((id) => {
     markTenderOpened(id);
     setSelectedTenderId(id);
@@ -260,24 +290,42 @@ export const AppProvider = ({ children }) => {
 
   // Expert actions
   const addExpert = useCallback(async (draft) => {
-    if (!draft.nama?.trim() || !draft.keahlian?.trim()) return;
+    const keahlianRaw = Array.isArray(draft.keahlian) ? draft.keahlian : (typeof draft.keahlian === 'string' ? draft.keahlian.split(',') : []);
+    const keahlianClean = keahlianRaw.filter(Boolean).map(s => String(s).trim()).filter(Boolean);
+    
+    if (!draft.nama?.trim() || keahlianClean.length === 0) {
+      showToast('Nama dan keahlian wajib diisi', 'error');
+      return false;
+    }
+    
     const body = {
       nama: draft.nama.trim(),
+      no_hp: draft.noHp?.trim() || null,
       instansi: draft.instansi?.trim() || 'Eksternal SUCOFINDO',
-      keahlian: [draft.keahlian.trim()],
+      keahlian: keahlianClean,
       availability: draft.availability || 'Tersedia',
-      portofolio: [draft.portfolio || 'SDA'],
-      rating: 4.2,
-      proyek: 0,
+      subporto: [draft.portfolio || 'SDA'],
     };
     try {
       const res = await api.post('/experts', body);
-      setExpertsRaw(prev => [...prev, res.data]);
+      const newExpert = {
+        ...res.data,
+        noHp: res.data.no_hp || '',
+        portofolio: res.data.subporto || [],
+        rating: res.data.rating_avg || 0,
+        proyek: res.data.jumlah_proyek || 0,
+        history: [],
+        reviews: [],
+      };
+      setExpertsRaw(prev => [...prev, newExpert]);
       showToast('Tenaga ahli berhasil ditambahkan');
+      return true;
     } catch (e) {
-      const fallbackExpert = { ...body, id: Date.now(), noHp: draft.noHp || '', history: [], reviews: [] };
+      console.error('Failed to create expert:', e);
+      const fallbackExpert = { ...body, id: Date.now(), noHp: draft.noHp || '', portofolio: body.subporto, rating: 0, proyek: 0, history: [], reviews: [], keahlian: keahlianClean };
       setExpertsRaw(prev => [...prev, fallbackExpert]);
       showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'error');
+      return true;
     }
   }, [showToast]);
 
@@ -288,7 +336,7 @@ export const AppProvider = ({ children }) => {
   const updateExpertProfile = useCallback(async (expertId, patch) => {
     const safePatch = {
       nama: patch?.nama?.trim(),
-      noHp: patch?.noHp?.trim(),
+      no_hp: patch?.noHp?.trim(),
       instansi: patch?.instansi?.trim(),
     };
     try {
@@ -296,7 +344,7 @@ export const AppProvider = ({ children }) => {
     } catch {
       // Keep local fallback update when API is unavailable.
     }
-    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { ...e, ...safePatch } : e));
+    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { ...e, nama: safePatch.nama, noHp: patch?.noHp?.trim(), instansi: safePatch.instansi } : e));
     showToast('Profil tenaga ahli berhasil diperbarui');
   }, [showToast]);
 
@@ -312,35 +360,64 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
-  const addReview = useCallback((expertId) => {
+  const addReview = useCallback(async (expertId) => {
     if (!reviewDraft.reviewer.trim() || !reviewDraft.komentar.trim()) return;
-    setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
-      ...e,
-      reviews: [...(e.reviews || []), { ...reviewDraft, tanggal: new Date().toLocaleDateString('id-ID') }],
-      rating: Number(((e.rating * (e.reviews || []).length + reviewDraft.rating) / ((e.reviews || []).length + 1)).toFixed(1))
-    } : e));
-    setReviewDraft({ reviewer: '', rating: 5, komentar: '' });
-    showToast('Review berhasil disimpan');
-  }, [reviewDraft]);
+    try {
+      const res = await api.post(`/experts/${expertId}/reviews`, {
+        reviewer_nama: reviewDraft.reviewer,
+        rating: reviewDraft.rating,
+        komentar: reviewDraft.komentar
+      });
+      const newReview = { id: res.data.id, reviewer: res.data.reviewer_nama, rating: res.data.rating, komentar: res.data.komentar, tanggal: new Date().toLocaleDateString('id-ID') };
+      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+        ...e,
+        reviews: [...(e.reviews || []), newReview],
+        rating: Number(((e.rating * (e.reviews || []).length + reviewDraft.rating) / ((e.reviews || []).length + 1)).toFixed(1))
+      } : e));
+      setReviewDraft({ reviewer: '', rating: 5, komentar: '' });
+      showToast('Review berhasil disimpan');
+    } catch (e) {
+      showToast('Gagal menyimpan review ke database', 'error');
+    }
+  }, [reviewDraft, showToast]);
 
-  const addHistory = useCallback((expertId) => {
+  const addHistory = useCallback(async (expertId) => {
     if (!historyDraft.proyek.trim() || !historyDraft.klien.trim()) return;
-    setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
-      ...e,
-      history: [...(e.history || []), {
-        proyek: historyDraft.proyek,
-        klien: historyDraft.klien,
+    try {
+      const res = await api.post(`/experts/${expertId}/projects`, {
+        nama_proyek: historyDraft.proyek,
+        pemberi_kerja: historyDraft.klien,
         tahun: historyDraft.tahun || new Date().getFullYear(),
-        nilai: Number(historyDraft.nilai || 0) * 1000000,
+        nilai_proyek: Number(historyDraft.nilai || 0) * 1000000,
         peran: historyDraft.peran || 'Tenaga Ahli',
         bersama: historyDraft.bersama,
-        status: 'Selesai'
-      }],
-      proyek: (e.proyek || 0) + 1
-    } : e));
-    setHistoryDraft({ proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo' });
-    showToast('Riwayat berhasil disimpan');
-  }, [historyDraft]);
+        status_proyek: 'Selesai'
+      });
+      const newProject = { id: res.data.id, proyek: res.data.nama_proyek, klien: res.data.pemberi_kerja, tahun: res.data.tahun, peran: res.data.peran, nilai: res.data.nilai_proyek, bersama: res.data.bersama, status: res.data.status_proyek };
+      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+        ...e,
+        history: [...(e.history || []), newProject],
+        proyek: (e.proyek || 0) + 1
+      } : e));
+      setHistoryDraft({ proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo' });
+      showToast('Riwayat berhasil disimpan');
+    } catch (e) {
+      showToast('Gagal menyimpan riwayat ke database', 'error');
+    }
+  }, [historyDraft, showToast]);
+
+  const deleteExpertHistory = useCallback(async (expertId, projectId) => {
+    try {
+      await api.delete(`/experts/${expertId}/projects/${projectId}`);
+      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+        ...e, history: (e.history || []).filter(h => h.id !== projectId)
+      } : e));
+      showToast('Riwayat berhasil dihapus');
+    } catch (e) {
+      showToast('Gagal menghapus riwayat', 'error');
+    }
+  }, [showToast]);
+
 
   const addUser = useCallback((draft) => {
     if (!draft?.nama?.trim()) return;
@@ -408,7 +485,7 @@ export const AppProvider = ({ children }) => {
     showKeywordManager, setShowKeywordManager,
     dashboardChartFilter, setDashboardChartFilter,
     // Expert actions
-    addExpert, updateExpertName, updateExpertProfile, deleteExpert,
+    addExpert, updateExpertName, updateExpertProfile, deleteExpert, deleteExpertHistory,
     reviewDraft, setReviewDraft, addReview,
     historyDraft, setHistoryDraft, addHistory,
   }), [
@@ -417,7 +494,7 @@ export const AppProvider = ({ children }) => {
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,
     keywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
-    internalStatuses, updateTenderStatus, tenderNotes, setTenderNotes,
+    internalStatuses, updateTenderStatus, tenderNotes, setTenderNotes, addTenderNote,
     users, addUser, updateUser, deleteUser,
     notifications, coverage, hpsThreshold,
     selectedTenderId, selectedExpertId, selectedRupId,
@@ -426,7 +503,7 @@ export const AppProvider = ({ children }) => {
     markTenderOpened, markRupOpened,
     showWinrateDetail, showStageRef, showPotensiChart, showUrgentPanel, showKeywordManager,
     dashboardChartFilter,
-    addExpert, updateExpertName, updateExpertProfile, deleteExpert,
+    addExpert, updateExpertName, updateExpertProfile, deleteExpert, deleteExpertHistory,
     reviewDraft, addReview, historyDraft, addHistory,
   ]);
 

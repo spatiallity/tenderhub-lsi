@@ -33,6 +33,31 @@ async def create_expert(expert_in: ExpertCreate, db: AsyncSession = Depends(get_
     expert = Expert(**expert_in.model_dump())
     db.add(expert)
     await db.commit()
+    # Re-fetch with relationships loaded so ExpertOut can serialize
+    result = await db.execute(
+        select(Expert)
+        .options(selectinload(Expert.projects), selectinload(Expert.reviews))
+        .where(Expert.id == expert.id)
+    )
+    return result.scalars().first()
+
+@router.patch("/{expert_id}", response_model=ExpertOut)
+async def update_expert(expert_id: int, expert_in: ExpertUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Expert)
+        .options(selectinload(Expert.projects), selectinload(Expert.reviews))
+        .where(Expert.id == expert_id)
+    )
+    expert = result.scalars().first()
+    if not expert:
+        raise HTTPException(status_code=404, detail="Expert not found")
+    
+    update_data = expert_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        if value is not None:
+            setattr(expert, key, value)
+    
+    await db.commit()
     await db.refresh(expert)
     return expert
 
@@ -65,3 +90,31 @@ async def add_review(expert_id: int, review_in: ExpertReviewCreate, db: AsyncSes
         
     await db.commit()
     return review
+
+@router.delete("/{expert_id}")
+async def delete_expert(expert_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Expert).where(Expert.id == expert_id))
+    expert = result.scalars().first()
+    if not expert:
+        raise HTTPException(status_code=404, detail="Expert not found")
+    
+    await db.delete(expert)
+    await db.commit()
+    return {"message": "Expert deleted successfully"}
+
+@router.delete("/{expert_id}/projects/{project_id}")
+async def delete_project(expert_id: int, project_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ExpertProject).where(ExpertProject.id == project_id, ExpertProject.expert_id == expert_id))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    await db.delete(project)
+    
+    # Update expert project count
+    expert = await db.get(Expert, expert_id)
+    if expert and expert.jumlah_proyek > 0:
+        expert.jumlah_proyek -= 1
+        
+    await db.commit()
+    return {"message": "Project deleted successfully"}

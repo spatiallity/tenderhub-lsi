@@ -38,7 +38,7 @@ async def search_tenders(
     # Fetch watchlist to overlay internal statuses
     from app.models.watchlist import TenderWatchlist
     wl_result = await db.execute(select(TenderWatchlist))
-    watchlist_map = {str(item.kd_tender): item.status_internal for item in wl_result.scalars().all()}
+    watchlist_map = {str(item.kd_tender): item for item in wl_result.scalars().all()}
 
     async def enrich_one(t):
         nama = t.get("nama") or t.get("nama_paket") or ""
@@ -47,9 +47,12 @@ async def search_tenders(
 
         kd_tender = str(t_enriched.get("kd_tender") or t_enriched.get("id"))
         
-        # Overlay internal status from DB
+        # Overlay internal status and notes from DB
         if kd_tender in watchlist_map:
-            t_enriched["internalStatus"] = watchlist_map[kd_tender]
+            wl_item = watchlist_map[kd_tender]
+            t_enriched["internalStatus"] = wl_item.status_internal
+            t_enriched["catatan_internal"] = wl_item.catatan_internal
+            t_enriched["assigned_expert_ids"] = wl_item.assigned_expert_ids
 
         if kd_tender and not t_enriched.get("jadwalTahapan"):
             try:
