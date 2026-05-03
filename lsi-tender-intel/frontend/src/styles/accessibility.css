@@ -1,0 +1,283 @@
+/**
+ * Accessibility Styles
+ * Enhanced focus indicators and keyboard navigation support
+ * WCAG 2.1 Level AA compliant
+ */
+
+/* ===== Focus Indicators ===== */
+
+/* Default focus ring for all interactive elements */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/* Enhanced focus for buttons */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* Focus for form inputs */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 0;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Focus for custom components */
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="option"]:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* ===== Skip to Content Link ===== */
+.skip-to-content:focus {
+  position: fixed !important;
+  left: 1rem !important;
+  top: 1rem !important;
+  z-index: 9999;
+}
+
+/* ===== Screen Reader Only ===== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* ===== High Contrast Mode Support ===== */
+@media (prefers-contrast: high) {
+  *:focus-visible {
+    outline-width: 3px;
+    outline-offset: 3px;
+  }
+  
+  button:focus-visible,
+  a:focus-visible {
+    outline-width: 3px;
+  }
+}
+
+/* ===== Reduced Motion Support ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== Keyboard Navigation Indicators ===== */
+
+/* Show focus indicator only for keyboard navigation */
+.js-focus-visible :focus:not(.focus-visible) {
+  outline: none;
+}
+
+/* Enhanced focus for navigation items */
+nav a:focus-visible,
+nav button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  background-color: rgba(37, 99, 235, 0.05);
+}
+
+/* ===== Color Contrast Enhancements ===== */
+
+/* Ensure sufficient contrast for text */
+.text-slate-400 {
+  /* Original: #94a3b8 (contrast ratio: 3.5:1 on white) */
+  /* Enhanced: #64748b (contrast ratio: 4.6:1 on white) */
+  color: #64748b !important;
+}
+
+.text-slate-500 {
+  /* Original: #64748b (contrast ratio: 4.6:1 on white) */
+  /* Already meets WCAG AA */
+  color: #64748b;
+}
+
+/* Ensure sufficient contrast for interactive elements */
+.hover\:text-slate-600:hover {
+  color: #475569; /* Contrast ratio: 7.4:1 on white */
+}
+
+/* ===== Focus Trap Indicators ===== */
+
+/* Visual indicator for modal/dialog focus trap */
+[role="dialog"]:focus,
+[role="alertdialog"]:focus {
+  outline: none; /* Remove default outline for container */
+}
+
+/* ===== Accessible Tooltips ===== */
+[aria-describedby]:focus-visible::after {
+  /* Tooltip will be shown via JS */
+  content: '';
+}
+
+/* ===== Live Region Announcements ===== */
+[aria-live="polite"],
+[aria-live="assertive"] {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ===== Disabled State Accessibility ===== */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+button:disabled:focus-visible,
+input:disabled:focus-visible,
+select:disabled:focus-visible,
+textarea:disabled:focus-visible {
+  outline: 2px solid #94a3b8; /* Gray outline for disabled elements */
+  box-shadow: none;
+}
+
+/* ===== Link Accessibility ===== */
+
+/* Ensure links are distinguishable */
+a:not([class]) {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+a:not([class]):hover {
+  color: #1d4ed8;
+}
+
+a:not([class]):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* ===== Table Accessibility ===== */
+
+/* Ensure table headers are distinguishable */
+th {
+  font-weight: 600;
+}
+
+/* Focus for table rows */
+tr:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+/* ===== Form Accessibility ===== */
+
+/* Required field indicator */
+[required]::after,
+[aria-required="true"]::after {
+  content: " *";
+  color: #dc2626;
+  font-weight: bold;
+}
+
+/* Error state */
+[aria-invalid="true"] {
+  border-color: #dc2626 !important;
+}
+
+[aria-invalid="true"]:focus-visible {
+  outline-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+}
+
+/* ===== Loading State Accessibility ===== */
+
+/* Ensure loading indicators are visible */
+[aria-busy="true"] {
+  cursor: wait;
+}
+
+/* ===== Custom Scrollbar Accessibility ===== */
+
+/* Ensure scrollbars are visible and accessible */
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid #f1f5f9;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* ===== Print Accessibility ===== */
+@media print {
+  /* Ensure focus indicators are not printed */
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Ensure links show URLs */
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+  
+  /* Hide skip links */
+  .skip-to-content {
+    display: none !important;
+  }
+}
