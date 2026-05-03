@@ -2,7 +2,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 
-# SQLite needs check_same_thread=False; PostgreSQL uses pool settings
 is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 
 if is_sqlite:
@@ -12,7 +11,8 @@ if is_sqlite:
         connect_args={"check_same_thread": False},
     )
 else:
-    # Supabase pgbouncer (port 6543) requires disabling prepared statements entirely
+    # For Supabase: use direct connection (port 5432) with SSL
+    # Add ssl=require via connect_args for asyncpg
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
@@ -20,10 +20,10 @@ else:
         pool_size=5,
         max_overflow=10,
         connect_args={
+            "ssl": "require",
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0,
         },
-        execution_options={"no_parameters": True},
     )
 
 AsyncSessionLocal = async_sessionmaker(
