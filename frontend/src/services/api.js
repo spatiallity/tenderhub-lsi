@@ -2,10 +2,43 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
-  timeout: 15000,
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Retry logic: retry up to 3 times on 429 or network errors
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000; // 2 seconds between retries
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+api.interceptors.response.use(
+  response => response,
+  async (error) => {
+    const config = error.config;
+
+    // Initialize retry count
+    if (!config._retryCount) config._retryCount = 0;
+
+    const isRateLimit = error.response?.status === 429;
+    const isServerError = error.response?.status >= 500;
+    const isNetworkError = !error.response;
+
+    const shouldRetry = (isRateLimit || isServerError || isNetworkError) && config._retryCount < MAX_RETRIES;
+
+    if (shouldRetry) {
+      config._retryCount += 1;
+      // Exponential backoff: 2s, 4s, 8s
+      const delay = RETRY_DELAY_MS * Math.pow(2, config._retryCount - 1);
+      console.warn(`API ${error.response?.status || 'network error'} — retrying (${config._retryCount}/${MAX_RETRIES}) in ${delay}ms...`);
+      await sleep(delay);
+      return api(config);
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default api;
