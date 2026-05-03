@@ -60,10 +60,25 @@ export const AppProvider = ({ children }) => {
   const [loadingExperts, setLoadingExperts] = useState(true);
 
   // Internal state (like mockup)
-  const [internalStatuses, setInternalStatuses] = useState({});
-  const [tenderNotes, setTenderNotes] = useState({});
+  const [internalStatuses, setInternalStatuses] = useState(() => {
+    try {
+      const stored = localStorage.getItem('lsi-internal-statuses');
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  });
+  const [tenderNotes, setTenderNotes] = useState(() => {
+    try {
+      const stored = localStorage.getItem('lsi-tender-notes');
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  });
   const [noteSaved, setNoteSaved] = useState({});
-  const [assignedPICs, setAssignedPICs] = useState({});
+  const [assignedPICs, setAssignedPICs] = useState(() => {
+    try {
+      const stored = localStorage.getItem('lsi-assigned-pics');
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  });
   const [expertCVs, setExpertCVs] = useState({});
   const [users, setUsers] = useState(DEFAULT_USERS);
   const [notifications, setNotifications] = useState({ baru: true, deadline: true, status: true, ta: true });
@@ -104,33 +119,47 @@ export const AppProvider = ({ children }) => {
     api.get('/tender/search', { params: { limit: 200 } })
       .then(res => {
         setTendersRaw(res.data || []);
-        // Initialize internalStatuses — normalize won/followed flags
+        // Merge API statuses with localStorage — localStorage takes priority (user changes)
+        const localStatuses = (() => {
+          try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
+        })();
+        const localNotes = (() => {
+          try { return JSON.parse(localStorage.getItem('lsi-tender-notes') || '{}'); } catch { return {}; }
+        })();
+        
         const statusMap = {};
         const notesMap = {};
         (res.data || []).forEach(t => {
-          t.id = t.kd_tender || t.id; // Prioritize kd_tender for persistence consistency
+          t.id = t.kd_tender || t.id;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = s;
+          // localStorage overrides API (user's local changes take priority)
+          statusMap[t.id] = localStatuses[t.id] || s;
           if (t.catatan_internal) {
             try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
           }
+          // localStorage notes override API notes
+          if (localNotes[t.id]) notesMap[t.id] = localNotes[t.id];
         });
-        setInternalStatuses(statusMap);
-        setTenderNotes(notesMap);
+        setInternalStatuses(prev => ({ ...statusMap, ...localStatuses }));
+        setTenderNotes(prev => ({ ...notesMap, ...localNotes }));
       })
       .catch(() => {
         setTendersRaw(FALLBACK_TENDERS);
+        // Load statuses from localStorage, fallback to dummy data defaults
+        const localStatuses = (() => {
+          try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
+        })();
         const statusMap = {};
         FALLBACK_TENDERS.forEach(t => {
           t.id = t.id || t.kd_tender;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = s;
+          statusMap[t.id] = localStatuses[t.id] || s;
         });
-        setInternalStatuses(statusMap);
+        setInternalStatuses(prev => ({ ...statusMap, ...localStatuses }));
         showToast('API tender belum tersambung. Dummy tender lokal dimuat.', 'error');
       })
       .finally(() => setLoadingTenders(false));
@@ -198,12 +227,44 @@ export const AppProvider = ({ children }) => {
     if (expertsRaw.length > 0) {
       try {
         localStorage.setItem('lsi-experts-local', JSON.stringify(expertsRaw));
-        console.log('Saved experts to localStorage:', expertsRaw.length);
       } catch (err) {
         console.error('Failed to save experts to localStorage:', err);
       }
     }
   }, [expertsRaw]);
+
+  // Save internalStatuses to localStorage
+  useEffect(() => {
+    try {
+      if (Object.keys(internalStatuses).length > 0) {
+        localStorage.setItem('lsi-internal-statuses', JSON.stringify(internalStatuses));
+      }
+    } catch (err) {
+      console.error('Failed to save internalStatuses to localStorage:', err);
+    }
+  }, [internalStatuses]);
+
+  // Save tenderNotes to localStorage
+  useEffect(() => {
+    try {
+      if (Object.keys(tenderNotes).length > 0) {
+        localStorage.setItem('lsi-tender-notes', JSON.stringify(tenderNotes));
+      }
+    } catch (err) {
+      console.error('Failed to save tenderNotes to localStorage:', err);
+    }
+  }, [tenderNotes]);
+
+  // Save assignedPICs to localStorage
+  useEffect(() => {
+    try {
+      if (Object.keys(assignedPICs).length > 0) {
+        localStorage.setItem('lsi-assigned-pics', JSON.stringify(assignedPICs));
+      }
+    } catch (err) {
+      console.error('Failed to save assignedPICs to localStorage:', err);
+    }
+  }, [assignedPICs]);
 
   // Phase 1: Heavy enrichment (relevance, stages, deadlines) — only re-runs when raw data or keywords change
   const tendersEnriched = useMemo(() =>
