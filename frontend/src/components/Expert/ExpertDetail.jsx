@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Save, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Save, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import { Badge, Stars, Btn, Card } from '../UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../../utils/constants';
 import { formatRupiah, initials } from '../../utils/helpers';
@@ -9,7 +9,7 @@ export default function ExpertDetail({ expert }) {
   const {
     reviewDraft, setReviewDraft, addReview,
     historyDraft, setHistoryDraft, addHistory,
-    updateExpertProfile
+    updateExpertProfile, deleteExpert, deleteExpertHistory
   } = useAppContext();
 
   if (!expert) return null;
@@ -163,6 +163,7 @@ export default function ExpertDetail({ expert }) {
                 <th className="bg-slate-50/50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-2 whitespace-nowrap">Peran</th>
                 <th className="bg-slate-50/50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-2 whitespace-nowrap">Bersama</th>
                 <th className="bg-slate-50/50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>
+                <th className="bg-slate-50/50 text-slate-500 px-3 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -175,6 +176,13 @@ export default function ExpertDetail({ expert }) {
                   <td className="text-xs px-3 py-2.5">{h.peran}</td>
                   <td className="px-3 py-2.5"><Badge color={h.bersama === 'Sucofindo' ? 'blue' : 'gray'}>{h.bersama}</Badge></td>
                   <td className="px-3 py-2.5"><Badge color="green">{h.status}</Badge></td>
+                  <td className="px-3 py-2.5">
+                    <button 
+                      onClick={() => { if (window.confirm("Hapus riwayat ini?")) deleteExpertHistory(expert.id, h.id); }}
+                      className="text-red-400 hover:text-red-600 transition-colors" title="Hapus riwayat">
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -230,6 +238,16 @@ export default function ExpertDetail({ expert }) {
             </Btn>
           </div>
         </div>
+      </div>
+
+      {/* Delete Expert */}
+      <div className="mt-4 border-t border-red-100 pt-4">
+        <button 
+          onClick={() => { if (window.confirm("Apakah anda yakin ingin menghapus tenaga ahli ini secara permanen?")) deleteExpert(expert.id); }}
+          className="w-full py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-extrabold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+        >
+          <Trash2 size={16} /> Hapus Tenaga Ahli
+        </button>
       </div>
 
     </div>

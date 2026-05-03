@@ -8,7 +8,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 
 export default function TenderDetail({ tender }) {
   const {
-    tenderNotes, setTenderNotes,
+    tenderNotes, setTenderNotes, addTenderNote,
     noteSaved, setNoteSaved,
     internalStatuses, updateTenderStatus,
     assignedPICs, setAssignedPICs,
@@ -45,15 +45,8 @@ export default function TenderDetail({ tender }) {
     const dateStr = now.toLocaleDateString('id-ID');
     const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     
-    setTenderNotes(prev => ({
-      ...prev,
-      [tender.id]: [
-        ...(prev[tender.id] || []),
-        { author: 'Admin LSI', content: newNote, date: dateStr, time: timeStr }
-      ]
-    }));
+    addTenderNote(tender.id, { author: 'Admin LSI', content: newNote, date: dateStr, time: timeStr });
     setNewNote('');
-    showToast('Catatan ditambahkan');
   };
 
   return (

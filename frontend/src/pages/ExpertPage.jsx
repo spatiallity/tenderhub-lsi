@@ -97,6 +97,9 @@ export default function ExpertPage() {
               <select className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" value={draft.availability} onChange={e => setDraft(p => ({ ...p, availability: e.target.value }))}>
                 <option>Tersedia</option><option>Sedang Bertugas</option><option>Tidak Tersedia</option>
               </select>
+              <select className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" value={draft.portfolio} onChange={e => setDraft(p => ({ ...p, portfolio: e.target.value }))}>
+                <option value="SDA">SDA</option><option value="FLP">FLP</option><option value="FITI">FITI</option>
+              </select>
               
               <div className="mt-2 pt-2 border-t border-slate-100">
                 <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Riwayat Pekerjaan Terakhir</div>
@@ -128,13 +131,14 @@ export default function ExpertPage() {
                   keahlian: draft.keahlian.split(',').map(s => s.trim()).filter(Boolean),
                   history
                 };
-                await addExpert(newExpert);
-                setDraft({ 
-                  nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
-                  historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
-                });
-                setShowForm(false);
-                showToast('Data tenaga ahli berhasil tersimpan');
+                const success = await addExpert(newExpert);
+                if (success) {
+                  setDraft({ 
+                    nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
+                    historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
+                  });
+                  setShowForm(false);
+                }
               }}>Simpan</Btn>
             </div>
           </div>
