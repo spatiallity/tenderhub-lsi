@@ -35,12 +35,22 @@ async def search_tenders(
     # Get from INAPROC
     tenders = await inaproc_service.get_tenders({"limit": limit})
 
+    # Fetch watchlist to overlay internal statuses
+    from app.models.watchlist import TenderWatchlist
+    wl_result = await db.execute(select(TenderWatchlist))
+    watchlist_map = {str(item.kd_tender): item.status_internal for item in wl_result.scalars().all()}
+
     async def enrich_one(t):
         nama = t.get("nama") or t.get("nama_paket") or ""
         rel = calculate_relevance(nama, keywords)
         t_enriched = {**t, **rel}
 
-        kd_tender = t_enriched.get("kd_tender") or t_enriched.get("id")
+        kd_tender = str(t_enriched.get("kd_tender") or t_enriched.get("id"))
+        
+        # Overlay internal status from DB
+        if kd_tender in watchlist_map:
+            t_enriched["internalStatus"] = watchlist_map[kd_tender]
+
         if kd_tender and not t_enriched.get("jadwalTahapan"):
             try:
                 jadwal = await inaproc_service.get_tender_jadwal(int(kd_tender))

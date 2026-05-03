@@ -203,6 +203,26 @@ export const AppProvider = ({ children }) => {
     });
   }, []);
 
+  const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
+    // 1. Update UI state immediately for responsiveness
+    setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
+    
+    // 2. Persist to Backend
+    const tender = tenders.find(t => t.id === tenderId);
+    try {
+      await api.post('/watchlist', {
+        kd_tender: parseInt(tenderId),
+        status_internal: newStatus,
+        nama_paket: tender?.nama || tender?.nama_paket,
+        hps: tender?.hps
+      });
+      showToast(`Status tender diperbarui menjadi ${newStatus}`);
+    } catch (e) {
+      console.error("Failed to sync status to database", e);
+      showToast("Gagal menyimpan status ke database, data hanya tersimpan sementara.", "error");
+    }
+  }, [tenders, showToast]);
+
   const openTender = useCallback((id) => {
     markTenderOpened(id);
     setSelectedTenderId(id);
@@ -362,7 +382,7 @@ export const AppProvider = ({ children }) => {
     // Keywords
     keywords, setKeywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
     // Internal state
-    internalStatuses, setInternalStatuses,
+    internalStatuses, updateTenderStatus,
     tenderNotes, setTenderNotes,
     noteSaved, setNoteSaved,
     assignedPICs, setAssignedPICs,
@@ -397,7 +417,7 @@ export const AppProvider = ({ children }) => {
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,
     keywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
-    internalStatuses, tenderNotes, noteSaved, assignedPICs, expertCVs,
+    internalStatuses, updateTenderStatus, tenderNotes, setTenderNotes,
     users, addUser, updateUser, deleteUser,
     notifications, coverage, hpsThreshold,
     selectedTenderId, selectedExpertId, selectedRupId,
