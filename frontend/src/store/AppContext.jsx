@@ -93,6 +93,7 @@ export const AppProvider = ({ children }) => {
         const statusMap = {};
         const notesMap = {};
         (res.data || []).forEach(t => {
+          t.id = t.id || t.kd_tender;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
@@ -108,6 +109,7 @@ export const AppProvider = ({ children }) => {
         setTendersRaw(FALLBACK_TENDERS);
         const statusMap = {};
         FALLBACK_TENDERS.forEach(t => {
+          t.id = t.id || t.kd_tender;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
@@ -293,8 +295,8 @@ export const AppProvider = ({ children }) => {
     const keahlianRaw = Array.isArray(draft.keahlian) ? draft.keahlian : (typeof draft.keahlian === 'string' ? draft.keahlian.split(',') : []);
     const keahlianClean = keahlianRaw.filter(Boolean).map(s => String(s).trim()).filter(Boolean);
     
-    if (!draft.nama?.trim() || keahlianClean.length === 0) {
-      showToast('Nama dan keahlian wajib diisi', 'error');
+    if (!draft.nama?.trim()) {
+      showToast('Nama tenaga ahli wajib diisi', 'error');
       return false;
     }
     
@@ -308,13 +310,38 @@ export const AppProvider = ({ children }) => {
     };
     try {
       const res = await api.post('/experts', body);
+      
+      let historyFromApi = [];
+      let jumlahProyek = 0;
+      if (draft.history && draft.history.length > 0) {
+        for (const h of draft.history) {
+          try {
+            const pres = await api.post(`/experts/${res.data.id}/projects`, {
+              nama_proyek: h.proyek,
+              pemberi_kerja: h.klien,
+              tahun: h.tahun || new Date().getFullYear(),
+              nilai_proyek: Number(h.nilai || 0),
+              peran: h.peran || 'Tenaga Ahli',
+              bersama: h.bersama,
+              status_proyek: h.status || 'Selesai'
+            });
+            historyFromApi.push({
+               id: pres.data.id, proyek: pres.data.nama_proyek, klien: pres.data.pemberi_kerja, 
+               tahun: pres.data.tahun, peran: pres.data.peran, nilai: pres.data.nilai_proyek, 
+               bersama: pres.data.bersama, status: pres.data.status_proyek
+            });
+            jumlahProyek++;
+          } catch(err) { console.error("Failed to add project history", err); }
+        }
+      }
+
       const newExpert = {
         ...res.data,
         noHp: res.data.no_hp || '',
         portofolio: res.data.subporto || [],
         rating: res.data.rating_avg || 0,
-        proyek: res.data.jumlah_proyek || 0,
-        history: [],
+        proyek: res.data.jumlah_proyek + jumlahProyek,
+        history: historyFromApi,
         reviews: [],
       };
       setExpertsRaw(prev => [...prev, newExpert]);
@@ -322,7 +349,7 @@ export const AppProvider = ({ children }) => {
       return true;
     } catch (e) {
       console.error('Failed to create expert:', e);
-      const fallbackExpert = { ...body, id: Date.now(), noHp: draft.noHp || '', portofolio: body.subporto, rating: 0, proyek: 0, history: [], reviews: [], keahlian: keahlianClean };
+      const fallbackExpert = { ...body, id: Date.now(), noHp: draft.noHp || '', portofolio: body.subporto, rating: 0, proyek: draft.history?.length || 0, history: draft.history || [], reviews: [], keahlian: keahlianClean };
       setExpertsRaw(prev => [...prev, fallbackExpert]);
       showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'error');
       return true;
@@ -330,7 +357,7 @@ export const AppProvider = ({ children }) => {
   }, [showToast]);
 
   const updateExpertName = useCallback((expertId, nama) => {
-    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { ...e, nama } : e));
+    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? { ...e, nama } : e));
   }, [showToast]);
 
   const updateExpertProfile = useCallback(async (expertId, patch) => {
@@ -344,21 +371,22 @@ export const AppProvider = ({ children }) => {
     } catch {
       // Keep local fallback update when API is unavailable.
     }
-    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { ...e, nama: safePatch.nama, noHp: patch?.noHp?.trim(), instansi: safePatch.instansi } : e));
+    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? { ...e, nama: safePatch.nama, noHp: patch?.noHp?.trim(), instansi: safePatch.instansi } : e));
     showToast('Profil tenaga ahli berhasil diperbarui');
   }, [showToast]);
 
   const deleteExpert = useCallback(async (expertId) => {
     try {
       await api.delete(`/experts/${expertId}`);
-      setExpertsRaw(prev => prev.filter(e => e.id !== expertId));
-      setSelectedExpertId(prev => prev === expertId ? null : prev);
+      setExpertsRaw(prev => prev.filter(e => String(e.id) !== String(expertId)));
+      setSelectedExpertId(null);
       showToast('Tenaga ahli dihapus');
     } catch {
-      setExpertsRaw(prev => prev.filter(e => e.id !== expertId));
-      setSelectedExpertId(prev => prev === expertId ? null : prev);
+      setExpertsRaw(prev => prev.filter(e => String(e.id) !== String(expertId)));
+      setSelectedExpertId(null);
+      showToast('Gagal terhubung API. Dihapus dari tampilan lokal.', 'warning');
     }
-  }, []);
+  }, [showToast, setSelectedExpertId]);
 
   const addReview = useCallback(async (expertId) => {
     if (!reviewDraft.reviewer.trim() || !reviewDraft.komentar.trim()) return;
@@ -369,7 +397,7 @@ export const AppProvider = ({ children }) => {
         komentar: reviewDraft.komentar
       });
       const newReview = { id: res.data.id, reviewer: res.data.reviewer_nama, rating: res.data.rating, komentar: res.data.komentar, tanggal: new Date().toLocaleDateString('id-ID') };
-      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+      setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
         ...e,
         reviews: [...(e.reviews || []), newReview],
         rating: Number(((e.rating * (e.reviews || []).length + reviewDraft.rating) / ((e.reviews || []).length + 1)).toFixed(1))
@@ -394,7 +422,7 @@ export const AppProvider = ({ children }) => {
         status_proyek: 'Selesai'
       });
       const newProject = { id: res.data.id, proyek: res.data.nama_proyek, klien: res.data.pemberi_kerja, tahun: res.data.tahun, peran: res.data.peran, nilai: res.data.nilai_proyek, bersama: res.data.bersama, status: res.data.status_proyek };
-      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+      setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
         ...e,
         history: [...(e.history || []), newProject],
         proyek: (e.proyek || 0) + 1
@@ -409,8 +437,8 @@ export const AppProvider = ({ children }) => {
   const deleteExpertHistory = useCallback(async (expertId, projectId) => {
     try {
       await api.delete(`/experts/${expertId}/projects/${projectId}`);
-      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
-        ...e, history: (e.history || []).filter(h => h.id !== projectId)
+      setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+        ...e, history: (e.history || []).filter(h => String(h.id) !== String(projectId))
       } : e));
       showToast('Riwayat berhasil dihapus');
     } catch (e) {
@@ -460,7 +488,7 @@ export const AppProvider = ({ children }) => {
     keywords, setKeywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
     // Internal state
     internalStatuses, updateTenderStatus,
-    tenderNotes, setTenderNotes,
+    tenderNotes, setTenderNotes, addTenderNote,
     noteSaved, setNoteSaved,
     assignedPICs, setAssignedPICs,
     expertCVs, setExpertCVs,

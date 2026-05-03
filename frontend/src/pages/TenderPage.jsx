@@ -22,7 +22,7 @@ export default function TenderPage() {
   const {
     tenders, keywords, loadingTenders,
     addKeyword, removeKeyword,
-    internalStatuses, setInternalStatuses, setSelectedTenderId,
+    internalStatuses, setInternalStatuses, updateTenderStatus, setSelectedTenderId,
     hpsThreshold,
     setShowKeywordManager,
     newTenderIds,
@@ -418,7 +418,7 @@ export default function TenderPage() {
                       <td className="px-3 py-3 align-top">
                         <select
                           value={internalStatuses[t.id] || 'Dipantau'}
-                          onChange={e => setInternalStatuses(prev => ({ ...prev, [t.id]: e.target.value }))}
+                          onChange={e => updateTenderStatus(t.id, e.target.value)}
                           onClick={e => e.stopPropagation()}
                           className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold cursor-pointer outline-none focus:ring-2 focus:ring-blue-200 transition-colors ${
                             {
