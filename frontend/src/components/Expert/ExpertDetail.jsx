@@ -178,7 +178,7 @@ export default function ExpertDetail({ expert }) {
                   <td className="px-3 py-2.5"><Badge color="green">{h.status}</Badge></td>
                   <td className="px-3 py-2.5">
                     <button 
-                      onClick={() => { if (window.confirm("Hapus riwayat ini?")) deleteExpertHistory(expert.id, h.id); }}
+                      onClick={() => deleteExpertHistory(expert.id, h.id)}
                       className="text-red-400 hover:text-red-600 transition-colors" title="Hapus riwayat">
                       <Trash2 size={14} />
                     </button>
@@ -243,7 +243,11 @@ export default function ExpertDetail({ expert }) {
       {/* Delete Expert */}
       <div className="mt-4 border-t border-red-100 pt-4">
         <button 
-          onClick={() => { if (window.confirm("Apakah anda yakin ingin menghapus tenaga ahli ini secara permanen?")) deleteExpert(expert.id); }}
+          onClick={async () => {
+            if (window.confirm(`Apakah Anda yakin ingin menghapus ${expert.nama}?`)) {
+              await deleteExpert(expert.id);
+            }
+          }}
           className="w-full py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-extrabold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
         >
           <Trash2 size={16} /> Hapus Tenaga Ahli

@@ -11,7 +11,7 @@ export default function TenderDetail({ tender }) {
     tenderNotes, setTenderNotes, addTenderNote,
     noteSaved, setNoteSaved,
     internalStatuses, updateTenderStatus,
-    assignedPICs, setAssignedPICs,
+    assignedPICs, updateTenderPIC,
     users, showToast
   } = useAppContext();
 
@@ -21,7 +21,7 @@ export default function TenderDetail({ tender }) {
   const status = internalStatuses[tender.id] || tender.internalStatus || 'Dipantau';
   const setStatus = (val) => updateTenderStatus(tender.id, val);
   const assignedPIC = assignedPICs[tender.id] || '';
-  const assignPIC = (userId) => setAssignedPICs(prev => ({ ...prev, [tender.id]: userId }));
+  const assignPIC = (userId) => updateTenderPIC(tender.id, userId);
 
   // Removed auto-save logic as we now use an array of explicit notes
 
