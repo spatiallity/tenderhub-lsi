@@ -12,12 +12,18 @@ if is_sqlite:
         connect_args={"check_same_thread": False},
     )
 else:
+    # Supabase uses pgbouncer with transaction pooling mode
+    # Must set statement_cache_size=0 to disable prepared statements
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
         pool_size=5,
         max_overflow=10,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        },
     )
 
 AsyncSessionLocal = async_sessionmaker(
