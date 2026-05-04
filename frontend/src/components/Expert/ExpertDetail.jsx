@@ -17,6 +17,8 @@ export default function ExpertDetail({ expert }) {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileDraft, setProfileDraft] = useState({ nama: '', noHp: '', instansi: '' });
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isSavingReview, setIsSavingReview] = useState(false);
+  const [isSavingHistory, setIsSavingHistory] = useState(false);
 
   useEffect(() => {
     setProfileDraft({
@@ -202,8 +204,20 @@ export default function ExpertDetail({ expert }) {
               <option>Sucofindo</option><option>Lain</option>
             </select>
           </div>
-          <Btn className="primary small mt-3" onClick={() => addHistory(expert.id)}>
-            <Plus size={14} />Simpan Riwayat
+          <Btn 
+            className="primary small mt-3" 
+            onClick={async () => {
+              if (isSavingHistory) return;
+              setIsSavingHistory(true);
+              try {
+                await addHistory(expert.id);
+              } finally {
+                setIsSavingHistory(false);
+              }
+            }}
+            disabled={isSavingHistory}
+          >
+            <Plus size={14} />{isSavingHistory ? 'Menyimpan...' : 'Simpan Riwayat'}
           </Btn>
         </div>
       </div>
@@ -233,8 +247,20 @@ export default function ExpertDetail({ expert }) {
             <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama reviewer" value={reviewDraft.reviewer} onChange={e => setReviewDraft(p => ({ ...p, reviewer: e.target.value }))} />
             <Stars rating={reviewDraft.rating} size={22} onRate={(rating) => setReviewDraft(p => ({ ...p, rating }))} />
             <textarea className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none min-h-[76px] resize-y" placeholder="Komentar review..." value={reviewDraft.komentar} onChange={e => setReviewDraft(p => ({ ...p, komentar: e.target.value }))} />
-            <Btn className="primary small self-start" onClick={() => addReview(expert.id)}>
-              <Save size={14} />Simpan Review
+            <Btn 
+              className="primary small self-start" 
+              onClick={async () => {
+                if (isSavingReview) return;
+                setIsSavingReview(true);
+                try {
+                  await addReview(expert.id);
+                } finally {
+                  setIsSavingReview(false);
+                }
+              }}
+              disabled={isSavingReview}
+            >
+              <Save size={14} />{isSavingReview ? 'Menyimpan...' : 'Simpan Review'}
             </Btn>
           </div>
         </div>

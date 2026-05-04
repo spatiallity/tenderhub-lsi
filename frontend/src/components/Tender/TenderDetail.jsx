@@ -17,9 +17,19 @@ export default function TenderDetail({ tender }) {
 
   if (!tender) return null;
 
+  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+  const [isSavingNote, setIsSavingNote] = React.useState(false);
 
   const status = internalStatuses[tender.id] || tender.internalStatus || 'Dipantau';
-  const setStatus = (val) => updateTenderStatus(tender.id, val);
+  const setStatus = async (val) => {
+    if (isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    try {
+      await updateTenderStatus(tender.id, val);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
   const assignedPIC = assignedPICs[tender.id] || '';
   const assignPIC = (userId) => updateTenderPIC(tender.id, userId);
 
@@ -39,14 +49,24 @@ export default function TenderDetail({ tender }) {
   const notes = tenderNotes[tender.id] || [];
   const [newNote, setNewNote] = React.useState('');
   
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('id-ID');
-    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const handleAddNote = async () => {
+    if (!newNote.trim()) {
+      showToast('Catatan tidak boleh kosong', 'error');
+      return;
+    }
+    if (isSavingNote) return;
     
-    addTenderNote(tender.id, { author: 'Admin LSI', content: newNote, date: dateStr, time: timeStr });
-    setNewNote('');
+    setIsSavingNote(true);
+    try {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('id-ID');
+      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      
+      await addTenderNote(tender.id, { author: 'Admin LSI', content: newNote, date: dateStr, time: timeStr });
+      setNewNote('');
+    } finally {
+      setIsSavingNote(false);
+    }
   };
 
   return (
@@ -223,8 +243,9 @@ export default function TenderDetail({ tender }) {
         </div>
         <select 
           value={status} 
-          onChange={e => setStatus(e.target.value)} 
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none mb-3"
+          onChange={e => setStatus(e.target.value)}
+          disabled={isUpdatingStatus}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'].map(s => {
             const isDisabled = s === 'Menang' && !isWinnerAnnouncementReached;
@@ -261,12 +282,17 @@ export default function TenderDetail({ tender }) {
         <textarea
           value={newNote}
           onChange={e => setNewNote(e.target.value)}
+          disabled={isSavingNote}
           placeholder="Tulis catatan koordinasi, kebutuhan dokumen..."
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none resize-y min-h-[60px]"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none resize-y min-h-[60px] disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <div className="flex mt-2 justify-end">
-          <Btn className="primary small" onClick={handleAddNote}>
-            <Save size={14} />Tambah Catatan
+          <Btn 
+            className="primary small" 
+            onClick={handleAddNote}
+            disabled={isSavingNote || !newNote.trim()}
+          >
+            <Save size={14} />{isSavingNote ? 'Menyimpan...' : 'Tambah Catatan'}
           </Btn>
         </div>
       </div>

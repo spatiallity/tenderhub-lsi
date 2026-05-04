@@ -14,6 +14,7 @@ export default function ExpertPage() {
   const [showForm, setShowForm] = useState(false);
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
+  const [isSaving, setIsSaving] = useState(false);
   const [draft, setDraft] = useState({ 
     nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
     historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
@@ -112,53 +113,64 @@ export default function ExpertPage() {
               </div>
             </div>
             <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
-              <Btn className="ghost" onClick={() => setShowForm(false)}>Batal</Btn>
-              <Btn className="primary" onClick={async () => {
-                try {
-                  const history = [];
-                  if (draft.historyProyek) {
-                    history.push({
-                      proyek: draft.historyProyek,
-                      klien: draft.historyKlien,
-                      tahun: draft.historyTahun,
-                      peran: draft.historyPeran,
-                      nilai: 0,
-                      bersama: 'Sucofindo',
-                      status: 'Selesai'
-                    });
-                  }
+              <Btn className="ghost" onClick={() => setShowForm(false)} disabled={isSaving}>Batal</Btn>
+              <Btn 
+                className="primary" 
+                disabled={isSaving}
+                onClick={async () => {
+                  if (isSaving) return; // Prevent double-click
                   
-                  const newExpert = {
-                    ...draft,
-                    keahlian: draft.keahlian.split(',').map(s => s.trim()).filter(Boolean),
-                    history
-                  };
-                  
-                  console.log('Submitting expert:', newExpert);
-                  const success = await addExpert(newExpert);
-                  console.log('Add expert result:', success);
-                  
-                  if (success) {
-                    // Reset form
-                    setDraft({ 
-                      nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
-                      historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
-                    });
+                  setIsSaving(true);
+                  try {
+                    const history = [];
+                    if (draft.historyProyek) {
+                      history.push({
+                        proyek: draft.historyProyek,
+                        klien: draft.historyKlien,
+                        tahun: draft.historyTahun,
+                        peran: draft.historyPeran,
+                        nilai: 0,
+                        bersama: 'Sucofindo',
+                        status: 'Selesai'
+                      });
+                    }
                     
-                    // Reset filters to show new expert
-                    setExpertSearch('');
-                    setAvailFilter('Semua');
-                    setPortFilter('Semua');
-                    setSortKey('');
+                    const newExpert = {
+                      ...draft,
+                      keahlian: draft.keahlian.split(',').map(s => s.trim()).filter(Boolean),
+                      history
+                    };
                     
-                    // Close form
-                    setShowForm(false);
+                    console.log('Submitting expert:', newExpert);
+                    const success = await addExpert(newExpert);
+                    console.log('Add expert result:', success);
+                    
+                    if (success) {
+                      // Reset form
+                      setDraft({ 
+                        nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
+                        historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
+                      });
+                      
+                      // Reset filters to show new expert
+                      setExpertSearch('');
+                      setAvailFilter('Semua');
+                      setPortFilter('Semua');
+                      setSortKey('');
+                      
+                      // Close form
+                      setShowForm(false);
+                    }
+                  } catch (error) {
+                    console.error('Error adding expert:', error);
+                    showToast('Terjadi kesalahan saat menambah tenaga ahli', 'error');
+                  } finally {
+                    setIsSaving(false);
                   }
-                } catch (error) {
-                  console.error('Error adding expert:', error);
-                  showToast('Terjadi kesalahan saat menambah tenaga ahli', 'error');
-                }
-              }}>Simpan</Btn>
+                }}
+              >
+                {isSaving ? 'Menyimpan...' : 'Simpan'}
+              </Btn>
             </div>
           </div>
         </div>
