@@ -228,19 +228,16 @@ export const enrichTender = (tender, keywords, internalStatuses = {}) => {
   const relevance = calcRelevance(tender, keywords);
   const stages = getStages(tender.metode);
   
-  const dynamicStage = getCurrentStageFromSchedule(tender, stages);
-  
-  // Use dynamicStage if available, otherwise fallback to tender.currentStage
-  const currentStage = dynamicStage ? dynamicStage.stageNo : Math.max(1, Math.min(tender.currentStage || 1, stages.length));
-  const currentStageName = dynamicStage ? dynamicStage.stageName : (stages[currentStage - 1]?.[0] || 'Unknown Stage');
+  // Use currentStage from backend data (already calculated correctly)
+  const currentStage = Math.max(1, Math.min(tender.currentStage || 1, stages.length));
+  const currentStageName = stages[currentStage - 1]?.[0] || 'Unknown Stage';
   const currentStageColor = stages[currentStage - 1]?.[1] || 'gray';
-  
   const submitGateStage = submitGateStageByMethod(tender.metode);
   const submitGateStageName = stages[submitGateStage - 1]?.[0] || '';
 
-  // Deadline: prioritize dynamic endDate from schedule, fallback to explicit fields
+  // Deadline: use currentStageDeadline or deadlineStage from backend
+  // Fallback to schedule if consolidated fields are missing (common for real data)
   const currentStageDeadline =
-    dynamicStage?.endDate ||
     tender.currentStageDeadline ||
     tender.deadlineCurrentStage ||
     tender.tgl_akhir_tahap_berjalan ||

@@ -78,19 +78,8 @@ async def seed_data():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    try:
-        await create_tables()
-        await seed_data()
-        print("INFO: Database initialized successfully.")
-    except Exception as e:
-        print(f"WARNING: Database initialization failed: {e}")
-        if not settings.USE_DUMMY_DATA:
-            print("CRITICAL: Production mode requires database. Exiting.")
-            # In production, we might want to fail hard, but for this app 
-            # let's allow it to start so the user can see the status/error
-        else:
-            print("INFO: Continuing in dummy data mode.")
-            
+    await create_tables()
+    await seed_data()
     yield
     # Shutdown
     from app.services.inaproc import inaproc_service
