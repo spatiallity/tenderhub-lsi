@@ -28,7 +28,7 @@ async def get_expert(expert_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Expert not found")
     return expert
 
-@router.post("/", response_model=ExpertOut)
+@router.post("", response_model=ExpertOut)
 async def create_expert(expert_in: ExpertCreate, db: AsyncSession = Depends(get_db)):
     data = expert_in.model_dump()
     projects_data = data.pop("projects", [])
