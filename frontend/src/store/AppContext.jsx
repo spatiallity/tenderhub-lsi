@@ -120,12 +120,6 @@ export const AppProvider = ({ children }) => {
     api.get('/tender/search', { params: { limit: 200 } })
       .then(res => {
         setTendersRaw(res.data || []);
-        const localStatuses = (() => {
-          try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
-        })();
-        const localNotes = (() => {
-          try { return JSON.parse(localStorage.getItem('lsi-tender-notes') || '{}'); } catch { return {}; }
-        })();
         const statusMap = {};
         const notesMap = {};
         (res.data || []).forEach(t => {
@@ -133,16 +127,18 @@ export const AppProvider = ({ children }) => {
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = localStatuses[t.id] || s;
+          // API/Supabase data always wins for cross-user sync
+          statusMap[t.id] = s;
           if (t.catatan_internal) {
             try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
           }
-          if (localNotes[t.id]) notesMap[t.id] = localNotes[t.id];
         });
-        setInternalStatuses(() => ({ ...statusMap, ...localStatuses }));
-        setTenderNotes(() => ({ ...notesMap, ...localNotes }));
+        // API data is source of truth — replaces localStorage values
+        setInternalStatuses(statusMap);
+        setTenderNotes(notesMap);
       })
       .catch(() => {
+        // Offline fallback: use localStorage as last resort
         setTendersRaw(FALLBACK_TENDERS);
         const localStatuses = (() => {
           try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
@@ -155,7 +151,7 @@ export const AppProvider = ({ children }) => {
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
           statusMap[t.id] = localStatuses[t.id] || s;
         });
-        setInternalStatuses(() => ({ ...statusMap, ...localStatuses }));
+        setInternalStatuses(statusMap);
       })
       .finally(() => setLoadingTenders(false));
   }, []);
@@ -179,8 +175,9 @@ export const AppProvider = ({ children }) => {
           }))
         }));
         setExpertsRaw(prev => {
-          const localOnly = prev.filter(e => e.id > 1000000000000);
-          return [...localOnly, ...apiExperts];
+          // Keep only optimistic entries (temp IDs) that haven't synced yet
+          const pendingOnly = prev.filter(e => String(e.id).startsWith('temp-'));
+          return [...pendingOnly, ...apiExperts];
         });
       })
       .catch(() => {
@@ -196,7 +193,6 @@ export const AppProvider = ({ children }) => {
     
     // Auto-refresh tenders every 60 seconds to sync with other users
     const intervalId = setInterval(() => {
-      console.log('Auto-refreshing tenders data...');
       fetchTenders();
     }, 60 * 1000); // 60 seconds
     
@@ -218,9 +214,8 @@ export const AppProvider = ({ children }) => {
     expertsLoadedRef.current = true;
     fetchExperts();
     
-    // Auto-refresh experts every 30 seconds (reduced from 2 minutes for faster sync)
+    // Auto-refresh experts every 30 seconds for cross-user sync
     const intervalId = setInterval(() => {
-      console.log('Auto-refreshing experts data...');
       fetchExperts();
     }, 30 * 1000); // 30 seconds
     
@@ -232,64 +227,15 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Silently re-fetch when user returns to tab
-        api.get('/tender/search', { params: { limit: 200 } })
-          .then(res => {
-            setTendersRaw(res.data || []);
-            // Merge: API data wins for statuses (reflects other users' changes)
-            // but keep local-only entries that haven't been synced yet
-            const localStatuses = (() => {
-              try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
-            })();
-            const statusMap = {};
-            const notesMap = {};
-            (res.data || []).forEach(t => {
-              t.id = t.kd_tender || t.id;
-              let s = t.internalStatus || 'Dipantau';
-              if (t.won === true) s = 'Menang';
-              else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-              // API wins on focus refresh (to pick up other users' changes)
-              statusMap[t.id] = s;
-              if (t.catatan_internal) {
-                try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
-              }
-            });
-            // Merge: keep local statuses for tenders not in API response
-            setInternalStatuses(prev => ({ ...prev, ...statusMap }));
-            setTenderNotes(prev => ({ ...prev, ...notesMap }));
-          })
-          .catch(() => { /* silent fail on focus refresh */ });
-
-        // Also refresh experts
-        api.get('/experts')
-          .then(res => {
-            const apiExperts = (res.data || []).map(e => ({
-              ...e,
-              noHp: e.no_hp || '',
-              portofolio: e.subporto || [],
-              rating: e.rating_avg || 0,
-              proyek: e.jumlah_proyek || 0,
-              history: (e.projects || []).map(p => ({
-                id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
-                peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
-              })),
-              reviews: (e.reviews || []).map(r => ({
-                id: r.id, reviewer: r.reviewer_nama, rating: r.rating, komentar: r.komentar,
-                tanggal: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : ''
-              }))
-            }));
-            setExpertsRaw(prev => {
-              const localOnly = prev.filter(e => e.id > 1000000000000);
-              return [...localOnly, ...apiExperts];
-            });
-          })
-          .catch(() => { /* silent fail */ });
+        // Re-fetch everything when user returns to tab (API = source of truth)
+        fetchTenders();
+        fetchExperts();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [fetchTenders, fetchExperts]);
 
   // Save experts to localStorage whenever it changes
   useEffect(() => {
