@@ -47,22 +47,34 @@ PASCAKUAL_STAGE_NAMES = [
 ]
 
 def _attach_dummy_stage_schedule(tender: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build a stage schedule anchored to TODAY.
+    - Current stage starts today and ends in 3 days
+    - Past stages are placed before today
+    - Future stages are placed after current stage
+    - deadlineStage = end of current stage (always relative to today)
+    """
     stages = PRAKUAL_STAGE_NAMES if tender.get("metode") == "Prakualifikasi" else PASCAKUAL_STAGE_NAMES
-    current_stage = max(1, min(int(tender.get("currentStage") or 1), len(stages)))
+    current_stage_no = max(1, min(int(tender.get("currentStage") or 1), len(stages)))
     today = date.today()
 
+    # Current stage: starts today, ends today+2 (3 days total)
+    # Each stage is 3 days. Offset = (stageNo - currentStage) * 3
     schedule = []
-    for idx, stage_name in enumerate(stages, start=1):
-        start = today + timedelta(days=(idx - current_stage) * 3 - 1)
-        end = today + timedelta(days=(idx - current_stage) * 3 + 2)
+    for idx in range(1, len(stages) + 1):
+        offset = idx - current_stage_no
+        stage_start = today + timedelta(days=offset * 3)
+        stage_end   = today + timedelta(days=offset * 3 + 2)
         schedule.append({
             "stageNo": idx,
-            "name": stage_name,
-            "startDate": start.isoformat(),
-            "endDate": end.isoformat(),
+            "name": stages[idx - 1],
+            "startDate": stage_start.isoformat(),
+            "endDate":   stage_end.isoformat(),
         })
 
-    current_deadline = schedule[current_stage - 1]["endDate"]
+    # deadline = end of current stage
+    current_deadline = schedule[current_stage_no - 1]["endDate"]
+
     return {
         **tender,
         "jadwalTahapan": schedule,

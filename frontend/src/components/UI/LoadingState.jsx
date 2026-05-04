@@ -23,8 +23,8 @@ export const Spinner = ({ size = 'md', className = '' }) => {
  * LoadingOverlay - Full-screen loading overlay
  */
 export const LoadingOverlay = ({ message = 'Memuat...', transparent = false }) => (
-  <div className={`fixed inset-0 z-[1040] flex items-center justify-center ${transparent ? 'bg-white/80' : 'bg-white'} backdrop-blur-sm`}>
-    <div className="text-center">
+  <div className={`fixed inset-0 z-[1040] flex flex-col items-center justify-center ${transparent ? 'bg-white/80' : 'bg-white'} backdrop-blur-sm`}>
+    <div className="text-center flex flex-col items-center">
       <Spinner size="xl" />
       <p className="mt-4 text-sm font-semibold text-slate-700">{message}</p>
     </div>

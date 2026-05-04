@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { ExternalLink, CheckCircle, Circle, Save, Trash2 } from 'lucide-react';
 import { Badge, MiniKpi, Btn } from '../UI/index';
-import { portfolioColor, levelColor, PRAKUAL_STAGES, PASCAKUAL_STAGES, TODAY } from '../../utils/constants';
+import { portfolioColor, levelColor, PRAKUAL_STAGES, PASCAKUAL_STAGES } from '../../utils/constants';
 import { formatRupiah, formatDate, dateFrom } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -202,9 +202,19 @@ export default function TenderDetail({ tender }) {
             const num = i + 1;
             const past = num < currentStage;
             const current = num === currentStage;
-            const start = dateFrom(TODAY, (num - currentStage) * 3 - 2);
-            const end = dateFrom(TODAY, (num - currentStage) * 3);
             const changes = tender.changes?.[num] || 0;
+
+            // Build stage dates from deadlineStage (source of truth) + currentStage offset
+            // deadlineStage = end of current stage. Each stage = 3 days.
+            const deadlineDate = tender.deadlineStage
+              ? new Date(`${tender.deadlineStage}T00:00:00+07:00`)
+              : new Date();
+            const offset = num - currentStage; // 0=current, -1=prev, +1=next
+            const endDate = new Date(deadlineDate);
+            endDate.setDate(endDate.getDate() + offset * 3);
+            const startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - 2);
+
             return (
               <div key={stage} className="flex gap-3 items-start">
                 <div className="flex flex-col items-center">
@@ -223,7 +233,7 @@ export default function TenderDetail({ tender }) {
                     {num}. {stage}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    {formatDate(start)} - {formatDate(end)}
+                    {formatDate(startDate)} - {formatDate(endDate)}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {current && <Badge color={color}>Tahap saat ini</Badge>}

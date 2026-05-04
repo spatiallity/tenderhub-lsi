@@ -211,18 +211,18 @@ export const AppProvider = ({ children }) => {
         showToast('API RUP belum tersambung. Dummy RUP lokal dimuat.', 'error');
       })
       .finally(() => setLoadingRup(false));
-  }, [showToast]);
+  }, []); // Empty dependency - only run once on mount
 
   useEffect(() => {
     if (expertsLoadedRef.current) return;
     expertsLoadedRef.current = true;
     fetchExperts();
     
-    // Auto-refresh experts every 2 minutes to sync with other users
+    // Auto-refresh experts every 30 seconds (reduced from 2 minutes for faster sync)
     const intervalId = setInterval(() => {
       console.log('Auto-refreshing experts data...');
       fetchExperts();
-    }, 2 * 60 * 1000); // 2 minutes
+    }, 30 * 1000); // 30 seconds
     
     return () => clearInterval(intervalId);
   }, [fetchExperts]);
@@ -523,58 +523,40 @@ export const AppProvider = ({ children }) => {
       keahlian: keahlianClean,
       availability: draft.availability || 'Tersedia',
       subporto: [draft.portfolio || 'SDA'],
+      projects: (draft.history || []).map(h => ({
+        nama_proyek: h.proyek,
+        pemberi_kerja: h.klien || '-',
+        tahun: h.tahun || new Date().getFullYear(),
+        nilai_proyek: Number(h.nilai || 0),
+        peran: h.peran || 'Tenaga Ahli',
+        bersama: h.bersama || 'Sucofindo',
+        status_proyek: h.status || 'Selesai'
+      }))
     };
     
-    console.log('Prepared body for API:', body);
+    console.log('Prepared body for API (Bulk):', body);
     
     try {
-      console.log('Attempting API call to /experts');
+      console.log('Attempting API call to /experts (Bulk)');
       const res = await api.post('/experts', body);
       console.log('API response:', res.data);
       
-      let historyFromApi = [];
-      let jumlahProyek = 0;
-      if (draft.history && draft.history.length > 0) {
-        console.log('Adding history:', draft.history);
-        for (const h of draft.history) {
-          try {
-            const pres = await api.post(`/experts/${res.data.id}/projects`, {
-              nama_proyek: h.proyek,
-              pemberi_kerja: h.klien || '-',
-              tahun: h.tahun || new Date().getFullYear(),
-              nilai_proyek: Number(h.nilai || 0),
-              peran: h.peran || 'Tenaga Ahli',
-              bersama: h.bersama || 'Sucofindo',
-              status_proyek: h.status || 'Selesai'
-            });
-            historyFromApi.push({
-               id: pres.data.id, proyek: pres.data.nama_proyek, klien: pres.data.pemberi_kerja, 
-               tahun: pres.data.tahun, peran: pres.data.peran, nilai: pres.data.nilai_proyek, 
-               bersama: pres.data.bersama, status: pres.data.status_proyek
-            });
-            jumlahProyek++;
-          } catch(err) { 
-            console.error("Failed to add project history", err); 
-          }
-        }
-      }
-
       const newExpert = {
         ...res.data,
         noHp: res.data.no_hp || '',
         portofolio: res.data.subporto || [],
         rating: res.data.rating_avg || 0,
-        proyek: res.data.jumlah_proyek + jumlahProyek,
-        history: historyFromApi,
+        proyek: res.data.jumlah_proyek,
+        history: (res.data.projects || []).map(p => ({
+          id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
+          peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
+        })),
         reviews: [],
       };
       
       console.log('Adding expert to state:', newExpert);
-      setExpertsRaw(prev => {
-        const updated = [newExpert, ...prev]; // Add to beginning
-        console.log('Updated experts list:', updated);
-        return updated;
-      });
+      setExpertsRaw(prev => [newExpert, ...prev]);
+      
       showToast('Tenaga ahli berhasil ditambahkan');
       return true;
     } catch (e) {
@@ -592,12 +574,7 @@ export const AppProvider = ({ children }) => {
         keahlian: keahlianClean 
       };
       
-      console.log('Adding fallback expert to state:', fallbackExpert);
-      setExpertsRaw(prev => {
-        const updated = [fallbackExpert, ...prev]; // Add to beginning
-        console.log('Updated experts list (fallback):', updated);
-        return updated;
-      });
+      setExpertsRaw(prev => [fallbackExpert, ...prev]);
       showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'warning');
       return true;
     }

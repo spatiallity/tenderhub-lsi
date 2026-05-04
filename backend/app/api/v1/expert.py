@@ -30,10 +30,21 @@ async def get_expert(expert_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=ExpertOut)
 async def create_expert(expert_in: ExpertCreate, db: AsyncSession = Depends(get_db)):
-    expert = Expert(**expert_in.model_dump())
+    data = expert_in.model_dump()
+    projects_data = data.pop("projects", [])
+    
+    expert = Expert(**data)
     db.add(expert)
+    await db.flush()  # Get expert ID
+    
+    for p_data in projects_data:
+        project = ExpertProject(expert_id=expert.id, **p_data)
+        db.add(project)
+        expert.jumlah_proyek += 1
+    
     await db.commit()
-    # Re-fetch with relationships loaded so ExpertOut can serialize
+    
+    # Re-fetch with relationships loaded
     result = await db.execute(
         select(Expert)
         .options(selectinload(Expert.projects), selectinload(Expert.reviews))
@@ -95,7 +106,12 @@ async def add_review(expert_id: int, review_in: ExpertReviewCreate, db: AsyncSes
 
 @router.delete("/{expert_id}")
 async def delete_expert(expert_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Expert).where(Expert.id == expert_id))
+    # Load with relationships to ensure cascade delete-orphan works smoothly in SQLAlchemy session
+    result = await db.execute(
+        select(Expert)
+        .options(selectinload(Expert.projects), selectinload(Expert.reviews))
+        .where(Expert.id == expert_id)
+    )
     expert = result.scalars().first()
     if not expert:
         raise HTTPException(status_code=404, detail="Expert not found")
