@@ -220,5 +220,5 @@ def _expand_experts_to_100(rows):
     return expanded
 
 
-RUP_RAW = _expand_rup_to_50(RUP_RAW)
-EXPERTS_RAW = _expand_experts_to_100(EXPERTS_RAW)
+# RUP_RAW = _expand_rup_to_50(RUP_RAW)
+# EXPERTS_RAW = _expand_experts_to_100(EXPERTS_RAW)
