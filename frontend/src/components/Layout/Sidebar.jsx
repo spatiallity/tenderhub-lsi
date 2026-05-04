@@ -19,7 +19,8 @@ export const Sidebar = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', padding: '0 8px' }}>
         <div>
           <div className="brand-title">Tender<span style={{ color: 'var(--primary)' }}>Hub</span></div>
-          <div className="brand-kicker" style={{ marginTop: '2px', fontSize: '10px' }}>SBU LSI PT SUCOFINDO</div>
+          <div className="brand-kicker" style={{ marginTop: '2px', fontSize: '9px', fontWeight: 800 }}>SBU Layanan Publik, Sumber Daya Alam, dan Investasi</div>
+          <div className="brand-kicker" style={{ marginTop: '1px', fontSize: '9px', fontWeight: 500, color: 'var(--muted)' }}>PT SUCOFINDO</div>
         </div>
         <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
           {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}

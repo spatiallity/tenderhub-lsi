@@ -1,9 +1,13 @@
-import React, { useMemo } from 'react';
-import { FileText, Target, TrendingUp, Clock, BarChart2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { FileText, Target, TrendingUp, Clock, BarChart2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { useAppContext } from '../store/AppContext';
 import { Card, Badge } from '../components/UI/index';
 import { KpiCard } from '../components/UI/index';
+import UrgentTenderPanel from '../components/Tender/UrgentPanel';
+import KeywordManagerPanel from '../components/Tender/KeywordManager';
+import WinrateChart from '../components/Dashboard/WinrateChart';
 import { portfolioColor } from '../utils/constants';
 import { formatRupiah } from '../utils/helpers';
 
@@ -16,12 +20,27 @@ export default function DashboardPage() {
     internalStatuses,
   } = useAppContext();
   const navigate = useNavigate();
+  const [showPotensiSidebar, setShowPotensiSidebar] = useState(false);
 
   const byPortfolio = useMemo(() =>
     ['FLP', 'SDA', 'FITI'].map(p => ({
       p,
       list: tenders.filter(t => t.recommendation === p),
     })), [tenders]);
+
+  const top20Potensi = useMemo(() => {
+    return [...tenders]
+      .sort((a, b) => (b.hps || 0) - (a.hps || 0))
+      .slice(0, 20);
+  }, [tenders]);
+  
+  const pieData = useMemo(() => {
+    return byPortfolio.map(item => ({
+      name: item.p,
+      value: item.list.reduce((sum, t) => sum + (t.hps || 0), 0),
+      color: item.p === 'SDA' ? '#0ea5e9' : item.p === 'FLP' ? '#f59e0b' : '#10b981'
+    })).filter(item => item.value > 0);
+  }, [byPortfolio]);
 
   const instansiRows = useMemo(() => {
     const counts = tenders.reduce((acc, t) => {
@@ -161,6 +180,7 @@ export default function DashboardPage() {
           sub="akumulasi nilai HPS"
           icon={TrendingUp}
           color="#9333ea" bg="#faf5ff"
+          onClick={() => setShowPotensiSidebar(true)}
         />
 
         <KpiCard
@@ -253,76 +273,13 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Winrate Chart */}
-        <div className="bg-white rounded-3xl border-2 border-slate-100/50 p-6 shadow-sm">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-[18px] font-black text-slate-900">Grafik Winrate</h2>
-              <p className="text-slate-500 text-[12px] font-bold">Tender diikuti vs tender menang</p>
-            </div>
-            <div className="text-right">
-              <div className="text-[32px] font-black text-emerald-600 leading-none">{winrate}%</div>
-              <div className="text-[11px] text-slate-500 font-bold mt-1">{won} menang dari {followed} diikuti</div>
-            </div>
-          </div>
-
-          <div className="space-y-3.5">
-            {winrateRows.map((row, i) => {
-              const total = Math.max(row.ikut, 1);
-              const winWidth = (row.menang / total) * 100;
-              
-              return (
-                <div key={i} className="flex items-center gap-4">
-                  <div className="w-16 text-[12px] font-black text-slate-500">{row.label}</div>
-                  <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden relative">
-                    {/* Diikuti (Blue) */}
-                    <div 
-                      className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-1000"
-                      style={{ width: `${(row.ikut / maxWinrateVolume) * 100}%` }}
-                    />
-                    {/* Menang (Green) */}
-                    <div 
-                      className="absolute inset-y-0 left-0 bg-emerald-500 transition-all duration-1000"
-                      style={{ width: `${(row.menang / maxWinrateVolume) * 100}%` }}
-                    />
-                  </div>
-                  <div className="w-8 text-right text-[12px] font-black text-slate-700">
-                    {row.menang}/{row.ikut}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Legend & Best Period Summary */}
-          <div className="mt-6 flex flex-wrap sm:flex-nowrap gap-4">
-            <div className="flex-1 bg-slate-50/50 border border-slate-100 rounded-2xl p-4">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded bg-blue-600" />
-                  <span className="text-[11px] font-bold text-slate-600">Diikuti</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded bg-emerald-500" />
-                  <span className="text-[11px] font-bold text-slate-600">Menang</span>
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                Menunjukkan performa akumulasi tender yang diikuti SBU LSI sepanjang periode 2025 - 2026.
-              </p>
-            </div>
-            
-            <div className="w-full sm:w-[140px] shrink-0 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 px-4 py-3 text-center flex flex-col justify-center">
-              <div className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1">Periode Terbaik</div>
-              <div className="text-[16px] font-black text-amber-900 leading-tight">
-                {bestWinrate.label}
-              </div>
-              <div className="text-[12px] font-bold text-amber-700 mt-0.5">
-                {bestWinrate.rate}% Winrate
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Winrate Chart via Recharts */}
+        <WinrateChart 
+          winrateRows={winrateRows}
+          winrate={winrate}
+          followed={followed}
+          won={won}
+        />
       </div>
 
       {/* Per Instansi */}
@@ -355,6 +312,92 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Potensi Sidebar */}
+      {showPotensiSidebar && (
+        <>
+          <div 
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity" 
+            onClick={() => setShowPotensiSidebar(false)}
+          />
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[400px] bg-white shadow-2xl z-50 flex flex-col animate-slideInRight border-l border-slate-200">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50/80">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">Nilai Potensial HPS</h2>
+                <p className="text-xs font-bold text-slate-500 mt-0.5">Top 20 Tender & Portofolio</p>
+              </div>
+              <button 
+                onClick={() => setShowPotensiSidebar(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200/50 hover:bg-slate-200 text-slate-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+              <div className="mb-6">
+                <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-3">Sebaran Portofolio</h3>
+                <div className="h-[220px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={85}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip 
+                        formatter={(value) => formatRupiah(value)}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+                        itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="flex justify-center gap-4 mt-2">
+                  {pieData.map((entry, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <span className="text-xs font-bold text-slate-700">{entry.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-3">Top 20 Proyek (HPS)</h3>
+                <div className="flex flex-col gap-2.5">
+                  {top20Potensi.map((t, i) => (
+                    <div key={t.id} className="p-3 border border-slate-100 rounded-xl bg-slate-50 hover:bg-white hover:border-blue-200 transition-colors hover:shadow-sm cursor-pointer group" onClick={() => { setShowPotensiSidebar(false); setSelectedTenderId(t.id); }}>
+                      <div className="flex justify-between items-start mb-2 gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-[10px] font-black text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                            {i + 1}
+                          </span>
+                          <Badge color={portfolioColor[t.recommendation]}>{t.recommendation}</Badge>
+                        </div>
+                        <div className="text-xs font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm">
+                          {formatRupiah(t.hps)}
+                        </div>
+                      </div>
+                      <div className="text-[12px] font-bold text-slate-700 leading-snug line-clamp-2 group-hover:text-blue-700 transition-colors">{t.nama}</div>
+                      <div className="text-[10px] text-slate-500 mt-1 truncate">{t.instansi}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -69,6 +69,12 @@ export default function TenderDetail({ tender }) {
     }
   };
 
+  // Compute Tgl Pengumuman dynamically based on Stage 1
+  const tglPengumumanDate = new Date(
+    tender.deadlineStage ? `${tender.deadlineStage}T00:00:00+07:00` : new Date()
+  );
+  tglPengumumanDate.setDate(tglPengumumanDate.getDate() + (1 - currentStage) * 3 - 2);
+
   return (
     <div className="flex flex-col gap-4">
       {/* Badges */}
@@ -166,7 +172,7 @@ export default function TenderDetail({ tender }) {
             ['Kontrak Pembayaran', tender.kontrak_pembayaran],
             ['Kode Tender', tender.kd_tender],
             ['Kode RUP', tender.kd_rup],
-            ['Tgl. Pengumuman', tender.tgl_pengumuman],
+            ['Tgl. Pengumuman', formatDate(tglPengumumanDate)],
             ['Lokasi Pekerjaan', tender.lokasi_pekerjaan],
             ['Nama PPK', tender.nama_ppk],
             ['Nama Pokja', tender.nama_pokja],
