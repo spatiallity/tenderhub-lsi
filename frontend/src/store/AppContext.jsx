@@ -259,6 +259,22 @@ export const AppProvider = ({ children }) => {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tender_watchlist' }, (payload) => {
         console.log('[Realtime] tender_watchlist changed:', payload.eventType, payload.new);
+        
+        // INSTANT PATCH: Update local state immediately from realtime payload
+        // This ensures sync even if the subsequent API fetch is slightly delayed or cached
+        if (payload.new && payload.new.kd_tender) {
+          const idKey = String(payload.new.kd_tender);
+          if (payload.new.status_internal) {
+            setInternalStatuses(prev => ({ ...prev, [idKey]: payload.new.status_internal }));
+          }
+          if (payload.new.catatan_internal) {
+            try {
+              const notes = JSON.parse(payload.new.catatan_internal);
+              setTenderNotes(prev => ({ ...prev, [idKey]: notes }));
+            } catch (e) { /* ignore */ }
+          }
+        }
+        
         debouncedFetchTenders();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, (payload) => {
