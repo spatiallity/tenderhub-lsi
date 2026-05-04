@@ -109,8 +109,9 @@ export const AppProvider = ({ children }) => {
   // ─── Reusable fetch functions ──────────────────────────────────────────────
 
   const fetchTenders = useCallback(() => {
-    api.get('/tender/search', { params: { limit: 200 } })
+    api.get('/tender/search', { params: { limit: 200, _t: Date.now() } })
       .then(res => {
+        console.log('[API] Tenders fetched successfully');
         setTendersRaw(res.data || []);
         const statusMap = {};
         const notesMap = {};
