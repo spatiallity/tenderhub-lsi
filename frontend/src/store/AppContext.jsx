@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import api from '../services/api';
+import supabase from '../services/supabase';
 import { DEFAULT_KEYWORDS, DEFAULT_USERS, PROVINCES } from '../utils/constants';
 import { calcRupMatch, enrichTender, activeKeywordCount } from '../utils/helpers';
 import { FALLBACK_RUP } from '../data/rupDummy';
@@ -184,10 +185,10 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     fetchTenders();
     
-    // Auto-refresh tenders every 60 seconds to sync with other users
+    // Fallback polling every 5 minutes (Realtime handles instant sync)
     const intervalId = setInterval(() => {
       fetchTenders();
-    }, 60 * 1000); // 60 seconds
+    }, 5 * 60 * 1000);
     
     return () => clearInterval(intervalId);
   }, [fetchTenders]);
@@ -207,20 +208,74 @@ export const AppProvider = ({ children }) => {
     expertsLoadedRef.current = true;
     fetchExperts();
     
-    // Auto-refresh experts every 30 seconds for cross-user sync
+    // Fallback polling every 5 minutes (Realtime handles instant sync)
     const intervalId = setInterval(() => {
       fetchExperts();
-    }, 30 * 1000); // 30 seconds
+    }, 5 * 60 * 1000);
     
     return () => clearInterval(intervalId);
   }, [fetchExperts]);
+
+  // ─── Supabase Realtime: instant cross-user sync ────────────────────────────
+
+  useEffect(() => {
+    // Debounce rapid-fire events (e.g. bulk seed inserts)
+    let expertTimer = null;
+    let tenderTimer = null;
+    const debounceRefresh = (fn, timerRef, delay = 1000) => {
+      return () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(fn, delay);
+      };
+    };
+    const expertTimerRef = { current: null };
+    const tenderTimerRef = { current: null };
+
+    const debouncedFetchExperts = () => {
+      if (expertTimerRef.current) clearTimeout(expertTimerRef.current);
+      expertTimerRef.current = setTimeout(() => fetchExperts(), 800);
+    };
+    const debouncedFetchTenders = () => {
+      if (tenderTimerRef.current) clearTimeout(tenderTimerRef.current);
+      tenderTimerRef.current = setTimeout(() => fetchTenders(), 800);
+    };
+
+    // Subscribe to experts table changes
+    const channel = supabase
+      .channel('tenderhub-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'experts' }, () => {
+        console.log('[Realtime] experts changed');
+        debouncedFetchExperts();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_projects' }, () => {
+        console.log('[Realtime] expert_projects changed');
+        debouncedFetchExperts();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_reviews' }, () => {
+        console.log('[Realtime] expert_reviews changed');
+        debouncedFetchExperts();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tender_watchlist' }, () => {
+        console.log('[Realtime] tender_watchlist changed');
+        debouncedFetchTenders();
+      })
+      .subscribe((status) => {
+        console.log('[Realtime] subscription status:', status);
+      });
+
+    return () => {
+      if (expertTimerRef.current) clearTimeout(expertTimerRef.current);
+      if (tenderTimerRef.current) clearTimeout(tenderTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchExperts, fetchTenders]);
 
   // ─── Refresh on tab focus (sync changes from other users) ─────────────────
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Re-fetch everything when user returns to tab (API = source of truth)
+        // Re-fetch everything when user returns to tab
         fetchTenders();
         fetchExperts();
       }
