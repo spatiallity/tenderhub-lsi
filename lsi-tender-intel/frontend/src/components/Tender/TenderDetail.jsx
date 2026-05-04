@@ -1,27 +1,37 @@
 import React, { useEffect, useRef } from 'react';
 import { ExternalLink, CheckCircle, Circle, Save, Trash2 } from 'lucide-react';
 import { Badge, MiniKpi, Btn } from '../UI/index';
-import { portfolioColor, levelColor, PRAKUAL_STAGES, PASCAKUAL_STAGES, TODAY } from '../../utils/constants';
+import { portfolioColor, levelColor, PRAKUAL_STAGES, PASCAKUAL_STAGES } from '../../utils/constants';
 import { formatRupiah, formatDate, dateFrom } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
 import { useDebounce } from '../../hooks/useDebounce';
 
 export default function TenderDetail({ tender }) {
   const {
-    tenderNotes, setTenderNotes,
+    tenderNotes, setTenderNotes, addTenderNote,
     noteSaved, setNoteSaved,
-    internalStatuses, setInternalStatuses,
-    assignedPICs, setAssignedPICs,
+    internalStatuses, updateTenderStatus,
+    assignedPICs, updateTenderPIC,
     users, showToast
   } = useAppContext();
 
   if (!tender) return null;
 
+  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+  const [isSavingNote, setIsSavingNote] = React.useState(false);
 
   const status = internalStatuses[tender.id] || tender.internalStatus || 'Dipantau';
-  const setStatus = (val) => setInternalStatuses(prev => ({ ...prev, [tender.id]: val }));
+  const setStatus = async (val) => {
+    if (isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    try {
+      await updateTenderStatus(tender.id, val);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
   const assignedPIC = assignedPICs[tender.id] || '';
-  const assignPIC = (userId) => setAssignedPICs(prev => ({ ...prev, [tender.id]: userId }));
+  const assignPIC = (userId) => updateTenderPIC(tender.id, userId);
 
   // Removed auto-save logic as we now use an array of explicit notes
 
@@ -39,22 +49,31 @@ export default function TenderDetail({ tender }) {
   const notes = tenderNotes[tender.id] || [];
   const [newNote, setNewNote] = React.useState('');
   
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('id-ID');
-    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const handleAddNote = async () => {
+    if (!newNote.trim()) {
+      showToast('Catatan tidak boleh kosong', 'error');
+      return;
+    }
+    if (isSavingNote) return;
     
-    setTenderNotes(prev => ({
-      ...prev,
-      [tender.id]: [
-        ...(prev[tender.id] || []),
-        { author: 'Admin LSI', content: newNote, date: dateStr, time: timeStr }
-      ]
-    }));
-    setNewNote('');
-    showToast('Catatan ditambahkan');
+    setIsSavingNote(true);
+    try {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('id-ID');
+      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      
+      await addTenderNote(tender.id, { author: 'Admin LSI', content: newNote, date: dateStr, time: timeStr });
+      setNewNote('');
+    } finally {
+      setIsSavingNote(false);
+    }
   };
+
+  // Compute Tgl Pengumuman dynamically based on Stage 1
+  const tglPengumumanDate = new Date(
+    tender.deadlineStage ? `${tender.deadlineStage}T00:00:00+07:00` : new Date()
+  );
+  tglPengumumanDate.setDate(tglPengumumanDate.getDate() + (1 - currentStage) * 3 - 2);
 
   return (
     <div className="flex flex-col gap-4">
@@ -153,7 +172,7 @@ export default function TenderDetail({ tender }) {
             ['Kontrak Pembayaran', tender.kontrak_pembayaran],
             ['Kode Tender', tender.kd_tender],
             ['Kode RUP', tender.kd_rup],
-            ['Tgl. Pengumuman', tender.tgl_pengumuman],
+            ['Tgl. Pengumuman', formatDate(tglPengumumanDate)],
             ['Lokasi Pekerjaan', tender.lokasi_pekerjaan],
             ['Nama PPK', tender.nama_ppk],
             ['Nama Pokja', tender.nama_pokja],
@@ -189,9 +208,19 @@ export default function TenderDetail({ tender }) {
             const num = i + 1;
             const past = num < currentStage;
             const current = num === currentStage;
-            const start = dateFrom(TODAY, (num - currentStage) * 3 - 2);
-            const end = dateFrom(TODAY, (num - currentStage) * 3);
             const changes = tender.changes?.[num] || 0;
+
+            // Build stage dates from deadlineStage (source of truth) + currentStage offset
+            // deadlineStage = end of current stage. Each stage = 3 days.
+            const deadlineDate = tender.deadlineStage
+              ? new Date(`${tender.deadlineStage}T00:00:00+07:00`)
+              : new Date();
+            const offset = num - currentStage; // 0=current, -1=prev, +1=next
+            const endDate = new Date(deadlineDate);
+            endDate.setDate(endDate.getDate() + offset * 3);
+            const startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - 2);
+
             return (
               <div key={stage} className="flex gap-3 items-start">
                 <div className="flex flex-col items-center">
@@ -210,7 +239,7 @@ export default function TenderDetail({ tender }) {
                     {num}. {stage}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    {formatDate(start)} - {formatDate(end)}
+                    {formatDate(startDate)} - {formatDate(endDate)}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {current && <Badge color={color}>Tahap saat ini</Badge>}
@@ -230,8 +259,9 @@ export default function TenderDetail({ tender }) {
         </div>
         <select 
           value={status} 
-          onChange={e => setStatus(e.target.value)} 
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none mb-3"
+          onChange={e => setStatus(e.target.value)}
+          disabled={isUpdatingStatus}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'].map(s => {
             const isDisabled = s === 'Menang' && !isWinnerAnnouncementReached;
@@ -268,12 +298,17 @@ export default function TenderDetail({ tender }) {
         <textarea
           value={newNote}
           onChange={e => setNewNote(e.target.value)}
+          disabled={isSavingNote}
           placeholder="Tulis catatan koordinasi, kebutuhan dokumen..."
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none resize-y min-h-[60px]"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none resize-y min-h-[60px] disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <div className="flex mt-2 justify-end">
-          <Btn className="primary small" onClick={handleAddNote}>
-            <Save size={14} />Tambah Catatan
+          <Btn 
+            className="primary small" 
+            onClick={handleAddNote}
+            disabled={isSavingNote || !newNote.trim()}
+          >
+            <Save size={14} />{isSavingNote ? 'Menyimpan...' : 'Tambah Catatan'}
           </Btn>
         </div>
       </div>

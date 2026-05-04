@@ -22,7 +22,7 @@ export default function TenderPage() {
   const {
     tenders, keywords, loadingTenders,
     addKeyword, removeKeyword,
-    internalStatuses, setInternalStatuses, setSelectedTenderId,
+    internalStatuses, setInternalStatuses, updateTenderStatus, setSelectedTenderId,
     hpsThreshold,
     setShowKeywordManager,
     newTenderIds,
@@ -39,6 +39,7 @@ export default function TenderPage() {
   const [hpsMax, setHpsMax] = useState('');
   const [tenderSearch, setTenderSearch] = useState('');
   const [keywordOnly, setKeywordOnly] = useState(true);
+  const [urgentOnly, setUrgentOnly] = useState(false);
   const [showIrrelevant, setShowIrrelevant] = useState(false);
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
@@ -115,10 +116,26 @@ export default function TenderPage() {
   );
 
   useEffect(() => {
-    if (dashboardChartFilter?.mode !== 'instansi' || !dashboardChartFilter?.instansi) return;
-    setInstansiFilter(dashboardChartFilter.instansi);
+    if (!dashboardChartFilter) return;
+
+    // Reset filters before applying new mode
+    setPortfolioFilter('Semua');
+    setInstansiFilter('Semua');
+    setLevelFilter('Semua');
+    setStatusFilter('');
     setTenderSearch('');
     setKeywordOnly(false);
+    setUrgentOnly(false);
+
+    if (dashboardChartFilter.mode === 'portfolio' && dashboardChartFilter.portfolio) {
+      setPortfolioFilter(dashboardChartFilter.portfolio);
+    } else if (dashboardChartFilter.mode === 'urgent') {
+      setUrgentOnly(true);
+    } else if (dashboardChartFilter.mode === 'relevant') {
+      setKeywordOnly(true);
+    } else if (dashboardChartFilter.mode === 'instansi' && dashboardChartFilter.instansi) {
+      setInstansiFilter(dashboardChartFilter.instansi);
+    }
   }, [dashboardChartFilter]);
   const filteredTenders = useMemo(() => {
     let result = tenders.filter(t => {
@@ -129,6 +146,7 @@ export default function TenderPage() {
         if (isIrrelevant) return false;
       }
 
+      if (urgentOnly && (t.daysLeft > 7 || t.daysLeft < 0)) return false;
       if (keywordOnly && (!t.matched || t.matched.length === 0)) return false;
       if (debouncedSearch.trim() && !`${t.nama} ${t.instansi} ${t.provinsi}`.toLowerCase().includes(debouncedSearch.trim().toLowerCase())) return false;
       if (instansiFilter !== 'Semua' && t.instansi !== instansiFilter) return false;
@@ -161,12 +179,12 @@ export default function TenderPage() {
       });
     }
     return result;
-  }, [tenders, portfolioFilter, levelFilter, statusFilter, instansiFilter, provinsiFilter, hpsMin, hpsMax, hpsThreshold, keywordOnly, debouncedSearch, sortKey, sortDir, internalStatuses, showIrrelevant]);
+  }, [tenders, portfolioFilter, levelFilter, statusFilter, instansiFilter, provinsiFilter, hpsMin, hpsMax, hpsThreshold, keywordOnly, urgentOnly, debouncedSearch, sortKey, sortDir, internalStatuses, showIrrelevant]);
 
   const clearAll = () => {
     setPortfolioFilter('Semua'); setLevelFilter('Semua'); setStatusFilter('');
     setInstansiFilter('Semua'); setProvinsiFilter('Semua'); setHpsMin(''); setHpsMax(''); setTenderSearch('');
-    setShowIrrelevant(false);
+    setShowIrrelevant(false); setKeywordOnly(false); setUrgentOnly(false);
     setDashboardChartFilter({ mode: 'all', portfolio: null });
   };
 
@@ -272,6 +290,18 @@ export default function TenderPage() {
             <span className="text-[11px] text-slate-500">
               ({keywordCount} aktif)
             </span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-xl bg-red-50">
+            <input
+              id="urgentOnly"
+              type="checkbox"
+              checked={urgentOnly}
+              onChange={e => setUrgentOnly(e.target.checked)}
+              className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+            />
+            <label htmlFor="urgentOnly" className="text-xs font-extrabold text-red-700 cursor-pointer">
+              Deadline {'<='} 7 Hari
+            </label>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-xl bg-slate-50">
             <input
@@ -418,7 +448,7 @@ export default function TenderPage() {
                       <td className="px-3 py-3 align-top">
                         <select
                           value={internalStatuses[t.id] || 'Dipantau'}
-                          onChange={e => setInternalStatuses(prev => ({ ...prev, [t.id]: e.target.value }))}
+                          onChange={e => updateTenderStatus(t.id, e.target.value)}
                           onClick={e => e.stopPropagation()}
                           className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold cursor-pointer outline-none focus:ring-2 focus:ring-blue-200 transition-colors ${
                             {

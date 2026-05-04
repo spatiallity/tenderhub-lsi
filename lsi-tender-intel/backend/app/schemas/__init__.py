@@ -61,11 +61,18 @@ class ExpertBase(BaseModel):
 
 
 class ExpertCreate(ExpertBase):
-    pass
+    projects: Optional[List[ExpertProjectCreate]] = []
 
 
-class ExpertUpdate(ExpertBase):
-    pass
+class ExpertUpdate(BaseModel):
+    nama: Optional[str] = None
+    no_hp: Optional[str] = None
+    instansi: Optional[str] = None
+    jenis_instansi: Optional[str] = None
+    keahlian: Optional[List[str]] = None
+    subporto: Optional[List[str]] = None
+    main_keahlian: Optional[str] = None
+    availability: Optional[str] = None
 
 
 class ExpertOut(ExpertBase):
@@ -181,6 +188,8 @@ class TenderOut(BaseModel):
     portofolio: Optional[str] = None
     status: Optional[str] = None
     internalStatus: Optional[str] = None
+    catatan_internal: Optional[str] = None
+    assigned_expert_ids: List[int] = []
     followed: bool = False
     won: bool = False
     nama_satker: Optional[str] = None

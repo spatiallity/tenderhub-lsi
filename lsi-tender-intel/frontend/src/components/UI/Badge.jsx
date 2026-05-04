@@ -1,5 +1,6 @@
 import React from 'react';
 import { colors } from '../../styles/design-tokens';
+import { daysFromNow } from '../../utils/helpers';
 
 /**
  * Badge Component - Enhanced with design tokens and better variants
@@ -83,56 +84,49 @@ const Badge = ({
 };
 
 /**
- * CountdownBadge - Shows days remaining with color coding
- * @param {number} days - Days left (from enriched tender data)
- * @param {number} daysLeft - Alternative prop name for days left
- * @param {string} dateStr - Date string to calculate days from
+ * CountdownBadge - Shows the deadline date with color coding based on urgency
+ * @param {string} dateStr - Date string (YYYY-MM-DD) to display
+ * @param {number} days - Days left (used for color coding only)
  * @param {boolean} expired - Whether deadline has passed
  */
 export const CountdownBadge = ({ days, daysLeft, dateStr, expired, className = '' }) => {
-  // Calculate daysLeft from dateStr if provided
-  let calculatedDays = days !== undefined ? days : daysLeft;
+  const dDays = days !== undefined ? days : (daysLeft !== undefined ? daysLeft : daysFromNow(dateStr));
   
-  if (dateStr && calculatedDays === undefined) {
-    const deadline = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    deadline.setHours(0, 0, 0, 0);
-    calculatedDays = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+  // Return early if no date information
+  if (!dateStr || (days === undefined && daysLeft === undefined && dDays === 999)) {
+    return <Badge color="gray" dot className={className}>Tidak tersedia</Badge>;
+  }
+
+  let displayText = '-';
+  if (dateStr) {
+    try {
+      const d = new Date(`${dateStr}T00:00:00+07:00`);
+      if (!isNaN(d.getTime())) {
+        displayText = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+      } else {
+        displayText = dateStr;
+      }
+    } catch (e) {
+      displayText = dateStr;
+    }
+  }
+
+  // Consistent color coding and display
+  if (expired || dDays < 0) {
+    return <Badge color="red" dot className={className}>{displayText} (Berakhir)</Badge>;
   }
   
-  // If still undefined, show error state
-  if (calculatedDays === undefined || isNaN(calculatedDays)) {
-    return (
-      <Badge color="gray" dot className={className}>
-        Tidak tersedia
-      </Badge>
-    );
+  if (dDays === 0) {
+    return <Badge color="red" dot className={className}>Hari ini ({displayText})</Badge>;
   }
   
-  let color = 'green';
-  let text = `${calculatedDays} hari lagi`;
-  
-  if (expired || calculatedDays < 0) {
-    color = 'red';
-    text = 'Terlewat';
-  } else if (calculatedDays === 0) {
-    color = 'red';
-    text = 'Hari ini';
-  } else if (calculatedDays === 1) {
-    color = 'amber';
-    text = 'Besok';
-  } else if (calculatedDays <= 3) {
-    color = 'red';
-  } else if (calculatedDays <= 7) {
-    color = 'amber';
+  if (dDays === 1) {
+    return <Badge color="red" dot className={className}>Besok ({displayText})</Badge>;
   }
-  
-  return (
-    <Badge color={color} dot className={className}>
-      {text}
-    </Badge>
-  );
+
+  if (dDays <= 3) return <Badge color="red" dot className={className}>{displayText}</Badge>;
+  if (dDays <= 7) return <Badge color="amber" dot className={className}>{displayText}</Badge>;
+  return <Badge color="green" dot className={className}>{displayText}</Badge>;
 };
 
 /**

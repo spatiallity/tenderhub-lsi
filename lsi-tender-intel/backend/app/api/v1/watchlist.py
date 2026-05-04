@@ -8,17 +8,22 @@ from app.schemas import WatchlistOut, WatchlistCreate, WatchlistUpdate
 
 router = APIRouter()
 
-@router.get("/", response_model=List[WatchlistOut])
+@router.get("", response_model=List[WatchlistOut])
 async def get_watchlist(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TenderWatchlist))
     return result.scalars().all()
 
-@router.post("/", response_model=WatchlistOut)
+@router.post("", response_model=WatchlistOut)
 async def add_to_watchlist(item_in: WatchlistCreate, db: AsyncSession = Depends(get_db)):
-    # Check if exists
+    # Check if exists (Upsert logic)
     result = await db.execute(select(TenderWatchlist).where(TenderWatchlist.kd_tender == item_in.kd_tender))
     existing = result.scalars().first()
     if existing:
+        update_data = item_in.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(existing, key, value)
+        await db.commit()
+        await db.refresh(existing)
         return existing
         
     item = TenderWatchlist(**item_in.model_dump())

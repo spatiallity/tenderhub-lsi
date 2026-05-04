@@ -29,7 +29,8 @@ export const formatMonthYear = (dateStr) =>
 export const daysFromNow = (dateStr) => {
   if (!dateStr) return 999;
   const target = new Date(`${dateStr}T00:00:00+07:00`);
-  const today = new Date(TODAY);
+  // Always use current date, not a cached constant
+  const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.floor((target - today) / 86400000);
 };
@@ -78,6 +79,69 @@ export const activeKeywordCount = (keywords) =>
   Object.values(keywords).flat().filter(k => k.active).length;
 
 const submitGateStageByMethod = (metode) => metode === 'Prakualifikasi' ? 4 : 4;
+
+/**
+ * Determines the current active stage based on today's date and the stage schedule
+ * Returns { stageNo, stageName, endDate } or null if no schedule available
+ */
+const getCurrentStageFromSchedule = (tender, stages) => {
+  const stageKeys = [
+    'jadwalTahapan',
+    'jadwal_tahapan',
+    'stageDeadlines',
+    'stage_deadlines',
+    'tahapan',
+  ];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (const key of stageKeys) {
+    const schedule = tender[key];
+    if (!schedule || !Array.isArray(schedule)) continue;
+
+    // Find the stage where today is between startDate and endDate
+    for (let i = 0; i < schedule.length; i++) {
+      const item = schedule[i];
+      const startDate = item?.startDate || item?.start_date || item?.start || item?.tanggalMulai || item?.tanggal_mulai || item?.tgl_mulai || item?.mulai;
+      const endDate = item?.endDate || item?.end_date || item?.end || item?.tanggalAkhir || item?.tanggal_akhir || item?.tgl_akhir || item?.tglAkhir || item?.tanggal_selesai || item?.tgl_selesai || item?.selesai || item?.akhir;
+      
+      if (!startDate || !endDate) continue;
+
+      const start = new Date(`${startDate}T00:00:00+07:00`);
+      const end = new Date(`${endDate}T00:00:00+07:00`);
+      
+      const stageNo = item?.stageNo || item?.stage || item?.no || item?.urutan || (i + 1);
+      const stageName = item?.name || item?.nama || item?.tahap || item?.nama_tahapan || item?.namaTahapan || stages[stageNo - 1]?.[0];
+      
+      // Check if today is within this stage's date range (inclusive)
+      if (today >= start && today <= end) {
+        return { stageNo: Number(stageNo), stageName, endDate };
+      }
+      
+      // If today is past this stage's end date, continue to next stage
+      if (today > end) {
+        continue;
+      }
+      
+      // If today is before this stage's start date, this is the next upcoming stage
+      if (today < start) {
+        return { stageNo: Number(stageNo), stageName, endDate };
+      }
+    }
+    
+    // If we found a schedule but no matching stage, return the last stage
+    if (schedule.length > 0) {
+      const lastItem = schedule[schedule.length - 1];
+      const stageNo = lastItem?.stageNo || lastItem?.stage || lastItem?.no || lastItem?.urutan || schedule.length;
+      const stageName = lastItem?.name || lastItem?.nama || lastItem?.tahap || lastItem?.nama_tahapan || lastItem?.namaTahapan || stages[stageNo - 1]?.[0];
+      const endDate = lastItem?.endDate || lastItem?.end_date || lastItem?.end || lastItem?.tanggalAkhir || lastItem?.tanggal_akhir || lastItem?.tgl_akhir;
+      return { stageNo: Number(stageNo), stageName, endDate };
+    }
+  }
+
+  return null;
+};
 
 const getStageDeadlineFromSchedule = (tender, stageNo, stageName) => {
   const stageKeys = [
@@ -146,11 +210,11 @@ export const enrichTender = (tender, keywords, internalStatuses = {}) => {
     return tender;
   }
   
-  if (!tender.metode || !tender.currentStage) {
-    console.warn(`enrichTender: Missing required fields for tender ${tender.id}`, { metode: tender.metode, currentStage: tender.currentStage });
+  if (!tender.metode) {
+    console.warn(`enrichTender: Missing metode for tender ${tender.id}`);
     return { 
       ...tender, 
-      error: 'Missing required fields',
+      error: 'Missing metode',
       totalStages: 0,
       currentStageName: 'Unknown',
       currentStageColor: 'gray',
@@ -164,19 +228,23 @@ export const enrichTender = (tender, keywords, internalStatuses = {}) => {
   const relevance = calcRelevance(tender, keywords);
   const stages = getStages(tender.metode);
   
-  // Ensure currentStage is within valid range
+  // Use currentStage from backend data (already calculated correctly)
   const currentStage = Math.max(1, Math.min(tender.currentStage || 1, stages.length));
-  
   const currentStageName = stages[currentStage - 1]?.[0] || 'Unknown Stage';
   const currentStageColor = stages[currentStage - 1]?.[1] || 'gray';
   const submitGateStage = submitGateStageByMethod(tender.metode);
   const submitGateStageName = stages[submitGateStage - 1]?.[0] || '';
+
+  // Deadline: use currentStageDeadline or deadlineStage from backend
+  // Fallback to schedule if consolidated fields are missing (common for real data)
   const currentStageDeadline =
     tender.currentStageDeadline ||
     tender.deadlineCurrentStage ||
     tender.tgl_akhir_tahap_berjalan ||
-    getStageDeadlineFromSchedule(tender, currentStage, currentStageName) ||
-    tender.deadlineStage;
+    tender.deadlineStage ||
+    getStageDeadlineFromSchedule(tender, currentStage, currentStageName);
+
+  // daysLeft is always calculated fresh from today's date
   const rawDaysLeft = daysFromNow(currentStageDeadline);
   const internalStatus = (internalStatuses[tender.id] || tender.internalStatus || 'Dipantau').trim();
   const submitDeadline =
@@ -185,11 +253,13 @@ export const enrichTender = (tender, keywords, internalStatuses = {}) => {
     tender.deadlineSubmitGate ||
     tender.tgl_akhir_submit ||
     getStageDeadlineFromSchedule(tender, submitGateStage, submitGateStageName) ||
-    (currentStage <= submitGateStage ? tender.deadlineStage : null);
+    (currentStage <= submitGateStage ? currentStageDeadline : null);
+  
   return {
     ...tender,
     ...relevance,
     totalStages: stages.length,
+    currentStage,
     currentStageName,
     currentStageColor,
     deadlineRefStageNo: currentStage,

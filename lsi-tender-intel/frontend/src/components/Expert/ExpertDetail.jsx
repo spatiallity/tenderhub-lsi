@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Save, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Save, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import { Badge, Stars, Btn, Card } from '../UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../../utils/constants';
 import { formatRupiah, initials } from '../../utils/helpers';
@@ -9,7 +9,7 @@ export default function ExpertDetail({ expert }) {
   const {
     reviewDraft, setReviewDraft, addReview,
     historyDraft, setHistoryDraft, addHistory,
-    updateExpertProfile
+    updateExpertProfile, deleteExpert, deleteExpertHistory
   } = useAppContext();
 
   if (!expert) return null;
@@ -17,6 +17,9 @@ export default function ExpertDetail({ expert }) {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileDraft, setProfileDraft] = useState({ nama: '', noHp: '', instansi: '' });
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isSavingReview, setIsSavingReview] = useState(false);
+  const [isSavingHistory, setIsSavingHistory] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   useEffect(() => {
     setProfileDraft({
@@ -163,6 +166,7 @@ export default function ExpertDetail({ expert }) {
                 <th className="bg-slate-50/50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-2 whitespace-nowrap">Peran</th>
                 <th className="bg-slate-50/50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-2 whitespace-nowrap">Bersama</th>
                 <th className="bg-slate-50/50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-2 whitespace-nowrap">Status</th>
+                <th className="bg-slate-50/50 text-slate-500 px-3 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -175,6 +179,13 @@ export default function ExpertDetail({ expert }) {
                   <td className="text-xs px-3 py-2.5">{h.peran}</td>
                   <td className="px-3 py-2.5"><Badge color={h.bersama === 'Sucofindo' ? 'blue' : 'gray'}>{h.bersama}</Badge></td>
                   <td className="px-3 py-2.5"><Badge color="green">{h.status}</Badge></td>
+                  <td className="px-3 py-2.5">
+                    <button 
+                      onClick={() => deleteExpertHistory(expert.id, h.id)}
+                      className="text-red-400 hover:text-red-600 transition-colors" title="Hapus riwayat">
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -194,8 +205,20 @@ export default function ExpertDetail({ expert }) {
               <option>Sucofindo</option><option>Lain</option>
             </select>
           </div>
-          <Btn className="primary small mt-3" onClick={() => addHistory(expert.id)}>
-            <Plus size={14} />Simpan Riwayat
+          <Btn 
+            className="primary small mt-3" 
+            onClick={async () => {
+              if (isSavingHistory) return;
+              setIsSavingHistory(true);
+              try {
+                await addHistory(expert.id);
+              } finally {
+                setIsSavingHistory(false);
+              }
+            }}
+            disabled={isSavingHistory}
+          >
+            <Plus size={14} />{isSavingHistory ? 'Menyimpan...' : 'Simpan Riwayat'}
           </Btn>
         </div>
       </div>
@@ -225,11 +248,64 @@ export default function ExpertDetail({ expert }) {
             <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama reviewer" value={reviewDraft.reviewer} onChange={e => setReviewDraft(p => ({ ...p, reviewer: e.target.value }))} />
             <Stars rating={reviewDraft.rating} size={22} onRate={(rating) => setReviewDraft(p => ({ ...p, rating }))} />
             <textarea className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none min-h-[76px] resize-y" placeholder="Komentar review..." value={reviewDraft.komentar} onChange={e => setReviewDraft(p => ({ ...p, komentar: e.target.value }))} />
-            <Btn className="primary small self-start" onClick={() => addReview(expert.id)}>
-              <Save size={14} />Simpan Review
+            <Btn 
+              className="primary small self-start" 
+              onClick={async () => {
+                if (isSavingReview) return;
+                setIsSavingReview(true);
+                try {
+                  await addReview(expert.id);
+                } finally {
+                  setIsSavingReview(false);
+                }
+              }}
+              disabled={isSavingReview}
+            >
+              <Save size={14} />{isSavingReview ? 'Menyimpan...' : 'Simpan Review'}
             </Btn>
           </div>
         </div>
+      </div>
+
+      {/* Delete Expert */}
+      <div className="mt-4 border-t border-red-100 pt-4">
+        {!showConfirmDelete ? (
+          <button 
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowConfirmDelete(true);
+            }}
+            className="w-full py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-extrabold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+          >
+            <Trash2 size={16} /> Hapus Tenaga Ahli
+          </button>
+        ) : (
+          <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex flex-col items-center justify-center gap-3 animate-fadeIn">
+            <div className="text-sm font-extrabold text-red-700 text-center leading-snug">
+              Apakah Anda yakin ingin menghapus {expert.nama}? Data yang dihapus tidak dapat dikembalikan.
+            </div>
+            <div className="flex gap-2 w-full">
+              <button 
+                type="button"
+                onClick={() => setShowConfirmDelete(false)}
+                className="flex-1 py-2 rounded-lg bg-white text-slate-700 text-xs font-extrabold border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                type="button"
+                onClick={async () => {
+                  await deleteExpert(expert.id);
+                  setShowConfirmDelete(false);
+                }}
+                className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-extrabold shadow-sm hover:bg-red-700 hover:shadow transition-all"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

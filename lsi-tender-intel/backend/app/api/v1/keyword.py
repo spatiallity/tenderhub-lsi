@@ -8,12 +8,12 @@ from app.schemas import KeywordOut, KeywordCreate, KeywordUpdate
 
 router = APIRouter()
 
-@router.get("/", response_model=List[KeywordOut])
+@router.get("", response_model=List[KeywordOut])
 async def get_keywords(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Keyword))
     return result.scalars().all()
 
-@router.post("/", response_model=KeywordOut)
+@router.post("", response_model=KeywordOut)
 async def create_keyword(keyword_in: KeywordCreate, db: AsyncSession = Depends(get_db)):
     keyword = Keyword(**keyword_in.model_dump())
     db.add(keyword)

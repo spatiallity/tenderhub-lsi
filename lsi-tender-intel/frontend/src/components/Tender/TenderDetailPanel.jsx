@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SidePanel, Badge, Button, RelevanceBar, CountdownBadge } from '../UI';
 import TenderTimeline from './TenderTimeline';
 import { formatRupiah, portfolioColor, internalStatusColor } from '../../utils/format';
@@ -7,15 +7,20 @@ import { useAppContext } from '../../store/AppContext';
 import api from '../../services/api';
 
 const TenderDetailPanel = ({ tender, onClose }) => {
-  const { showToast } = useAppContext();
+  const { showToast, updateTenderStatus } = useAppContext();
+  const [selectedStatus, setSelectedStatus] = useState('Dipantau');
+
+  useEffect(() => {
+    if (tender) {
+      setSelectedStatus(tender.internalStatus || tender.status_internal || 'Dipantau');
+    }
+  }, [tender]);
   
   if (!tender) return null;
 
   const handleSaveWatchlist = () => {
-    // API call to watchlist logic
-    api.post('/watchlist', { kd_tender: tender.kd_tender || tender.id, nama_paket: tender.nama, hps: tender.hps })
-      .then(() => showToast("Tender ditambahkan ke Watchlist!"))
-      .catch(() => showToast("Gagal menyimpan tender", "error"));
+    updateTenderStatus(tender.kd_tender || tender.id, selectedStatus);
+    onClose();
   };
 
   return (
@@ -49,7 +54,7 @@ const TenderDetailPanel = ({ tender, onClose }) => {
       <div className="form-grid" style={{ marginBottom: '24px' }}>
         <div>
           <label className="muted" style={{ fontSize: '12px', fontWeight: 800 }}>Ubah Status Internal</label>
-          <select style={{ width: '100%', marginTop: '4px' }} defaultValue={tender.internalStatus || tender.status_internal || 'Dipantau'}>
+          <select style={{ width: '100%', marginTop: '4px' }} value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
             <option>Dipantau</option>
             <option>Akan Diikuti</option>
             <option>Sudah Diikuti</option>
