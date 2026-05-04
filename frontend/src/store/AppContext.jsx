@@ -109,22 +109,20 @@ export const AppProvider = ({ children }) => {
   // ─── Reusable fetch functions ──────────────────────────────────────────────
 
   const fetchTenders = useCallback(() => {
-    api.get('/tender/search', { params: { limit: 200, _t: Date.now() } })
+    api.get('/tender/search', { params: { limit: 200 } })
       .then(res => {
-        console.log('[API] Tenders fetched successfully');
         setTendersRaw(res.data || []);
         const statusMap = {};
         const notesMap = {};
         (res.data || []).forEach(t => {
-          const idKey = String(t.kd_tender || t.id);
-          t.id = idKey;
+          t.id = t.kd_tender || t.id;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
           // API/Supabase data always wins for cross-user sync
-          statusMap[idKey] = s;
+          statusMap[t.id] = s;
           if (t.catatan_internal) {
-            try { notesMap[idKey] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
+            try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
           }
         });
         // API data is source of truth — replaces localStorage values
@@ -151,7 +149,7 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const fetchExperts = useCallback(() => {
-    api.get('/experts', { params: { _t: Date.now() } })
+    api.get('/experts')
       .then(res => {
         const apiExperts = (res.data || []).map(e => ({
           ...e,
@@ -245,48 +243,28 @@ export const AppProvider = ({ children }) => {
     // Subscribe to experts table changes
     const channel = supabase
       .channel('tenderhub-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'experts' }, (payload) => {
-        console.log('[Realtime] experts changed:', payload.eventType);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'experts' }, () => {
+        console.log('[Realtime] experts changed');
         debouncedFetchExperts();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_projects' }, (payload) => {
-        console.log('[Realtime] expert_projects changed:', payload.eventType);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_projects' }, () => {
+        console.log('[Realtime] expert_projects changed');
         debouncedFetchExperts();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_reviews' }, (payload) => {
-        console.log('[Realtime] expert_reviews changed:', payload.eventType);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_reviews' }, () => {
+        console.log('[Realtime] expert_reviews changed');
         debouncedFetchExperts();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tender_watchlist' }, (payload) => {
-        console.log('[Realtime] tender_watchlist changed:', payload.eventType, payload.new);
-        
-        // INSTANT PATCH: Update local state immediately from realtime payload
-        // This ensures sync even if the subsequent API fetch is slightly delayed or cached
-        if (payload.new && payload.new.kd_tender) {
-          const idKey = String(payload.new.kd_tender);
-          if (payload.new.status_internal) {
-            setInternalStatuses(prev => ({ ...prev, [idKey]: payload.new.status_internal }));
-          }
-          if (payload.new.catatan_internal) {
-            try {
-              const notes = JSON.parse(payload.new.catatan_internal);
-              setTenderNotes(prev => ({ ...prev, [idKey]: notes }));
-            } catch (e) { /* ignore */ }
-          }
-        }
-        
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tender_watchlist' }, () => {
+        console.log('[Realtime] tender_watchlist changed');
         debouncedFetchTenders();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, (payload) => {
-        console.log('[Realtime] keywords changed:', payload.eventType);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, () => {
+        console.log('[Realtime] keywords changed');
         if (typeof fetchGlobalKeywords === 'function') fetchGlobalKeywords();
       })
-      .subscribe((status, err) => {
-        console.log('[Realtime] Subscription status:', status);
-        if (err) console.error('[Realtime] Subscription error:', err);
-        if (status === 'CHANNEL_ERROR') {
-          console.warn('[Realtime] Subscription failed. Check RLS or Realtime settings in Supabase dashboard.');
-        }
+      .subscribe((status) => {
+        console.log('[Realtime] subscription status:', status);
       });
 
     return () => {
@@ -416,16 +394,14 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const updateTenderStatus = useCallback((tenderId, newStatus) => {
-    // Ensure tenderId is treated as string for consistent mapping
-    const idKey = String(tenderId);
     // OPTIMISTIC: Update UI immediately
-    setInternalStatuses(prev => ({ ...prev, [idKey]: newStatus }));
-    showToast(`Berhasil ubah status tender: ${newStatus}`);
+    setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
+    showToast(`Status tender diperbarui menjadi ${newStatus}`);
     
     // BACKGROUND: Sync to API
-    const tender = tenders.find(t => String(t.id) === idKey);
+    const tender = tenders.find(t => t.id === tenderId);
     api.post('/watchlist', {
-      kd_tender: parseInt(idKey),
+      kd_tender: parseInt(tenderId),
       status_internal: newStatus,
       nama_paket: tender?.nama || tender?.nama_paket,
       hps: tender?.hps
