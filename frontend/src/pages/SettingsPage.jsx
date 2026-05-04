@@ -6,7 +6,7 @@ import { portfolioColor, PROVINCES } from '../utils/constants';
 
 export default function SettingsPage() {
   const {
-    keywords, addKeyword, removeKeyword,
+    keywords, addKeyword, removeKeyword, deleteGlobalKeyword,
     users, addUser, updateUser, deleteUser,
     coverage, setCoverage,
     hpsThreshold, setHpsThreshold,
@@ -61,13 +61,13 @@ export default function SettingsPage() {
               <div key={port} className="border border-slate-200 rounded-xl p-3 bg-slate-50">
                 <div className="flex items-center gap-2 mb-2">
                   <Badge color={portfolioColor[port]}>{port}</Badge>
-                  <span className="text-[11px] font-bold text-slate-500">{items.filter(k => k.isGlobal).length} keywords global</span>
+                  <span className="text-[11px] font-bold text-slate-500">{items.length} keywords</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {items.filter(k => k.isGlobal).map(k => (
+                  {items.map(k => (
                     <Badge key={k.id} color={k.active ? 'green' : 'gray'} className={!k.active ? 'opacity-60' : ''}>
                       {k.text}
-                      <button onClick={() => removeKeyword(port, k.id, true)} className="ml-1 cursor-pointer text-slate-500 hover:text-red-500 transition-colors">×</button>
+                      <button onClick={() => deleteGlobalKeyword(port, k.id)} className="ml-1 cursor-pointer text-slate-500 hover:text-red-500 transition-colors">×</button>
                     </Badge>
                   ))}
                 </div>
