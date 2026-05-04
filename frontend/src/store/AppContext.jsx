@@ -404,55 +404,50 @@ export const AppProvider = ({ children }) => {
     });
   }, []);
 
-  const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
-    // 1. Update UI state immediately for responsiveness
+  const updateTenderStatus = useCallback((tenderId, newStatus) => {
+    // OPTIMISTIC: Update UI immediately
     setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
+    showToast(`Status tender diperbarui menjadi ${newStatus}`);
     
-    // 2. Persist to Backend
+    // BACKGROUND: Sync to API
     const tender = tenders.find(t => t.id === tenderId);
-    try {
-      await api.post('/watchlist', {
-        kd_tender: parseInt(tenderId),
-        status_internal: newStatus,
-        nama_paket: tender?.nama || tender?.nama_paket,
-        hps: tender?.hps
-      });
-      showToast(`Status tender diperbarui menjadi ${newStatus}`);
-    } catch (e) {
-      console.error("Failed to sync status to database", e);
-      showToast("Gagal menyimpan status ke database, data hanya tersimpan sementara.", "error");
-    }
+    api.post('/watchlist', {
+      kd_tender: parseInt(tenderId),
+      status_internal: newStatus,
+      nama_paket: tender?.nama || tender?.nama_paket,
+      hps: tender?.hps
+    }).catch(() => {
+      showToast("Gagal sinkronisasi status ke server", "warning");
+    });
   }, [tenders, showToast]);
 
-  const updateTenderPIC = useCallback(async (tenderId, userId) => {
+  const updateTenderPIC = useCallback((tenderId, userId) => {
+    // OPTIMISTIC: Update UI immediately
     setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
+    showToast('PIC tender berhasil diatur');
     
-    try {
-      await api.post('/watchlist', {
-        kd_tender: parseInt(tenderId),
-        assigned_expert_ids: userId ? [parseInt(userId)] : []
-      });
-      showToast('PIC tender berhasil diatur');
-    } catch (e) {
-      console.error("Failed to sync PIC to database", e);
-      showToast("Gagal menyimpan PIC ke database, hanya tersimpan lokal.", "error");
-    }
+    // BACKGROUND: Sync to API
+    api.post('/watchlist', {
+      kd_tender: parseInt(tenderId),
+      assigned_expert_ids: userId ? [parseInt(userId)] : []
+    }).catch(() => {
+      showToast("Gagal sinkronisasi PIC ke server", "warning");
+    });
   }, [showToast]);
 
-  const addTenderNote = useCallback(async (tenderId, noteObj) => {
+  const addTenderNote = useCallback((tenderId, noteObj) => {
+    // OPTIMISTIC: Update UI immediately
     const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
     setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
+    showToast('Catatan ditambahkan');
     
-    try {
-      await api.post('/watchlist', {
-        kd_tender: parseInt(tenderId),
-        catatan_internal: JSON.stringify(updatedNotes)
-      });
-      showToast('Catatan ditambahkan');
-    } catch (e) {
-      console.error("Failed to sync notes", e);
-      showToast('Gagal sinkronisasi catatan, hanya tersimpan lokal', 'error');
-    }
+    // BACKGROUND: Sync to API
+    api.post('/watchlist', {
+      kd_tender: parseInt(tenderId),
+      catatan_internal: JSON.stringify(updatedNotes)
+    }).catch(() => {
+      showToast('Gagal sinkronisasi catatan ke server', 'warning');
+    });
   }, [tenderNotes, showToast]);
 
   const openTender = useCallback((id) => {
@@ -491,9 +486,7 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // Expert actions
-  const addExpert = useCallback(async (draft) => {
-    console.log('addExpert called with:', draft);
-    
+  const addExpert = useCallback((draft) => {
     // Handle keahlian - could be array or string
     let keahlianClean = [];
     if (Array.isArray(draft.keahlian)) {
@@ -502,16 +495,12 @@ export const AppProvider = ({ children }) => {
       keahlianClean = draft.keahlian.split(',').map(s => s.trim()).filter(Boolean);
     }
     
-    console.log('Cleaned keahlian:', keahlianClean);
-    
     if (!draft.nama?.trim()) {
-      console.log('Validation failed: nama empty');
       showToast('Nama tenaga ahli wajib diisi', 'error');
       return false;
     }
     
     if (keahlianClean.length === 0) {
-      console.log('Validation failed: keahlian empty');
       showToast('Minimal satu keahlian harus diisi', 'error');
       return false;
     }
@@ -534,50 +523,49 @@ export const AppProvider = ({ children }) => {
       }))
     };
     
-    console.log('Prepared body for API (Bulk):', body);
+    // OPTIMISTIC: Add to UI immediately with a temporary ID
+    const tempId = `temp-${Date.now()}`;
+    const optimisticExpert = {
+      ...body,
+      id: tempId,
+      noHp: draft.noHp || '',
+      portofolio: body.subporto,
+      rating: 0,
+      rating_avg: 0,
+      proyek: draft.history?.length || 0,
+      jumlah_proyek: draft.history?.length || 0,
+      history: draft.history || [],
+      reviews: [],
+      _syncing: true,
+    };
+    setExpertsRaw(prev => [optimisticExpert, ...prev]);
+    showToast('Tenaga ahli berhasil ditambahkan');
     
-    try {
-      console.log('Attempting API call to /experts (Bulk)');
-      const res = await api.post('/experts', body);
-      console.log('API response:', res.data);
-      
-      const newExpert = {
-        ...res.data,
-        noHp: res.data.no_hp || '',
-        portofolio: res.data.subporto || [],
-        rating: res.data.rating_avg || 0,
-        proyek: res.data.jumlah_proyek,
-        history: (res.data.projects || []).map(p => ({
-          id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
-          peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
-        })),
-        reviews: [],
-      };
-      
-      console.log('Adding expert to state:', newExpert);
-      setExpertsRaw(prev => [newExpert, ...prev]);
-      
-      showToast('Tenaga ahli berhasil ditambahkan');
-      return true;
-    } catch (e) {
-      console.error('API call failed, using fallback:', e);
-      // Fallback: save to local state
-      const fallbackExpert = { 
-        ...body, 
-        id: Date.now(), 
-        noHp: draft.noHp || '', 
-        portofolio: body.subporto, 
-        rating: 0, 
-        proyek: draft.history?.length || 0, 
-        history: draft.history || [], 
-        reviews: [], 
-        keahlian: keahlianClean 
-      };
-      
-      setExpertsRaw(prev => [fallbackExpert, ...prev]);
-      showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'warning');
-      return true;
-    }
+    // BACKGROUND: Sync to API
+    api.post('/experts', body)
+      .then(res => {
+        const serverExpert = {
+          ...res.data,
+          noHp: res.data.no_hp || '',
+          portofolio: res.data.subporto || [],
+          rating: res.data.rating_avg || 0,
+          proyek: res.data.jumlah_proyek,
+          history: (res.data.projects || []).map(p => ({
+            id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
+            peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
+          })),
+          reviews: [],
+        };
+        // Replace temp entry with real server data
+        setExpertsRaw(prev => prev.map(e => e.id === tempId ? serverExpert : e));
+      })
+      .catch(() => {
+        // Keep the optimistic entry but mark as local-only
+        setExpertsRaw(prev => prev.map(e => e.id === tempId ? { ...e, _syncing: false } : e));
+        showToast('Gagal sinkronisasi ke server. Data tersimpan lokal.', 'warning');
+      });
+    
+    return true;
   }, [showToast]);
 
   const updateExpertName = useCallback((expertId, nama) => {
@@ -599,84 +587,136 @@ export const AppProvider = ({ children }) => {
     showToast('Profil tenaga ahli berhasil diperbarui');
   }, [showToast]);
 
-  const deleteExpert = useCallback(async (expertId) => {
-    try {
-      await api.delete(`/experts/${expertId}`);
-      setExpertsRaw(prev => prev.filter(e => String(e.id) !== String(expertId)));
-      setSelectedExpertId(null);
-      showToast('Tenaga ahli berhasil dihapus');
-    } catch (err) {
-      console.error('Failed to delete expert:', err);
-      // Still remove from local state even if API fails
-      setExpertsRaw(prev => prev.filter(e => String(e.id) !== String(expertId)));
-      setSelectedExpertId(null);
-      showToast('Gagal terhubung API. Dihapus dari tampilan lokal.', 'warning');
-    }
-  }, [showToast, setSelectedExpertId]);
+  const deleteExpert = useCallback((expertId) => {
+    // OPTIMISTIC: Remove from UI immediately
+    const removedExpert = expertsRaw.find(e => String(e.id) === String(expertId));
+    setExpertsRaw(prev => prev.filter(e => String(e.id) !== String(expertId)));
+    setSelectedExpertId(null);
+    showToast('Tenaga ahli berhasil dihapus');
+    
+    // BACKGROUND: Sync to API
+    api.delete(`/experts/${expertId}`)
+      .catch(() => {
+        // Rollback if API fails — re-add to list
+        if (removedExpert) {
+          setExpertsRaw(prev => [...prev, removedExpert]);
+          showToast('Gagal menghapus dari server. Data dikembalikan.', 'warning');
+        }
+      });
+  }, [showToast, setSelectedExpertId, expertsRaw]);
 
-  const addReview = useCallback(async (expertId) => {
+  const addReview = useCallback((expertId) => {
     if (!reviewDraft.reviewer?.trim() || !reviewDraft.komentar?.trim()) {
       showToast('Nama reviewer dan komentar wajib diisi', 'error');
       return;
     }
-    try {
-      const res = await api.post(`/experts/${expertId}/reviews`, {
-        reviewer_nama: reviewDraft.reviewer,
-        rating: reviewDraft.rating,
-        komentar: reviewDraft.komentar
-      });
-      const newReview = { id: res.data.id, reviewer: res.data.reviewer_nama, rating: res.data.rating, komentar: res.data.komentar, tanggal: new Date().toLocaleDateString('id-ID') };
+    
+    // OPTIMISTIC: Add review to UI immediately
+    const tempReview = {
+      id: `temp-${Date.now()}`,
+      reviewer: reviewDraft.reviewer,
+      rating: reviewDraft.rating,
+      komentar: reviewDraft.komentar,
+      tanggal: new Date().toLocaleDateString('id-ID'),
+    };
+    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+      ...e,
+      reviews: [...(e.reviews || []), tempReview],
+      rating: Number(((e.rating * (e.reviews || []).length + reviewDraft.rating) / ((e.reviews || []).length + 1)).toFixed(1))
+    } : e));
+    const savedDraft = { ...reviewDraft };
+    setReviewDraft({ reviewer: '', rating: 5, komentar: '' });
+    showToast('Review berhasil disimpan');
+    
+    // BACKGROUND: Sync to API
+    api.post(`/experts/${expertId}/reviews`, {
+      reviewer_nama: savedDraft.reviewer,
+      rating: savedDraft.rating,
+      komentar: savedDraft.komentar
+    }).then(res => {
+      // Replace temp ID with server ID
       setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
         ...e,
-        reviews: [...(e.reviews || []), newReview],
-        rating: Number(((e.rating * (e.reviews || []).length + reviewDraft.rating) / ((e.reviews || []).length + 1)).toFixed(1))
+        reviews: (e.reviews || []).map(r => r.id === tempReview.id ? { ...r, id: res.data.id } : r)
       } : e));
-      setReviewDraft({ reviewer: '', rating: 5, komentar: '' });
-      showToast('Review berhasil disimpan');
-    } catch (e) {
-      showToast('Gagal menyimpan review ke database', 'error');
-    }
+    }).catch(() => {
+      showToast('Gagal sinkronisasi review ke server', 'warning');
+    });
   }, [reviewDraft, showToast]);
 
-  const addHistory = useCallback(async (expertId) => {
+  const addHistory = useCallback((expertId) => {
     if (!historyDraft.proyek?.trim()) {
       showToast('Nama proyek wajib diisi', 'error');
       return;
     }
-    try {
-      const res = await api.post(`/experts/${expertId}/projects`, {
-        nama_proyek: historyDraft.proyek,
-        pemberi_kerja: historyDraft.klien || '-',
-        tahun: historyDraft.tahun || new Date().getFullYear(),
-        nilai_proyek: Number(historyDraft.nilai || 0) * 1000000,
-        peran: historyDraft.peran || 'Tenaga Ahli',
-        bersama: historyDraft.bersama || 'Sucofindo',
-        status_proyek: 'Selesai'
+    
+    const apiPayload = {
+      nama_proyek: historyDraft.proyek,
+      pemberi_kerja: historyDraft.klien || '-',
+      tahun: historyDraft.tahun || new Date().getFullYear(),
+      nilai_proyek: Number(historyDraft.nilai || 0) * 1000000,
+      peran: historyDraft.peran || 'Tenaga Ahli',
+      bersama: historyDraft.bersama || 'Sucofindo',
+      status_proyek: 'Selesai'
+    };
+    
+    // OPTIMISTIC: Add to UI immediately
+    const tempProject = {
+      id: `temp-${Date.now()}`,
+      proyek: apiPayload.nama_proyek,
+      klien: apiPayload.pemberi_kerja,
+      tahun: apiPayload.tahun,
+      peran: apiPayload.peran,
+      nilai: apiPayload.nilai_proyek,
+      bersama: apiPayload.bersama,
+      status: apiPayload.status_proyek,
+    };
+    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+      ...e,
+      history: [...(e.history || []), tempProject],
+      proyek: (e.proyek || 0) + 1
+    } : e));
+    setHistoryDraft({ proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo' });
+    showToast('Riwayat berhasil disimpan');
+    
+    // BACKGROUND: Sync to API
+    api.post(`/experts/${expertId}/projects`, apiPayload)
+      .then(res => {
+        setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+          ...e,
+          history: (e.history || []).map(h => h.id === tempProject.id ? { ...h, id: res.data.id } : h)
+        } : e));
+      })
+      .catch(() => {
+        showToast('Gagal sinkronisasi riwayat ke server', 'warning');
       });
-      const newProject = { id: res.data.id, proyek: res.data.nama_proyek, klien: res.data.pemberi_kerja, tahun: res.data.tahun, peran: res.data.peran, nilai: res.data.nilai_proyek, bersama: res.data.bersama, status: res.data.status_proyek };
-      setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
-        ...e,
-        history: [...(e.history || []), newProject],
-        proyek: (e.proyek || 0) + 1
-      } : e));
-      setHistoryDraft({ proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo' });
-      showToast('Riwayat berhasil disimpan');
-    } catch (e) {
-      showToast('Gagal menyimpan riwayat ke database', 'error');
-    }
   }, [historyDraft, showToast]);
 
-  const deleteExpertHistory = useCallback(async (expertId, projectId) => {
-    try {
-      await api.delete(`/experts/${expertId}/projects/${projectId}`);
-      setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
-        ...e, history: (e.history || []).filter(h => String(h.id) !== String(projectId))
-      } : e));
-      showToast('Riwayat berhasil dihapus');
-    } catch (e) {
-      showToast('Gagal menghapus riwayat', 'error');
-    }
-  }, [showToast]);
+  const deleteExpertHistory = useCallback((expertId, projectId) => {
+    // OPTIMISTIC: Remove from UI immediately
+    const expert = expertsRaw.find(e => String(e.id) === String(expertId));
+    const removedProject = expert?.history?.find(h => String(h.id) === String(projectId));
+    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+      ...e,
+      history: (e.history || []).filter(h => String(h.id) !== String(projectId)),
+      proyek: Math.max((e.proyek || 0) - 1, 0)
+    } : e));
+    showToast('Riwayat berhasil dihapus');
+    
+    // BACKGROUND: Sync to API
+    api.delete(`/experts/${expertId}/projects/${projectId}`)
+      .catch(() => {
+        // Rollback on failure
+        if (removedProject) {
+          setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+            ...e,
+            history: [...(e.history || []), removedProject],
+            proyek: (e.proyek || 0) + 1
+          } : e));
+          showToast('Gagal menghapus dari server. Data dikembalikan.', 'warning');
+        }
+      });
+  }, [showToast, expertsRaw]);
 
 
   const addUser = useCallback((draft) => {

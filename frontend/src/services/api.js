@@ -8,9 +8,9 @@ const api = axios.create({
   },
 });
 
-// Retry logic: retry up to 3 times on 429 or network errors
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 2000; // 2 seconds between retries
+// Retry logic: retry once on 429 or server errors (keep it fast for HF Spaces)
+const MAX_RETRIES = 1;
+const RETRY_DELAY_MS = 1000; // 1 second before retry
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
