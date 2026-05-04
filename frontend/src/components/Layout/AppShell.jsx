@@ -143,13 +143,26 @@ export default function AppShell() {
         <div className="flex flex-col h-full p-4">
           {/* Logo & Toggle */}
           <div className={`flex items-start justify-between mb-8 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
-            <div className={`overflow-hidden transition-all duration-300 flex flex-col ${sidebarOpen ? 'opacity-100 w-auto' : 'opacity-0 w-0 hidden'}`}>
-              <div className="text-[19px] font-black tracking-tight leading-tight">
-                <span className="text-blue-600">Tender</span>
-                <span style={{ color: '#13B2AA' }}>Hub</span>
+            <div className={`overflow-hidden transition-all duration-300 flex items-start gap-3 ${sidebarOpen ? 'opacity-100 w-auto' : 'opacity-0 w-0 hidden'}`}>
+              {/* Icon Dokumen */}
+              <div className="shrink-0 mt-0.5">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#13B2AA" fillOpacity="0.1" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M14 2V8H20" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16 13H8" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16 17H8" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10 9H9H8" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
-              <div className="text-[10px] text-slate-500 mt-1.5 leading-snug">SBU Layanan Publik, SDA, dan Investasi</div>
-              <div className="text-[10px] text-slate-400 font-semibold">PT. SUCOFINDO</div>
+              
+              {/* Text */}
+              <div className="flex flex-col">
+                <div className="text-[17px] font-black tracking-tight leading-tight">
+                  <span className="text-blue-600">Tender</span>
+                  <span style={{ color: '#13B2AA' }}>Hub</span>
+                </div>
+                <div className="text-[10px] text-slate-600 mt-1 leading-snug font-semibold">SBU LSI PT SUCOFINDO</div>
+              </div>
             </div>
             
             {/* Desktop Toggle */}
@@ -258,8 +271,17 @@ export default function AppShell() {
             </button>
             
             {/* Mobile Logo */}
-            <div className="text-sm font-extrabold tracking-tight text-blue-600">
-              TenderHub
+            <div className="flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#13B2AA" fillOpacity="0.1" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M14 2V8H20" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M16 13H8" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M16 17H8" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <div className="text-sm font-extrabold tracking-tight">
+                <span className="text-blue-600">Tender</span>
+                <span style={{ color: '#13B2AA' }}>Hub</span>
+              </div>
             </div>
             
             {/* Mobile Actions */}

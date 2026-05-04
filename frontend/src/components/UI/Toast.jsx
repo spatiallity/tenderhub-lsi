@@ -157,7 +157,7 @@ export const ToastContainer = ({ toasts = [], onRemove }) => {
   
   return createPortal(
     <div
-      className="fixed top-4 right-4 z-[1080] flex flex-col gap-3 pointer-events-none"
+      className="fixed bottom-4 right-4 z-[1080] flex flex-col-reverse gap-3 pointer-events-none"
       aria-live="polite"
       aria-atomic="false"
     >
