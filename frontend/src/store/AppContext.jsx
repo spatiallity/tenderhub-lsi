@@ -193,6 +193,14 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     fetchTenders();
+    
+    // Auto-refresh tenders every 60 seconds to sync with other users
+    const intervalId = setInterval(() => {
+      console.log('Auto-refreshing tenders data...');
+      fetchTenders();
+    }, 60 * 1000); // 60 seconds
+    
+    return () => clearInterval(intervalId);
   }, [fetchTenders]);
 
   useEffect(() => {
@@ -209,6 +217,14 @@ export const AppProvider = ({ children }) => {
     if (expertsLoadedRef.current) return;
     expertsLoadedRef.current = true;
     fetchExperts();
+    
+    // Auto-refresh experts every 2 minutes to sync with other users
+    const intervalId = setInterval(() => {
+      console.log('Auto-refreshing experts data...');
+      fetchExperts();
+    }, 2 * 60 * 1000); // 2 minutes
+    
+    return () => clearInterval(intervalId);
   }, [fetchExperts]);
 
   // ─── Refresh on tab focus (sync changes from other users) ─────────────────
@@ -708,6 +724,20 @@ export const AppProvider = ({ children }) => {
     showToast('Pengguna berhasil dihapus');
   }, [showToast]);
 
+  // Manual refresh function for users to sync data
+  const refreshAllData = useCallback(async () => {
+    showToast('Menyinkronkan data...', 'info');
+    try {
+      await Promise.all([
+        fetchTenders(),
+        fetchExperts(),
+      ]);
+      showToast('Data berhasil disinkronkan');
+    } catch (error) {
+      showToast('Gagal menyinkronkan data', 'error');
+    }
+  }, [fetchTenders, fetchExperts, showToast]);
+
   const value = useMemo(() => ({
     // Sidebar
     sidebarCollapsed, setSidebarCollapsed,
@@ -755,6 +785,8 @@ export const AppProvider = ({ children }) => {
     addExpert, updateExpertName, updateExpertProfile, deleteExpert, deleteExpertHistory,
     reviewDraft, setReviewDraft, addReview,
     historyDraft, setHistoryDraft, addHistory,
+    // Data refresh
+    refreshAllData,
   }), [
     sidebarCollapsed, toast, showToast,
     tenders, rupPlans, expertsRaw,
@@ -770,6 +802,7 @@ export const AppProvider = ({ children }) => {
     newTenderIds, newRupIds, openTender, openRup,
     markTenderOpened, markRupOpened,
     showWinrateDetail, showStageRef, showPotensiChart, showUrgentPanel, showKeywordManager,
+    refreshAllData,
     dashboardChartFilter,
     addExpert, updateExpertName, updateExpertProfile, deleteExpert, deleteExpertHistory,
     reviewDraft, addReview, historyDraft, addHistory,
