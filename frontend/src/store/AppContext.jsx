@@ -203,10 +203,45 @@ export const AppProvider = ({ children }) => {
       .finally(() => setLoadingRup(false));
   }, []); // Empty dependency - only run once on mount
 
+  const fetchKeywords = useCallback(() => {
+    api.get('/keyword')
+      .then(res => {
+        const data = res.data || [];
+        const grouped = { SDA: [], FLP: [], FITI: [] };
+        data.forEach(k => {
+          if (grouped[k.subporto]) {
+            grouped[k.subporto].push({
+              id: k.id,
+              text: k.keyword_text,
+              active: k.is_active,
+              isGlobal: true
+            });
+          }
+        });
+        
+        setKeywords(prev => {
+          const merged = { SDA: [], FLP: [], FITI: [] };
+          ['SDA', 'FLP', 'FITI'].forEach(port => {
+            const localOnly = (prev[port] || []).filter(k => !k.isGlobal);
+            // Replace global keywords with fresh API data, keep local ones
+            merged[port] = [...grouped[port], ...localOnly];
+          });
+          return merged;
+        });
+      })
+      .catch(() => {
+        setKeywords(prev => {
+          if (Object.values(prev).flat().length === 0) return DEFAULT_KEYWORDS;
+          return prev;
+        });
+      });
+  }, []);
+
   useEffect(() => {
     if (expertsLoadedRef.current) return;
     expertsLoadedRef.current = true;
     fetchExperts();
+    fetchKeywords();
     
     // Fallback polling every 5 minutes (Realtime handles instant sync)
     const intervalId = setInterval(() => {
@@ -214,7 +249,7 @@ export const AppProvider = ({ children }) => {
     }, 5 * 60 * 1000);
     
     return () => clearInterval(intervalId);
-  }, [fetchExperts]);
+  }, [fetchExperts, fetchKeywords]);
 
   // ─── Supabase Realtime: instant cross-user sync ────────────────────────────
 
@@ -230,6 +265,7 @@ export const AppProvider = ({ children }) => {
     };
     const expertTimerRef = { current: null };
     const tenderTimerRef = { current: null };
+    const keywordTimerRef = { current: null };
 
     const debouncedFetchExperts = () => {
       if (expertTimerRef.current) clearTimeout(expertTimerRef.current);
@@ -238,6 +274,11 @@ export const AppProvider = ({ children }) => {
     const debouncedFetchTenders = () => {
       if (tenderTimerRef.current) clearTimeout(tenderTimerRef.current);
       tenderTimerRef.current = setTimeout(() => fetchTenders(), 800);
+    };
+
+    const debouncedFetchKeywords = () => {
+      if (keywordTimerRef.current) clearTimeout(keywordTimerRef.current);
+      keywordTimerRef.current = setTimeout(() => fetchKeywords(), 800);
     };
 
     // Subscribe to experts table changes
@@ -261,7 +302,7 @@ export const AppProvider = ({ children }) => {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, () => {
         console.log('[Realtime] keywords changed');
-        if (typeof fetchGlobalKeywords === 'function') fetchGlobalKeywords();
+        debouncedFetchKeywords();
       })
       .subscribe((status) => {
         console.log('[Realtime] subscription status:', status);
@@ -282,6 +323,7 @@ export const AppProvider = ({ children }) => {
         // Re-fetch everything when user returns to tab
         fetchTenders();
         fetchExperts();
+        fetchKeywords();
       }
     };
 
@@ -450,77 +492,64 @@ export const AppProvider = ({ children }) => {
   }, [markRupOpened]);
 
   // Keyword actions
-  const fetchGlobalKeywords = useCallback(() => {
-    api.get('/keyword').then(res => {
-      const globalKws = { SDA: [], FLP: [], FITI: [] };
-      (res.data || []).forEach(k => {
-        if (globalKws[k.subporto]) {
-          globalKws[k.subporto].push({ id: k.id, text: k.keyword_text, active: k.is_active, isGlobal: true });
-        }
-      });
-      setKeywords(prev => {
-        const merged = { SDA: [], FLP: [], FITI: [] };
-        ['SDA', 'FLP', 'FITI'].forEach(p => {
-          const locals = prev[p].filter(x => !x.isGlobal && !String(x.id).startsWith('temp-'));
-          merged[p] = [...globalKws[p], ...locals];
-        });
-        return merged;
-      });
-    }).catch(err => console.error("Failed to fetch global keywords", err));
-  }, []);
-
-  useEffect(() => {
-    fetchGlobalKeywords();
-  }, [fetchGlobalKeywords]);
-
   const addKeyword = useCallback((portfolio, text, isGlobal = false) => {
     if (!text?.trim()) return;
-    const trimText = text.trim();
+    
     if (isGlobal) {
-      // Optimistic update
-      const tempId = `temp-${Date.now()}`;
+      api.post('/keyword', { keyword_text: text.trim(), subporto: portfolio, is_active: true })
+        .then(() => showToast('Keyword global berhasil ditambahkan'))
+        .catch(() => showToast('Gagal menambah keyword global', 'error'));
+        
       setKeywords(prev => ({
         ...prev,
-        [portfolio]: [...prev[portfolio], { id: tempId, text: trimText, active: true, isGlobal: true }]
+        [portfolio]: [...prev[portfolio], { id: `temp-${Date.now()}`, text: text.trim(), active: true, isGlobal: true }]
       }));
-      api.post('/keyword', { keyword_text: trimText, subporto: portfolio, is_active: true })
-        .then(() => fetchGlobalKeywords())
-        .catch(() => showToast('Gagal menyimpan keyword global', 'error'));
     } else {
       setKeywords(prev => ({
         ...prev,
-        [portfolio]: [...prev[portfolio], { id: `local-${Date.now()}`, text: trimText, active: true, isGlobal: false }]
+        [portfolio]: [...prev[portfolio], { id: `local-${Date.now()}`, text: text.trim(), active: true, isGlobal: false }]
       }));
     }
-  }, [showToast, fetchGlobalKeywords]);
+  }, [showToast]);
 
-  const removeKeyword = useCallback((portfolio, id, isGlobal = false) => {
-    if (isGlobal && typeof id === 'number') { // DB IDs are numbers
+  const removeKeyword = useCallback((portfolio, id) => {
+    // Local remove (hides it from current session even if global)
+    setKeywords(prev => ({ ...prev, [portfolio]: prev[portfolio].filter(k => k.id !== id) }));
+  }, []);
+
+  const deleteGlobalKeyword = useCallback((portfolio, id) => {
+    // Global remove via API
+    if (!String(id).startsWith('temp-') && !String(id).startsWith('local-')) {
       api.delete(`/keyword/${id}`)
-        .then(() => fetchGlobalKeywords())
-        .catch(() => showToast('Gagal menghapus keyword global', 'error'));
+        .then(() => showToast('Keyword global dihapus'))
+        .catch(() => showToast('Gagal menghapus keyword', 'error'));
     }
     setKeywords(prev => ({ ...prev, [portfolio]: prev[portfolio].filter(k => k.id !== id) }));
-  }, [fetchGlobalKeywords, showToast]);
+  }, [showToast]);
 
   const clearKeywords = useCallback(() => {
-    // Only clear local keywords
+    // Reset local filter state (deactivate all)
     setKeywords(prev => {
       const cleared = { SDA: [], FLP: [], FITI: [] };
-      ['SDA', 'FLP', 'FITI'].forEach(p => {
-        cleared[p] = prev[p].filter(k => k.isGlobal);
+      ['SDA', 'FLP', 'FITI'].forEach(port => {
+        cleared[port] = prev[port].map(k => ({ ...k, active: false }));
       });
       return cleared;
     });
-    showToast('Semua keyword lokal berhasil dibersihkan');
+    showToast('Filter keyword dinonaktifkan');
   }, [showToast]);
 
   const updateKeyword = useCallback((portfolio, id, patch) => {
+    const keyword = keywords[portfolio]?.find(k => k.id === id);
+    if (keyword?.isGlobal && !String(id).startsWith('temp-') && patch.active !== undefined) {
+      api.put(`/keyword/${id}`, { is_active: patch.active })
+        .catch(() => showToast('Gagal update status keyword', 'error'));
+    }
     setKeywords(prev => ({
       ...prev,
       [portfolio]: prev[portfolio].map(k => k.id === id ? { ...k, ...patch } : k)
     }));
-  }, []);
+  }, [keywords, showToast]);
 
   // Expert actions
   const addExpert = useCallback((draft) => {
@@ -793,6 +822,7 @@ export const AppProvider = ({ children }) => {
       await Promise.all([
         fetchTenders(),
         fetchExperts(),
+        fetchKeywords(),
       ]);
       showToast('Data berhasil disinkronkan');
     } catch (error) {
@@ -816,7 +846,7 @@ export const AppProvider = ({ children }) => {
     // Derived
     keywordCount, totalPotensi, relevantCount, urgentCount,
     // Keywords
-    keywords, setKeywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
+    keywords, setKeywords, addKeyword, removeKeyword, deleteGlobalKeyword, clearKeywords, updateKeyword,
     // Internal state
     internalStatuses, updateTenderStatus,
     tenderNotes, setTenderNotes, addTenderNote,
@@ -854,7 +884,7 @@ export const AppProvider = ({ children }) => {
     tenders, rupPlans, expertsRaw,
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,
-    keywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
+    keywords, addKeyword, removeKeyword, deleteGlobalKeyword, clearKeywords, updateKeyword,
     internalStatuses, updateTenderStatus, tenderNotes, setTenderNotes, addTenderNote,
     assignedPICs, updateTenderPIC,
     users, addUser, updateUser, deleteUser,
