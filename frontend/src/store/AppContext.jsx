@@ -259,6 +259,10 @@ export const AppProvider = ({ children }) => {
         console.log('[Realtime] tender_watchlist changed');
         debouncedFetchTenders();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, () => {
+        console.log('[Realtime] keywords changed');
+        if (typeof fetchGlobalKeywords === 'function') fetchGlobalKeywords();
+      })
       .subscribe((status) => {
         console.log('[Realtime] subscription status:', status);
       });
@@ -446,21 +450,69 @@ export const AppProvider = ({ children }) => {
   }, [markRupOpened]);
 
   // Keyword actions
-  const addKeyword = useCallback((portfolio, text) => {
-    if (!text?.trim()) return;
-    setKeywords(prev => ({
-      ...prev,
-      [portfolio]: [...prev[portfolio], { id: `${portfolio}-${Date.now()}`, text: text.trim(), active: true }]
-    }));
-  }, [showToast]);
-
-  const removeKeyword = useCallback((portfolio, id) => {
-    setKeywords(prev => ({ ...prev, [portfolio]: prev[portfolio].filter(k => k.id !== id) }));
+  const fetchGlobalKeywords = useCallback(() => {
+    api.get('/keyword').then(res => {
+      const globalKws = { SDA: [], FLP: [], FITI: [] };
+      (res.data || []).forEach(k => {
+        if (globalKws[k.subporto]) {
+          globalKws[k.subporto].push({ id: k.id, text: k.keyword_text, active: k.is_active, isGlobal: true });
+        }
+      });
+      setKeywords(prev => {
+        const merged = { SDA: [], FLP: [], FITI: [] };
+        ['SDA', 'FLP', 'FITI'].forEach(p => {
+          const locals = prev[p].filter(x => !x.isGlobal && !String(x.id).startsWith('temp-'));
+          merged[p] = [...globalKws[p], ...locals];
+        });
+        return merged;
+      });
+    }).catch(err => console.error("Failed to fetch global keywords", err));
   }, []);
 
+  useEffect(() => {
+    fetchGlobalKeywords();
+  }, [fetchGlobalKeywords]);
+
+  const addKeyword = useCallback((portfolio, text, isGlobal = false) => {
+    if (!text?.trim()) return;
+    const trimText = text.trim();
+    if (isGlobal) {
+      // Optimistic update
+      const tempId = `temp-${Date.now()}`;
+      setKeywords(prev => ({
+        ...prev,
+        [portfolio]: [...prev[portfolio], { id: tempId, text: trimText, active: true, isGlobal: true }]
+      }));
+      api.post('/keyword', { keyword_text: trimText, subporto: portfolio, is_active: true })
+        .then(() => fetchGlobalKeywords())
+        .catch(() => showToast('Gagal menyimpan keyword global', 'error'));
+    } else {
+      setKeywords(prev => ({
+        ...prev,
+        [portfolio]: [...prev[portfolio], { id: `local-${Date.now()}`, text: trimText, active: true, isGlobal: false }]
+      }));
+    }
+  }, [showToast, fetchGlobalKeywords]);
+
+  const removeKeyword = useCallback((portfolio, id, isGlobal = false) => {
+    if (isGlobal && typeof id === 'number') { // DB IDs are numbers
+      api.delete(`/keyword/${id}`)
+        .then(() => fetchGlobalKeywords())
+        .catch(() => showToast('Gagal menghapus keyword global', 'error'));
+    }
+    setKeywords(prev => ({ ...prev, [portfolio]: prev[portfolio].filter(k => k.id !== id) }));
+  }, [fetchGlobalKeywords, showToast]);
+
   const clearKeywords = useCallback(() => {
-    setKeywords(prev => Object.fromEntries(Object.keys(prev).map(portfolio => [portfolio, []])));
-    showToast('Semua keyword berhasil dibersihkan');
+    // Only clear local keywords
+    setKeywords(prev => {
+      const cleared = { SDA: [], FLP: [], FITI: [] };
+      ['SDA', 'FLP', 'FITI'].forEach(p => {
+        cleared[p] = prev[p].filter(k => k.isGlobal);
+      });
+      return cleared;
+    });
+    showToast('Semua keyword lokal berhasil dibersihkan');
   }, [showToast]);
 
   const updateKeyword = useCallback((portfolio, id, patch) => {

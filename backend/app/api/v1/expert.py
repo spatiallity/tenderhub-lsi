@@ -12,7 +12,9 @@ router = APIRouter()
 @router.get("", response_model=List[ExpertOut])
 async def list_experts(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Expert).options(selectinload(Expert.projects), selectinload(Expert.reviews))
+        select(Expert)
+        .options(selectinload(Expert.projects), selectinload(Expert.reviews))
+        .order_by(Expert.id.desc())
     )
     return result.scalars().all()
 
