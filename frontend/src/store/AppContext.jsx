@@ -245,28 +245,32 @@ export const AppProvider = ({ children }) => {
     // Subscribe to experts table changes
     const channel = supabase
       .channel('tenderhub-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'experts' }, () => {
-        console.log('[Realtime] experts changed');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'experts' }, (payload) => {
+        console.log('[Realtime] experts changed:', payload.eventType);
         debouncedFetchExperts();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_projects' }, () => {
-        console.log('[Realtime] expert_projects changed');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_projects' }, (payload) => {
+        console.log('[Realtime] expert_projects changed:', payload.eventType);
         debouncedFetchExperts();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_reviews' }, () => {
-        console.log('[Realtime] expert_reviews changed');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_reviews' }, (payload) => {
+        console.log('[Realtime] expert_reviews changed:', payload.eventType);
         debouncedFetchExperts();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tender_watchlist' }, () => {
-        console.log('[Realtime] tender_watchlist changed');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tender_watchlist' }, (payload) => {
+        console.log('[Realtime] tender_watchlist changed:', payload.eventType, payload.new);
         debouncedFetchTenders();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, () => {
-        console.log('[Realtime] keywords changed');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, (payload) => {
+        console.log('[Realtime] keywords changed:', payload.eventType);
         if (typeof fetchGlobalKeywords === 'function') fetchGlobalKeywords();
       })
-      .subscribe((status) => {
-        console.log('[Realtime] subscription status:', status);
+      .subscribe((status, err) => {
+        console.log('[Realtime] Subscription status:', status);
+        if (err) console.error('[Realtime] Subscription error:', err);
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('[Realtime] Subscription failed. Check RLS or Realtime settings in Supabase dashboard.');
+        }
       });
 
     return () => {
