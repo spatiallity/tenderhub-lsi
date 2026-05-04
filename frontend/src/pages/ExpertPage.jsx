@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Search, MapPin, ChevronRight, Filter, Star, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Filter, Star, Plus, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
 import { useAppContext } from '../store/AppContext';
 import { Badge, PageTitle, Card, Btn, Stars } from '../components/UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../utils/constants';
 import { formatRupiah, initials } from '../utils/helpers';
 
 export default function ExpertPage() {
-  const { experts, setSelectedExpertId, addExpert, showToast } = useAppContext();
+  const { experts, setSelectedExpertId, addExpert, showToast, refreshAllData } = useAppContext();
 
   const [expertSearch, setExpertSearch] = useState('');
   const [availFilter, setAvailFilter] = useState('Semua');
@@ -75,105 +75,103 @@ export default function ExpertPage() {
       <PageTitle
         title="Database Tenaga Ahli"
         subtitle={`${filteredExperts.length} tenaga ahli tampil dari total ${experts?.length || 0}. Siapkan kandidat sejak fase RUP agar respons proposal lebih cepat.`}
-        right={<Btn className="primary" onClick={() => setShowForm(true)}><Plus size={16} />Tambah Tenaga Ahli</Btn>}
+        right={
+          <div className="flex gap-2">
+            <Btn className="ghost" onClick={refreshAllData} title="Refresh data dari server">
+              <RefreshCw size={16} />Refresh
+            </Btn>
+            <Btn className="primary" onClick={() => setShowForm(true)}>
+              <Plus size={16} />Tambah Tenaga Ahli
+            </Btn>
+          </div>
+        }
       />
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-[slideUp_0.3s_ease-out]">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-extrabold tracking-tight text-slate-900">Tambah Tenaga Ahli</h2>
-                <p className="text-slate-500 text-[11px] mt-0.5">Isi profil ringkas untuk kandidat expert baru.</p>
-              </div>
-              <button onClick={() => setShowForm(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                ✕
-              </button>
+        <Card className="border-2 border-blue-100 bg-blue-50/30 animate-[slideDown_0.3s_ease-out] mb-4">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-blue-100">
+            <div>
+              <h2 className="text-base font-extrabold tracking-tight text-slate-900">Form Tambah Tenaga Ahli</h2>
+              <p className="text-slate-500 text-[11px] mt-0.5">Lengkapi profil untuk kandidat expert baru.</p>
             </div>
-            <div className="p-5 flex flex-col gap-3">
-              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama lengkap" value={draft.nama} onChange={e => setDraft(p => ({ ...p, nama: e.target.value }))} />
-              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Instansi / afiliasi" value={draft.instansi} onChange={e => setDraft(p => ({ ...p, instansi: e.target.value }))} />
-              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="No. HP" value={draft.noHp} onChange={e => setDraft(p => ({ ...p, noHp: e.target.value }))} />
-              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Keahlian utama (pisahkan koma)" value={draft.keahlian} onChange={e => setDraft(p => ({ ...p, keahlian: e.target.value }))} />
-              <select className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" value={draft.availability} onChange={e => setDraft(p => ({ ...p, availability: e.target.value }))}>
+            <button onClick={() => setShowForm(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white text-slate-400 hover:text-slate-600 transition-colors shadow-sm">
+              ✕
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Informasi Dasar</label>
+              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="Nama lengkap" value={draft.nama} onChange={e => setDraft(p => ({ ...p, nama: e.target.value }))} />
+              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="Instansi / afiliasi" value={draft.instansi} onChange={e => setDraft(p => ({ ...p, instansi: e.target.value }))} />
+              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="No. HP" value={draft.noHp} onChange={e => setDraft(p => ({ ...p, noHp: e.target.value }))} />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Keahlian & Unit</label>
+              <input className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="Keahlian utama (pisahkan koma)" value={draft.keahlian} onChange={e => setDraft(p => ({ ...p, keahlian: e.target.value }))} />
+              <select className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={draft.availability} onChange={e => setDraft(p => ({ ...p, availability: e.target.value }))}>
                 <option>Tersedia</option><option>Sedang Bertugas</option><option>Tidak Tersedia</option>
               </select>
-              <select className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" value={draft.portfolio} onChange={e => setDraft(p => ({ ...p, portfolio: e.target.value }))}>
+              <select className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" value={draft.portfolio} onChange={e => setDraft(p => ({ ...p, portfolio: e.target.value }))}>
                 <option value="SDA">SDA</option><option value="FLP">FLP</option><option value="FITI">FITI</option>
               </select>
-              
-              <div className="mt-2 pt-2 border-t border-slate-100">
-                <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Riwayat Pekerjaan Terakhir</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama proyek" value={draft.historyProyek} onChange={e => setDraft(p => ({ ...p, historyProyek: e.target.value }))} />
-                  <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Klien" value={draft.historyKlien} onChange={e => setDraft(p => ({ ...p, historyKlien: e.target.value }))} />
-                  <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Tahun" value={draft.historyTahun} onChange={e => setDraft(p => ({ ...p, historyTahun: e.target.value }))} />
-                  <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Peran" value={draft.historyPeran} onChange={e => setDraft(p => ({ ...p, historyPeran: e.target.value }))} />
-                </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Pengalaman Terakhir</label>
+              <div className="grid grid-cols-2 gap-2">
+                <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="Nama proyek" value={draft.historyProyek} onChange={e => setDraft(p => ({ ...p, historyProyek: e.target.value }))} />
+                <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="Klien" value={draft.historyKlien} onChange={e => setDraft(p => ({ ...p, historyKlien: e.target.value }))} />
+                <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="Tahun" value={draft.historyTahun} onChange={e => setDraft(p => ({ ...p, historyTahun: e.target.value }))} />
+                <input className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" placeholder="Peran" value={draft.historyPeran} onChange={e => setDraft(p => ({ ...p, historyPeran: e.target.value }))} />
               </div>
             </div>
-            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
-              <Btn className="ghost" onClick={() => setShowForm(false)} disabled={isSaving}>Batal</Btn>
-              <Btn 
-                className="primary" 
-                disabled={isSaving}
-                onClick={async () => {
-                  if (isSaving) return; // Prevent double-click
-                  
-                  setIsSaving(true);
-                  try {
-                    const history = [];
-                    if (draft.historyProyek) {
-                      history.push({
-                        proyek: draft.historyProyek,
-                        klien: draft.historyKlien,
-                        tahun: draft.historyTahun,
-                        peran: draft.historyPeran,
-                        nilai: 0,
-                        bersama: 'Sucofindo',
-                        status: 'Selesai'
-                      });
-                    }
-                    
-                    const newExpert = {
-                      ...draft,
-                      keahlian: draft.keahlian.split(',').map(s => s.trim()).filter(Boolean),
-                      history
-                    };
-                    
-                    console.log('Submitting expert:', newExpert);
-                    const success = await addExpert(newExpert);
-                    console.log('Add expert result:', success);
-                    
-                    if (success) {
-                      // Reset form
-                      setDraft({ 
-                        nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
-                        historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
-                      });
-                      
-                      // Reset filters to show new expert
-                      setExpertSearch('');
-                      setAvailFilter('Semua');
-                      setPortFilter('Semua');
-                      setSortKey('');
-                      
-                      // Close form
-                      setShowForm(false);
-                    }
-                  } catch (error) {
-                    console.error('Error adding expert:', error);
-                    showToast('Terjadi kesalahan saat menambah tenaga ahli', 'error');
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-              >
-                {isSaving ? 'Menyimpan...' : 'Simpan'}
-              </Btn>
-            </div>
           </div>
-        </div>
+
+          <div className="mt-6 flex gap-2 justify-end">
+            <Btn className="ghost" onClick={() => setShowForm(false)} disabled={isSaving}>Batal</Btn>
+            <Btn 
+              className="primary" 
+              disabled={isSaving}
+              onClick={async () => {
+                if (isSaving) return;
+                setIsSaving(true);
+                try {
+                  const history = [];
+                  if (draft.historyProyek) {
+                    history.push({
+                      proyek: draft.historyProyek,
+                      klien: draft.historyKlien,
+                      tahun: draft.historyTahun,
+                      peran: draft.historyPeran,
+                      nilai: 0,
+                      bersama: 'Sucofindo',
+                      status: 'Selesai'
+                    });
+                  }
+                  
+                  const newExpert = { ...draft, history };
+                  const success = await addExpert(newExpert);
+                  
+                  if (success) {
+                    setDraft({ 
+                      nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
+                      historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
+                    });
+                    setShowForm(false);
+                  }
+                } catch (error) {
+                  console.error('Error adding expert:', error);
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
+            >
+              {isSaving ? 'Menyimpan...' : 'Simpan Tenaga Ahli'}
+            </Btn>
+          </div>
+        </Card>
       )}
 
       <Card>

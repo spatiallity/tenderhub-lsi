@@ -1,6 +1,12 @@
 // Semua konstanta dari mockup index.html
 
-export const TODAY = new Date();
+// TODAY is a getter function that always returns the current date
+// This ensures daysLeft calculations update correctly each day
+export const TODAY = (() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
+})();
 
 export const portfolioColor = { FLP: 'blue', SDA: 'green', FITI: 'amber' };
 export const internalStatusColor = { 'Dipantau': 'gray', 'Akan Diikuti': 'amber', 'Sudah Diikuti': 'green', 'Tidak Relevan': 'red' };

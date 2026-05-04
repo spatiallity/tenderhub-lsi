@@ -21,10 +21,10 @@ const Card = ({
   
   // Variant styles
   const variantStyles = {
-    default: 'bg-white border border-slate-200 shadow-sm',
-    elevated: 'bg-white border border-slate-200 shadow-md',
+    default: 'bg-white border-2 border-slate-200 shadow-sm',
+    elevated: 'bg-white border-2 border-slate-200 shadow-md',
     outlined: 'bg-white border-2 border-slate-300',
-    interactive: 'bg-white border border-slate-200 shadow-sm',
+    interactive: 'bg-white border-2 border-slate-200 shadow-sm',
   };
   
   // Interactive styles
@@ -100,7 +100,7 @@ export const CardBody = ({ children, className = '', ...props }) => (
  * CardFooter - Footer section of card
  */
 export const CardFooter = ({ children, className = '', ...props }) => (
-  <div className={`mt-4 pt-4 border-t border-slate-200 ${className}`} {...props}>
+  <div className={`mt-4 pt-4 border-t-2 border-slate-200 ${className}`} {...props}>
     {children}
   </div>
 );
@@ -110,15 +110,19 @@ export const CardFooter = ({ children, className = '', ...props }) => (
  */
 export const KpiCard = ({
   title,
+  label, // alias for title
   value,
+  sub,   // alias for subtitle
   subtitle,
   icon: Icon,
-  trend,
-  trendValue,
   color = 'blue',
+  bg,    // custom bg color
   onClick,
   className = '',
 }) => {
+  const displayTitle = title || label;
+  const displaySub = subtitle || sub;
+
   const colorStyles = {
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-green-50 text-green-600',
@@ -127,48 +131,35 @@ export const KpiCard = ({
     purple: 'bg-purple-50 text-purple-600',
   };
   
-  const trendColors = {
-    up: 'text-green-600',
-    down: 'text-red-600',
-    neutral: 'text-slate-600',
-  };
+  const iconStyle = bg ? { backgroundColor: bg, color: color } : {};
   
   return (
-    <Card
-      variant={onClick ? 'interactive' : 'default'}
+    <div
       onClick={onClick}
-      className={className}
+      className={`bg-white rounded-2xl p-5 border-2 border-slate-100/50 shadow-sm flex justify-between items-start ${onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200' : ''} ${className}`}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-slate-600 mb-1">{title}</p>
-          <p className="text-2xl font-bold text-slate-900 mb-1">{value}</p>
-          {subtitle && (
-            <p className="text-xs text-slate-500">{subtitle}</p>
-          )}
-          {trend && trendValue && (
-            <div className={`flex items-center gap-1 mt-2 text-xs font-semibold ${trendColors[trend]}`}>
-              {trend === 'up' && (
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M6 10V2M6 2L2 6M6 2L10 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-              {trend === 'down' && (
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M6 2V10M6 10L10 6M6 10L2 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-              <span>{trendValue}</span>
-            </div>
-          )}
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-1.5 truncate">
+          {displayTitle}
         </div>
-        {Icon && (
-          <div className={`p-3 rounded-xl ${colorStyles[color]}`}>
-            <Icon size={24} />
+        <div className="text-[32px] font-black tracking-tight leading-none text-slate-900">
+          {value}
+        </div>
+        {displaySub && (
+          <div className="text-[12px] font-medium text-slate-500 mt-2 truncate">
+            {displaySub}
           </div>
         )}
       </div>
-    </Card>
+      {Icon && (
+        <div 
+          className={`w-[48px] h-[48px] rounded-xl flex items-center justify-center shrink-0 shadow-sm ${!bg ? colorStyles[color] : ''}`}
+          style={iconStyle}
+        >
+          <Icon size={24} />
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -61,7 +61,7 @@ class ExpertBase(BaseModel):
 
 
 class ExpertCreate(ExpertBase):
-    pass
+    projects: Optional[List[ExpertProjectCreate]] = []
 
 
 class ExpertUpdate(BaseModel):
