@@ -116,14 +116,15 @@ export const AppProvider = ({ children }) => {
         const statusMap = {};
         const notesMap = {};
         (res.data || []).forEach(t => {
-          t.id = t.kd_tender || t.id;
+          const idKey = String(t.kd_tender || t.id);
+          t.id = idKey;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
           // API/Supabase data always wins for cross-user sync
-          statusMap[t.id] = s;
+          statusMap[idKey] = s;
           if (t.catatan_internal) {
-            try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
+            try { notesMap[idKey] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
           }
         });
         // API data is source of truth — replaces localStorage values
@@ -150,7 +151,7 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const fetchExperts = useCallback(() => {
-    api.get('/experts')
+    api.get('/experts', { params: { _t: Date.now() } })
       .then(res => {
         const apiExperts = (res.data || []).map(e => ({
           ...e,
@@ -395,14 +396,16 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const updateTenderStatus = useCallback((tenderId, newStatus) => {
+    // Ensure tenderId is treated as string for consistent mapping
+    const idKey = String(tenderId);
     // OPTIMISTIC: Update UI immediately
-    setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
-    showToast(`Status tender diperbarui menjadi ${newStatus}`);
+    setInternalStatuses(prev => ({ ...prev, [idKey]: newStatus }));
+    showToast(`Berhasil ubah status tender: ${newStatus}`);
     
     // BACKGROUND: Sync to API
-    const tender = tenders.find(t => t.id === tenderId);
+    const tender = tenders.find(t => String(t.id) === idKey);
     api.post('/watchlist', {
-      kd_tender: parseInt(tenderId),
+      kd_tender: parseInt(idKey),
       status_internal: newStatus,
       nama_paket: tender?.nama || tender?.nama_paket,
       hps: tender?.hps
