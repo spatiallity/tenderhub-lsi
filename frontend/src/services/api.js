@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+// Determine API base URL:
+// - In production (deployed site): always use HTTPS HF Spaces endpoint
+// - In development (localhost): use local backend
+const isProduction = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+const PROD_API = 'https://spatiallity-tenderhub-api.hf.space/api/v1';
+const DEV_API = 'http://127.0.0.1:8000/api/v1';
+
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1').replace('localhost', '127.0.0.1'),
+  baseURL: isProduction ? PROD_API : (import.meta.env.VITE_API_BASE_URL || DEV_API).replace('localhost', '127.0.0.1'),
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
