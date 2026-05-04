@@ -9,7 +9,7 @@ from app.schemas import ExpertOut, ExpertCreate, ExpertUpdate, ExpertProjectCrea
 
 router = APIRouter()
 
-@router.get("/", response_model=List[ExpertOut])
+@router.get("", response_model=List[ExpertOut])
 async def list_experts(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Expert).options(selectinload(Expert.projects), selectinload(Expert.reviews))
