@@ -74,8 +74,20 @@ export const AppProvider = ({ children }) => {
   const [expertCVs, setExpertCVs] = useState({});
   const [users, setUsers] = useState(DEFAULT_USERS);
   const [notifications, setNotifications] = useState({ baru: true, deadline: true, status: true, ta: true });
-  const [coverage, setCoverage] = useState(() => PROVINCES.map((name, i) => ({ name, active: i < 10 })));
+  const [coverage, setCoverage] = useState(() => PROVINCES.map((name) => ({ name, active: true })));
   const [hpsThreshold, setHpsThreshold] = useState(200);
+
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const stored = localStorage.getItem('lsi-user-profile');
+      return stored ? JSON.parse(stored) : { name: 'Admin LSI', title: 'Sales & Marketing' };
+    } catch { return { name: 'Admin LSI', title: 'Sales & Marketing' }; }
+  });
+
+  // Save profile changes
+  useEffect(() => {
+    localStorage.setItem('lsi-user-profile', JSON.stringify(userProfile));
+  }, [userProfile]);
 
   // Panel state
   const [selectedTenderId, setSelectedTenderId] = useState(null);
@@ -858,6 +870,7 @@ export const AppProvider = ({ children }) => {
     notifications, setNotifications,
     coverage, setCoverage,
     hpsThreshold, setHpsThreshold,
+    userProfile, setUserProfile,
     // Panel state
     selectedTenderId, setSelectedTenderId: openTender,
     selectedExpertId, setSelectedExpertId,
@@ -888,7 +901,7 @@ export const AppProvider = ({ children }) => {
     internalStatuses, updateTenderStatus, tenderNotes, setTenderNotes, addTenderNote,
     assignedPICs, updateTenderPIC,
     users, addUser, updateUser, deleteUser,
-    notifications, coverage, hpsThreshold,
+    notifications, coverage, hpsThreshold, userProfile,
     selectedTenderId, selectedExpertId, selectedRupId,
     selectedTender, selectedExpert, selectedRup,
     newTenderIds, newRupIds, openTender, openRup,

@@ -10,12 +10,19 @@ export default function SettingsPage() {
     users, addUser, updateUser, deleteUser,
     coverage, setCoverage,
     hpsThreshold, setHpsThreshold,
+    userProfile, setUserProfile,
     showToast
   } = useAppContext();
 
   const [kwDraft, setKwDraft] = useState({ text: '', portfolio: 'SDA' });
   const [userDraft, setUserDraft] = useState({ nama: '', role: 'PIC', aktif: true });
   const [editingUserId, setEditingUserId] = useState(null);
+  
+  // Profile Draft State
+  const [profileDraft, setProfileDraft] = useState({
+    name: userProfile?.name || 'Admin LSI',
+    title: userProfile?.title || 'Sales & Marketing'
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,6 +122,38 @@ export default function SettingsPage() {
                     <span className="text-xs font-bold text-slate-700">{p}</span>
                   </label>
                 ))}
+              </div>
+            </div>
+          </Card>
+
+          {/* Profil Saya */}
+          <Card>
+            <h2 className="text-base font-extrabold tracking-tight mb-1">Profil Saya</h2>
+            <p className="text-slate-500 text-xs mb-3">Informasi profil Anda yang ditampilkan di dasbor dan aplikasi.</p>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap</label>
+                <input 
+                  type="text" 
+                  value={profileDraft.name} 
+                  onChange={e => setProfileDraft(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Jabatan / Peran</label>
+                <input 
+                  type="text" 
+                  value={profileDraft.title} 
+                  onChange={e => setProfileDraft(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                />
+              </div>
+              <div className="flex justify-end mt-1">
+                <Btn className="primary" onClick={() => {
+                  setUserProfile(profileDraft);
+                  showToast('Profil berhasil diperbarui');
+                }}><Save size={16} />Simpan Profil</Btn>
               </div>
             </div>
           </Card>

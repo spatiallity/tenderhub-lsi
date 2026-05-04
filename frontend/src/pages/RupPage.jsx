@@ -258,10 +258,11 @@ export default function RupPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredRup.map(r => {
-                  const isNew = newRupSet.has(String(r.id));
+                  const isNew = newRupSet.has(String(r.id)) && r.daysUntilSelection >= 120;
                   const todayRaw = new Date();
                   const currentMonthStr = `${todayRaw.getFullYear()}-${String(todayRaw.getMonth() + 1).padStart(2, '0')}`;
                   const isThisMonth = r.tgl_awal_pemilihan?.startsWith(currentMonthStr);
+                  const monthsLeft = Math.max(1, Math.round((r.daysUntilSelection || 0) / 30));
                   
                   return (
                   <tr key={r.id} className={`transition-colors ${isNew ? 'bg-cyan-50/80 hover:bg-cyan-100/70 shadow-[inset_4px_0_0_#06b6d4]' : 'hover:bg-slate-50'}`}>
@@ -294,12 +295,12 @@ export default function RupPage() {
                       <Badge 
                         color={
                           isThisMonth ? 'red' :
-                          r.daysUntilSelection <= 30 ? 'amber' : 
+                          monthsLeft <= 1 ? 'amber' : 
                           'green'
                         } 
                         className="mt-1"
                       >
-                        {isThisMonth ? 'Bulan Ini' : `${r.daysUntilSelection} hari lagi`}
+                        {isThisMonth ? 'Bulan Ini' : `${monthsLeft} bulan lagi`}
                       </Badge>
                     </td>
                     <td className="px-3 py-3 align-top whitespace-nowrap">
