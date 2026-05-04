@@ -35,6 +35,8 @@ export const AppProvider = ({ children }) => {
   
   // Track if initial data has been loaded
   const expertsLoadedRef = useRef(false);
+  // Track IDs being deleted to prevent auto-refresh from resurrecting them
+  const pendingDeleteIdsRef = useRef(new Set());
 
   // Keywords state
   const [keywords, setKeywords] = useState(DEFAULT_KEYWORDS);
@@ -42,19 +44,8 @@ export const AppProvider = ({ children }) => {
   // Tenders state from API
   const [tendersRaw, setTendersRaw] = useState([]);
   const [rupRaw, setRupRaw] = useState([]);
-  const [expertsRaw, setExpertsRaw] = useState(() => {
-    // Load from localStorage on init
-    try {
-      const stored = localStorage.getItem('lsi-experts-local');
-      if (stored) {
-        console.log('Loading experts from localStorage');
-        return JSON.parse(stored);
-      }
-    } catch (err) {
-      console.error('Failed to load experts from localStorage:', err);
-    }
-    return [];
-  });
+  // Always start empty — API/Supabase is the single source of truth
+  const [expertsRaw, setExpertsRaw] = useState([]);
   const [loadingTenders, setLoadingTenders] = useState(true);
   const [loadingRup, setLoadingRup] = useState(true);
   const [loadingExperts, setLoadingExperts] = useState(true);
@@ -177,7 +168,9 @@ export const AppProvider = ({ children }) => {
         setExpertsRaw(prev => {
           // Keep only optimistic entries (temp IDs) that haven't synced yet
           const pendingOnly = prev.filter(e => String(e.id).startsWith('temp-'));
-          return [...pendingOnly, ...apiExperts];
+          // Filter out experts that are pending deletion
+          const filtered = apiExperts.filter(e => !pendingDeleteIdsRef.current.has(String(e.id)));
+          return [...pendingOnly, ...filtered];
         });
       })
       .catch(() => {
@@ -237,16 +230,7 @@ export const AppProvider = ({ children }) => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [fetchTenders, fetchExperts]);
 
-  // Save experts to localStorage whenever it changes
-  useEffect(() => {
-    if (expertsRaw.length > 0) {
-      try {
-        localStorage.setItem('lsi-experts-local', JSON.stringify(expertsRaw));
-      } catch (err) {
-        console.error('Failed to save experts to localStorage:', err);
-      }
-    }
-  }, [expertsRaw]);
+  // localStorage is no longer used for experts — API/Supabase is source of truth
 
   // Save internalStatuses to localStorage
   useEffect(() => {
@@ -534,6 +518,9 @@ export const AppProvider = ({ children }) => {
   }, [showToast]);
 
   const deleteExpert = useCallback((expertId) => {
+    // Track this ID as pending deletion — prevents auto-refresh from bringing it back
+    pendingDeleteIdsRef.current.add(String(expertId));
+    
     // OPTIMISTIC: Remove from UI immediately
     const removedExpert = expertsRaw.find(e => String(e.id) === String(expertId));
     setExpertsRaw(prev => prev.filter(e => String(e.id) !== String(expertId)));
@@ -542,8 +529,13 @@ export const AppProvider = ({ children }) => {
     
     // BACKGROUND: Sync to API
     api.delete(`/experts/${expertId}`)
+      .then(() => {
+        // Delete confirmed — safe to remove from pending set
+        pendingDeleteIdsRef.current.delete(String(expertId));
+      })
       .catch(() => {
-        // Rollback if API fails — re-add to list
+        // Rollback: remove from pending set and re-add to list
+        pendingDeleteIdsRef.current.delete(String(expertId));
         if (removedExpert) {
           setExpertsRaw(prev => [...prev, removedExpert]);
           showToast('Gagal menghapus dari server. Data dikembalikan.', 'warning');
