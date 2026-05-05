@@ -1,0 +1,30 @@
+# RTK Token Optimization Rules
+
+Always use RTK commands to minimize token consumption by 60-90%.
+
+## Git Commands
+- Use `rtk git status` instead of `git status`
+- Use `rtk git diff` instead of `git diff`
+- Use `rtk git log` instead of `git log`
+- Use `rtk git add` instead of `git add`
+- Use `rtk git commit` instead of `git commit`
+- Use `rtk git push` instead of `git push`
+- Use `rtk git pull` instead of `git pull`
+
+## File Operations
+- Use `rtk read <file>` instead of `cat <file>`
+- Use `rtk ls` instead of `ls -la`
+- Use `rtk grep <pattern>` instead of `grep`
+- Use `rtk find` instead of `find`
+
+## Build & Test
+- Use `rtk cargo test` instead of `cargo test`
+- Use `rtk cargo build` instead of `cargo build`
+- Use `rtk npm test` instead of `npm test`
+
+## Why
+RTK filters command output to compress tokens by 60-90% before reaching Claude's context window. This saves significant tokens on large projects.
+
+## Example
+Instead of: `git status` (outputs ~2000 tokens)
+Use: `rtk git status` (outputs ~200 tokens, -90% savings)

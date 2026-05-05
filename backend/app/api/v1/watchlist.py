@@ -8,42 +8,21 @@ from app.schemas import WatchlistOut, WatchlistCreate, WatchlistUpdate
 
 router = APIRouter()
 
-@router.get("", response_model=List[WatchlistOut])
+@router.get("/", response_model=List[WatchlistOut])
 async def get_watchlist(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TenderWatchlist))
     return result.scalars().all()
 
-@router.post("", response_model=WatchlistOut)
+@router.post("/", response_model=WatchlistOut)
 async def add_to_watchlist(item_in: WatchlistCreate, db: AsyncSession = Depends(get_db)):
-    # Check if exists (Upsert logic)
+    # Check if exists
     result = await db.execute(select(TenderWatchlist).where(TenderWatchlist.kd_tender == item_in.kd_tender))
     existing = result.scalars().first()
     if existing:
-        update_data = item_in.model_dump(exclude_unset=True)
-        for key, value in update_data.items():
-            setattr(existing, key, value)
-        await db.commit()
-        await db.refresh(existing)
         return existing
         
     item = TenderWatchlist(**item_in.model_dump())
     db.add(item)
-    await db.commit()
-    await db.refresh(item)
-    return item
-
-@router.patch("/{kd_tender}", response_model=WatchlistOut)
-async def patch_watchlist_by_kd_tender(kd_tender: int, item_in: WatchlistUpdate, db: AsyncSession = Depends(get_db)):
-    """Partial update of a watchlist entry by kd_tender (status, catatan, PIC)."""
-    result = await db.execute(select(TenderWatchlist).where(TenderWatchlist.kd_tender == kd_tender))
-    item = result.scalars().first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Watchlist item not found for this kd_tender")
-
-    update_data = item_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(item, key, value)
-
     await db.commit()
     await db.refresh(item)
     return item

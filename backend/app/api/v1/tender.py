@@ -53,6 +53,7 @@ async def search_tenders(
             t_enriched["internalStatus"] = wl_item.status_internal
             t_enriched["catatan_internal"] = wl_item.catatan_internal
             t_enriched["assigned_expert_ids"] = wl_item.assigned_expert_ids
+            t_enriched["watchlist_id"] = wl_item.id
 
         if kd_tender and not t_enriched.get("jadwalTahapan"):
             try:
