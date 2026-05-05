@@ -144,13 +144,6 @@ export default function AppShell() {
           {/* Logo & Toggle */}
           <div className={`flex items-start justify-between mb-8 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
             <div className={`overflow-hidden transition-all duration-300 flex flex-col ${sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 hidden'}`}>
-              {/* Logo Sucofindo - Left Aligned & Larger */}
-              <img 
-                src="https://raw.githubusercontent.com/spatiallity/tenderhub-lsi/main/frontend/public/assets/sucofindo-logo.png" 
-                alt="Sucofindo Logo" 
-                className="h-12 w-auto object-contain mb-4"
-              />
-              
               {/* TenderHub Title */}
               <div>
                 <div className="text-[20px] font-black tracking-tight leading-tight">

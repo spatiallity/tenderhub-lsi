@@ -361,6 +361,83 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  // Helper: ensure a watchlist entry exists for kd_tender before patching
+  const ensureWatchlistEntry = useCallback(async (tenderId, forcedStatus) => {
+    const tender = tenders.find(t => t.id === tenderId);
+    await api.post('/watchlist', {
+      kd_tender: parseInt(tenderId),
+      status_internal: forcedStatus !== undefined ? forcedStatus : (internalStatuses[tenderId] || 'Dipantau'),
+      nama_paket: tender?.nama || tender?.nama_paket || null,
+      hps: tender?.hps || null,
+    });
+  }, [tenders, internalStatuses]);
+
+  const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
+    // OPTIMISTIC: Update UI immediately
+    setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
+
+    // SYNC: PATCH to backend
+    try {
+      await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        // Entry doesn't exist yet — create it first, then patch
+        try {
+          await ensureWatchlistEntry(tenderId, newStatus);
+          await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
+    }
+  }, [ensureWatchlistEntry]);
+
+  const updateTenderPIC = useCallback(async (tenderId, userId) => {
+    // OPTIMISTIC: Update UI immediately
+    setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
+
+    // SYNC: PATCH to backend
+    try {
+      await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        try {
+          await ensureWatchlistEntry(tenderId);
+          await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
+    }
+  }, [ensureWatchlistEntry]);
+
+  const addTenderNote = useCallback(async (tenderId, noteObj) => {
+    // OPTIMISTIC: Update UI immediately
+    const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
+    setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
+
+    // SYNC: PATCH to backend
+    const payload = { catatan_internal: JSON.stringify(updatedNotes) };
+    try {
+      await api.patch(`/watchlist/${tenderId}`, payload);
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        try {
+          await ensureWatchlistEntry(tenderId);
+          await api.patch(`/watchlist/${tenderId}`, payload);
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
+    }
+  }, [tenderNotes, ensureWatchlistEntry]);
+
   const value = useMemo(() => ({
     // Sidebar
     sidebarCollapsed, setSidebarCollapsed,
@@ -380,10 +457,10 @@ export const AppProvider = ({ children }) => {
     // Keywords
     keywords, setKeywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
     // Internal state
-    internalStatuses, setInternalStatuses,
-    tenderNotes, setTenderNotes,
+    internalStatuses, setInternalStatuses, updateTenderStatus,
+    tenderNotes, setTenderNotes, addTenderNote,
     noteSaved, setNoteSaved,
-    assignedPICs, setAssignedPICs,
+    assignedPICs, setAssignedPICs, updateTenderPIC,
     expertCVs, setExpertCVs,
     users, setUsers,
     addUser, updateUser, deleteUser,
@@ -416,7 +493,7 @@ export const AppProvider = ({ children }) => {
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,
     keywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
-    internalStatuses, tenderNotes, noteSaved, assignedPICs, expertCVs,
+    internalStatuses, updateTenderStatus, tenderNotes, addTenderNote, noteSaved, assignedPICs, updateTenderPIC, expertCVs,
     users, addUser, updateUser, deleteUser,
     notifications, coverage, hpsThreshold,
     selectedTenderId, selectedExpertId, selectedRupId,
