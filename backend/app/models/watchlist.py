@@ -14,6 +14,7 @@ class TenderWatchlist(Base):
     status_internal = Column(String(50), default="Dipantau")
     # Dipantau / Akan Diikuti / Sudah Diikuti / Tidak Relevan
     catatan_internal = Column(Text, nullable=True)
+    assigned_pic = Column(String(100), nullable=True)
     assigned_expert_ids = Column(JSON, default=list)
     subporto_rekomendasi = Column(String(10), nullable=True)
     relevance_score = Column(Float, nullable=True)

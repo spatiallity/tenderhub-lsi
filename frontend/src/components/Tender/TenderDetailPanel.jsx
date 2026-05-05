@@ -9,6 +9,7 @@ import api from '../../services/api';
 const TenderDetailPanel = ({ tender, onClose }) => {
   const { showToast, updateTenderStatus } = useAppContext();
   const [selectedStatus, setSelectedStatus] = useState('Dipantau');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (tender) {
@@ -18,9 +19,18 @@ const TenderDetailPanel = ({ tender, onClose }) => {
   
   if (!tender) return null;
 
-  const handleSaveWatchlist = () => {
-    updateTenderStatus(tender.kd_tender || tender.id, selectedStatus);
-    onClose();
+  const handleSaveWatchlist = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await updateTenderStatus(tender.kd_tender || tender.id, selectedStatus);
+      showToast('Status tender berhasil diperbarui');
+      onClose();
+    } catch {
+      showToast('Gagal menyimpan perubahan. Silakan coba lagi.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -71,8 +81,8 @@ const TenderDetailPanel = ({ tender, onClose }) => {
       </div>
       
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-        <Button className="primary" style={{ flex: 1 }} onClick={handleSaveWatchlist}>
-          <Save size={16} /> Simpan Perubahan
+        <Button className="primary" style={{ flex: 1 }} onClick={handleSaveWatchlist} disabled={isSaving}>
+          <Save size={16} /> {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
         </Button>
         {tender.lpse && (
           <a href={tender.lpse} target="_blank" rel="noreferrer" className="btn ghost">
