@@ -14,43 +14,65 @@ async def seed_data():
         # Seed/top-up experts up to 100 rows when using dummy data
         try:
             from app.services.dummy_data import EXPERTS_RAW
-            existing_count = (await db.execute(select(func.count()).select_from(Expert))).scalar_one()
-            if existing_count < 100:
-                needed = 100 - existing_count
-                for e_raw in EXPERTS_RAW[:needed]:
-                    expert_db = Expert(
-                        nama=e_raw.get("nama"),
-                        no_hp=e_raw.get("noHp"),
-                        instansi=e_raw.get("instansi"),
-                        keahlian=e_raw.get("keahlian", []),
-                        subporto=e_raw.get("portofolio", []),
-                        main_keahlian=e_raw.get("main"),
-                        availability=e_raw.get("availability"),
-                        rating_avg=e_raw.get("rating", 0.0),
-                        jumlah_proyek=e_raw.get("proyek", 0)
-                    )
-                    db.add(expert_db)
-                    await db.flush()
+            
+            # 1. Cleanup existing duplicates first (fix previous issues)
+            res = await db.execute(select(Expert).order_by(Expert.id))
+            all_experts = res.scalars().all()
+            
+            seen_names = set()
+            for expert_obj in all_experts:
+                if expert_obj.nama in seen_names:
+                    await db.delete(expert_obj)
+                else:
+                    seen_names.add(expert_obj.nama)
+            await db.commit()
 
-                    for p in e_raw.get("history", []):
-                        db.add(ExpertProject(
-                            expert_id=expert_db.id,
-                            nama_proyek=p.get("proyek"),
-                            pemberi_kerja=p.get("klien"),
-                            tahun=p.get("tahun"),
-                            nilai_proyek=p.get("nilai"),
-                            peran=p.get("peran"),
-                            bersama=p.get("bersama"),
-                            status_proyek=p.get("status")
-                        ))
+            # 2. Topping up safely (idempotent)
+            # Fetch names again to have an accurate list of what's in DB
+            res = await db.execute(select(Expert.nama))
+            current_names = set(res.scalars().all())
+            
+            if len(current_names) < 100:
+                for e_raw in EXPERTS_RAW:
+                    if len(current_names) >= 100:
+                        break
+                    
+                    if e_raw.get("nama") not in current_names:
+                        expert_db = Expert(
+                            nama=e_raw.get("nama"),
+                            no_hp=e_raw.get("noHp"),
+                            instansi=e_raw.get("instansi"),
+                            keahlian=e_raw.get("keahlian", []),
+                            subporto=e_raw.get("portofolio", []),
+                            main_keahlian=e_raw.get("main"),
+                            availability=e_raw.get("availability"),
+                            rating_avg=e_raw.get("rating", 0.0),
+                            jumlah_proyek=e_raw.get("proyek", 0)
+                        )
+                        db.add(expert_db)
+                        await db.flush()
+                        
+                        current_names.add(e_raw.get("nama"))
 
-                    for r in e_raw.get("reviews", []):
-                        db.add(ExpertReview(
-                            expert_id=expert_db.id,
-                            reviewer_nama=r.get("reviewer"),
-                            rating=r.get("rating"),
-                            komentar=r.get("komentar")
-                        ))
+                        for p in e_raw.get("history", []):
+                            db.add(ExpertProject(
+                                expert_id=expert_db.id,
+                                nama_proyek=p.get("proyek"),
+                                pemberi_kerja=p.get("klien"),
+                                tahun=p.get("tahun"),
+                                nilai_proyek=p.get("nilai"),
+                                peran=p.get("peran"),
+                                bersama=p.get("bersama"),
+                                status_proyek=p.get("status")
+                            ))
+
+                        for r in e_raw.get("reviews", []):
+                            db.add(ExpertReview(
+                                expert_id=expert_db.id,
+                                reviewer_nama=r.get("reviewer"),
+                                rating=r.get("rating"),
+                                komentar=r.get("komentar")
+                            ))
                 await db.commit()
         except ImportError:
             pass
@@ -101,7 +123,7 @@ app.add_middleware(
 app.include_router(tender.router, prefix="/api/v1/tender", tags=["Tender"])
 app.include_router(rup.router, prefix="/api/v1/rup", tags=["RUP"])
 app.include_router(expert.router, prefix="/api/v1/experts", tags=["Experts"])
-app.include_router(keyword.router, prefix="/api/v1/keywords", tags=["Keywords"])
+app.include_router(keyword.router, prefix="/api/v1/keyword", tags=["Keywords"])
 app.include_router(watchlist.router, prefix="/api/v1/watchlist", tags=["Watchlist"])
 
 @app.get("/api/health")
