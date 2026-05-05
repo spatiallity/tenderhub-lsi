@@ -344,16 +344,34 @@ export const AppProvider = ({ children }) => {
     showToast('Pengguna berhasil dihapus');
   }, [showToast]);
 
+  const refetchTenders = useCallback(async () => {
+    try {
+      const res = await api.get('/tender/search', { params: { limit: 200 } });
+      setTendersRaw(res.data || []);
+      const statusMap = {};
+      (res.data || []).forEach(t => {
+        let s = t.internalStatus || 'Dipantau';
+        if (t.won === true) s = 'Menang';
+        else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
+        statusMap[t.id] = s;
+      });
+      setInternalStatuses(statusMap);
+    } catch (err) {
+      console.error('Failed to refetch tenders:', err);
+    }
+  }, []);
+
   const value = useMemo(() => ({
     // Sidebar
     sidebarCollapsed, setSidebarCollapsed,
     // Toast
-    toast, 
+    toast,
     showToast,
     toasts: toast.toasts,
     removeToast: toast.removeToast,
-    // Data
+    // Data & actions
     tenders, rupPlans, expertsRaw, setExpertsRaw,
+    refetchTenders,
     rupList: rupPlans,
     experts: expertsRaw,
     loadingTenders, loadingRup, loadingExperts,
@@ -394,6 +412,7 @@ export const AppProvider = ({ children }) => {
   }), [
     sidebarCollapsed, toast, showToast,
     tenders, rupPlans, expertsRaw,
+    refetchTenders,
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,
     keywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
