@@ -2,9 +2,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy } from 'react';
 import { AppProvider } from './store/AppContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Layout (not lazy loaded - needed immediately)
 import AppShell from './components/Layout/AppShell';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 // Loading fallback component
 import { LoadingOverlay } from './components/UI/LoadingState';
@@ -13,6 +15,7 @@ import { LoadingOverlay } from './components/UI/LoadingState';
 import PerformanceMonitor from './components/Dev/PerformanceMonitor';
 
 // Lazy load pages for code splitting
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TenderPage = lazy(() => import('./pages/TenderPage'));
 const RupPage = lazy(() => import('./pages/RupPage'));
@@ -36,66 +39,86 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<AppShell />}>
+      <AuthProvider>
+        <AppProvider>
+          <Router>
+            <Routes>
+              {/* Public route - Login */}
               <Route 
-                index 
+                path="/login" 
                 element={
-                  <Suspense fallback={<LoadingOverlay message="Memuat Dashboard..." />}>
-                    <DashboardPage />
+                  <Suspense fallback={<LoadingOverlay message="Memuat..." />}>
+                    <LoginPage />
                   </Suspense>
                 } 
               />
+
+              {/* Protected routes */}
               <Route 
-                path="tender" 
+                path="/" 
                 element={
-                  <Suspense fallback={<LoadingOverlay message="Memuat Tender Intelligence..." />}>
-                    <TenderPage />
-                  </Suspense>
-                } 
-              />
-              <Route 
-                path="rup" 
-                element={
-                  <Suspense fallback={<LoadingOverlay message="Memuat RUP Pipeline..." />}>
-                    <RupPage />
-                  </Suspense>
-                } 
-              />
-              <Route 
-                path="status" 
-                element={
-                  <Suspense fallback={<LoadingOverlay message="Memuat Status Tender..." />}>
-                    <StatusPage />
-                  </Suspense>
-                } 
-              />
-              <Route 
-                path="experts" 
-                element={
-                  <Suspense fallback={<LoadingOverlay message="Memuat Tenaga Ahli..." />}>
-                    <ExpertPage />
-                  </Suspense>
-                } 
-              />
-              <Route 
-                path="settings" 
-                element={
-                  <Suspense fallback={<LoadingOverlay message="Memuat Pengaturan..." />}>
-                    <SettingsPage />
-                  </Suspense>
-                } 
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </Router>
-        
-        {/* Performance Monitor (Development Only) */}
-        <PerformanceMonitor />
-      </AppProvider>
+                  <ProtectedRoute>
+                    <AppShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route 
+                  index 
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat Dashboard..." />}>
+                      <DashboardPage />
+                    </Suspense>
+                  } 
+                />
+                <Route 
+                  path="tender" 
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat Tender Intelligence..." />}>
+                      <TenderPage />
+                    </Suspense>
+                  } 
+                />
+                <Route 
+                  path="rup" 
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat RUP Pipeline..." />}>
+                      <RupPage />
+                    </Suspense>
+                  } 
+                />
+                <Route 
+                  path="status" 
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat Status Tender..." />}>
+                      <StatusPage />
+                    </Suspense>
+                  } 
+                />
+                <Route 
+                  path="experts" 
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat Tenaga Ahli..." />}>
+                      <ExpertPage />
+                    </Suspense>
+                  } 
+                />
+                <Route 
+                  path="settings" 
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat Pengaturan..." />}>
+                      <SettingsPage />
+                    </Suspense>
+                  } 
+                />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </Router>
+          
+          {/* Performance Monitor (Development Only) */}
+          <PerformanceMonitor />
+        </AppProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

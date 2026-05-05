@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { Search, MapPin, ChevronRight, Filter, Star, Plus, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
 import { useAppContext } from '../store/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Badge, PageTitle, Card, Btn, Stars } from '../components/UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../utils/constants';
 import { formatRupiah, initials } from '../utils/helpers';
 
 export default function ExpertPage() {
   const { experts, setSelectedExpertId, addExpert, showToast, refreshAllData } = useAppContext();
+  const { isGuest } = useAuth();
 
   const [expertSearch, setExpertSearch] = useState('');
   const [availFilter, setAvailFilter] = useState('Semua');
@@ -80,9 +82,11 @@ export default function ExpertPage() {
             <Btn className="ghost" onClick={refreshAllData} title="Refresh data dari server">
               <RefreshCw size={16} />Refresh
             </Btn>
-            <Btn className="primary" onClick={() => setShowForm(true)}>
-              <Plus size={16} />Tambah Tenaga Ahli
-            </Btn>
+            {!isGuest && (
+              <Btn className="primary" onClick={() => setShowForm(true)}>
+                <Plus size={16} />Tambah Tenaga Ahli
+              </Btn>
+            )}
           </div>
         }
       />

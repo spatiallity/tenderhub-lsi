@@ -4,6 +4,7 @@ import { Badge, MiniKpi, Btn } from '../UI/index';
 import { portfolioColor, levelColor, PRAKUAL_STAGES, PASCAKUAL_STAGES } from '../../utils/constants';
 import { formatRupiah, formatDate, dateFrom } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useDebounce } from '../../hooks/useDebounce';
 
 export default function TenderDetail({ tender }) {
@@ -14,6 +15,8 @@ export default function TenderDetail({ tender }) {
     assignedPICs, updateTenderPIC,
     users, showToast
   } = useAppContext();
+  
+  const { isGuest } = useAuth();
 
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   const [isSavingNote, setIsSavingNote] = React.useState(false);
@@ -294,30 +297,41 @@ export default function TenderDetail({ tender }) {
         <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
           Status Internal
         </div>
-        <div className="flex gap-2 mb-3 items-center">
-          <select 
-            value={localStatus} 
-            onChange={e => setLocalStatus(e.target.value)}
-            disabled={isUpdatingStatus}
-            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'].map(s => {
-              const isDisabled = s === 'Menang' && !isWinnerAnnouncementReached;
-              return (
-                <option key={s} value={s} disabled={isDisabled}>
-                  {s} {isDisabled ? '(Belum Pengumuman)' : ''}
-                </option>
-              );
-            })}
-          </select>
-          <Btn 
-            className="primary small whitespace-nowrap"
-            onClick={handleSaveStatus}
-            disabled={isUpdatingStatus || localStatus === committedStatus}
-          >
-            <Save size={14} />{isUpdatingStatus ? 'Menyimpan...' : 'Simpan'}
-          </Btn>
-        </div>
+        {isGuest ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+            <div className="text-sm font-semibold text-amber-900">
+              Status: <span className="font-extrabold">{localStatus}</span>
+            </div>
+            <div className="text-xs text-amber-700 mt-1">
+              Mode Guest - Tidak dapat mengubah status
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-3 items-center">
+            <select 
+              value={localStatus} 
+              onChange={e => setLocalStatus(e.target.value)}
+              disabled={isUpdatingStatus}
+              className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'].map(s => {
+                const isDisabled = s === 'Menang' && !isWinnerAnnouncementReached;
+                return (
+                  <option key={s} value={s} disabled={isDisabled}>
+                    {s} {isDisabled ? '(Belum Pengumuman)' : ''}
+                  </option>
+                );
+              })}
+            </select>
+            <Btn 
+              className="primary small whitespace-nowrap"
+              onClick={handleSaveStatus}
+              disabled={isUpdatingStatus || localStatus === committedStatus}
+            >
+              <Save size={14} />{isUpdatingStatus ? 'Menyimpan...' : 'Simpan'}
+            </Btn>
+          </div>
+        )}
         
         <div className="flex items-center justify-between mb-2">
           <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
@@ -341,22 +355,30 @@ export default function TenderDetail({ tender }) {
           )}
         </div>
 
-        <textarea
-          value={newNote}
-          onChange={e => setNewNote(e.target.value)}
-          disabled={isSavingNote}
-          placeholder="Tulis catatan koordinasi, kebutuhan dokumen..."
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none resize-y min-h-[60px] disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-        <div className="flex mt-2 justify-end">
-          <Btn 
-            className="primary small" 
-            onClick={handleAddNote}
-            disabled={isSavingNote || !newNote.trim()}
-          >
-            <Save size={14} />{isSavingNote ? 'Menyimpan...' : 'Tambah Catatan'}
-          </Btn>
-        </div>
+        {isGuest ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+            Mode Guest - Tidak dapat menambah catatan
+          </div>
+        ) : (
+          <>
+            <textarea
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              disabled={isSavingNote}
+              placeholder="Tulis catatan koordinasi, kebutuhan dokumen..."
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none resize-y min-h-[60px] disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <div className="flex mt-2 justify-end">
+              <Btn 
+                className="primary small" 
+                onClick={handleAddNote}
+                disabled={isSavingNote || !newNote.trim()}
+              >
+                <Save size={14} />{isSavingNote ? 'Menyimpan...' : 'Tambah Catatan'}
+              </Btn>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Assign PIC */}
@@ -364,26 +386,37 @@ export default function TenderDetail({ tender }) {
         <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
           Assign PIC Tender
         </div>
-        <div className="flex gap-2 items-center">
-          <select 
-            value={localPIC} 
-            onChange={e => setLocalPIC(e.target.value)} 
-            disabled={isAssigningPIC}
-            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <option value="">-- Pilih PIC Tender --</option>
-            {users.filter(u => u.aktif).map(u => (
-              <option key={u.id} value={u.id}>{u.nama} ({u.role})</option>
-            ))}
-          </select>
-          <Btn 
-            className="primary small whitespace-nowrap"
-            onClick={handleSavePIC}
-            disabled={isAssigningPIC || localPIC === committedPIC}
-          >
-            <Save size={14} />{isAssigningPIC ? 'Menyimpan...' : 'Simpan'}
-          </Btn>
-        </div>
+        {isGuest ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <div className="text-sm font-semibold text-amber-900">
+              PIC: <span className="font-extrabold">{users.find(u => u.id === localPIC)?.nama || 'Belum ditugaskan'}</span>
+            </div>
+            <div className="text-xs text-amber-700 mt-1">
+              Mode Guest - Tidak dapat mengubah PIC
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 items-center">
+            <select 
+              value={localPIC} 
+              onChange={e => setLocalPIC(e.target.value)} 
+              disabled={isAssigningPIC}
+              className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">-- Pilih PIC Tender --</option>
+              {users.filter(u => u.aktif).map(u => (
+                <option key={u.id} value={u.id}>{u.nama} ({u.role})</option>
+              ))}
+            </select>
+            <Btn 
+              className="primary small whitespace-nowrap"
+              onClick={handleSavePIC}
+              disabled={isAssigningPIC || localPIC === committedPIC}
+            >
+              <Save size={14} />{isAssigningPIC ? 'Menyimpan...' : 'Simpan'}
+            </Btn>
+          </div>
+        )}
       </div>
 
       {/* Add shimmer animation styles */}

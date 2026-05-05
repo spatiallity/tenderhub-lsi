@@ -15,23 +15,32 @@ export const Sidebar = () => {
   ];
 
   return (
-    <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', padding: '0 8px' }}>
+    <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {/* Header with Logo */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', padding: '0 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <img 
+            src="/assets/sucofindo-logo.png" 
+            alt="Sucofindo Logo" 
+            style={{ height: '32px', width: 'auto', objectFit: 'contain' }}
+          />
+          <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
+        
         <div>
           <div className="brand-title">Tender<span style={{ color: 'var(--primary)' }}>Hub</span></div>
           <div className="brand-kicker" style={{ marginTop: '2px', fontSize: '9px', fontWeight: 800 }}>SBU Layanan Publik, Sumber Daya Alam, dan Investasi</div>
           <div className="brand-kicker" style={{ marginTop: '1px', fontSize: '9px', fontWeight: 500, color: 'var(--muted)' }}>PT SUCOFINDO</div>
         </div>
-        <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
-          {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-        </button>
       </div>
 
       <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '12px', paddingLeft: '12px' }} className="nav-label">
         Main Navigation
       </div>
 
-      <nav>
+      <nav style={{ flex: 1, overflowY: 'auto' }}>
         {navs.map((n, i) => (
           <NavLink 
             key={i} 
@@ -44,14 +53,20 @@ export const Sidebar = () => {
           </NavLink>
         ))}
       </nav>
-
-      <div className="sidebar-bottom" style={{ marginTop: 'auto', padding: '16px 12px', background: '#f8fafc', borderRadius: '14px', border: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div className="avatar" style={{ width: '36px', height: '36px', fontSize: '13px', background: 'var(--primary)' }}>AR</div>
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 800 }}>Arvian Riatmaja</div>
-            <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Sales LSI</div>
-          </div>
+      
+      {/* Copyright Footer */}
+      <div style={{ 
+        padding: '16px 12px', 
+        borderTop: '1px solid #e2e8f0',
+        fontSize: '9px',
+        color: '#64748b',
+        lineHeight: '1.4'
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+          SBU Layanan Publik, Sumber Daya Alam, dan Investasi
+        </div>
+        <div style={{ fontWeight: 500 }}>
+          PT SUCOFINDO (PERSERO) © 2026
         </div>
       </div>
     </aside>

@@ -143,18 +143,19 @@ export default function AppShell() {
         <div className="flex flex-col h-full p-4">
           {/* Logo & Toggle */}
           <div className={`flex items-start justify-between mb-8 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
-            <div className={`overflow-hidden transition-all duration-300 flex items-start gap-3 ${sidebarOpen ? 'opacity-100 w-auto' : 'opacity-0 w-0 hidden'}`}>
-              {/* Text */}
-              <div className="flex flex-col">
-                <div className="text-[17px] font-black tracking-tight leading-tight">
+            <div className={`overflow-hidden transition-all duration-300 flex flex-col ${sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 hidden'}`}>
+              {/* Logo Sucofindo - Left Aligned & Larger */}
+              <img 
+                src="/assets/sucofindo-logo.png" 
+                alt="Sucofindo Logo" 
+                className="h-12 w-auto object-contain mb-4"
+              />
+              
+              {/* TenderHub Title */}
+              <div>
+                <div className="text-[20px] font-black tracking-tight leading-tight">
                   <span className="text-blue-600">Tender</span>
                   <span style={{ color: '#13B2AA' }}>Hub</span>
-                </div>
-                <div className="text-[9px] text-slate-600 mt-1 leading-snug font-bold uppercase">
-                  SBU Layanan Publik, Sumber Daya Alam, dan Investasi
-                </div>
-                <div className="text-[9px] text-slate-500 leading-tight font-medium uppercase">
-                  PT SUCOFINDO
                 </div>
               </div>
             </div>
@@ -231,15 +232,14 @@ export default function AppShell() {
             ))}
           </nav>
 
-          {/* Footer Sidebar */}
-          <div className={`mt-auto pt-4 border-t border-slate-100 overflow-hidden whitespace-nowrap transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-extrabold flex items-center justify-center text-xs shadow-md">
-                AM
+          {/* Copyright Footer */}
+          <div className={`mt-auto pt-4 border-t border-slate-100 overflow-hidden transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
+            <div className="text-[9px] text-slate-500 leading-relaxed">
+              <div className="font-semibold mb-1">
+                SBU Layanan Publik, Sumber Daya Alam,<br />dan Investasi
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-extrabold truncate">Admin LSI</div>
-                <div className="text-[10px] text-slate-500 truncate">Sales & Marketing</div>
+              <div className="font-medium">
+                PT SUCOFINDO (PERSERO) © 2026
               </div>
             </div>
           </div>

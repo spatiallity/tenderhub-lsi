@@ -7,9 +7,11 @@ import {
   Search,
   Settings,
   LogOut,
-  HelpCircle
+  HelpCircle,
+  UserCheck
 } from 'lucide-react';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import useKeyboardShortcut from '../../hooks/useKeyboardShortcut';
 import GlobalSearch from '../UI/GlobalSearch';
 
@@ -23,9 +25,14 @@ const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const { newTenderCount, newRupCount, userProfile } = useAppContext();
+  const { user, profile, isGuest, signOut } = useAuth();
   
   // Calculate user initials
-  const userInitials = (userProfile?.name || 'Admin LSI')
+  const displayName = isGuest ? 'Guest' : (profile?.name || user?.email?.split('@')[0] || 'User');
+  const displayEmail = isGuest ? 'guest@local' : (user?.email || 'user@sucofindo.co.id');
+  const displayTitle = isGuest ? 'Mode Tamu' : (userProfile?.title || 'Staff');
+  
+  const userInitials = displayName
     .split(' ')
     .map(n => n[0])
     .join('')
@@ -209,12 +216,19 @@ const Header = () => {
               aria-label="User menu"
               aria-expanded={showUserMenu}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-extrabold flex items-center justify-center text-xs shadow-md">
-                {userInitials}
+              <div className={`w-8 h-8 rounded-full ${isGuest ? 'bg-gradient-to-br from-slate-400 to-slate-500' : 'bg-gradient-to-br from-blue-500 to-blue-600'} text-white font-extrabold flex items-center justify-center text-xs shadow-md`}>
+                {isGuest ? <UserCheck size={16} /> : userInitials}
               </div>
               <div className="hidden lg:block text-left">
-                <div className="text-xs font-bold text-slate-900">{userProfile?.name || 'Admin LSI'}</div>
-                <div className="text-[10px] text-slate-500">{userProfile?.title || 'Sales & Marketing'}</div>
+                <div className="flex items-center gap-1.5">
+                  <div className="text-xs font-bold text-slate-900">{displayName}</div>
+                  {isGuest && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold text-amber-700 bg-amber-100 rounded">
+                      GUEST
+                    </span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-500">{displayTitle}</div>
               </div>
             </button>
             
@@ -228,55 +242,64 @@ const Header = () => {
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-20 animate-slideDown">
                   <div className="p-4 border-b border-slate-200">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-extrabold flex items-center justify-center text-sm shadow-md">
-                        {userInitials}
+                      <div className={`w-10 h-10 rounded-full ${isGuest ? 'bg-gradient-to-br from-slate-400 to-slate-500' : 'bg-gradient-to-br from-blue-500 to-blue-600'} text-white font-extrabold flex items-center justify-center text-sm shadow-md`}>
+                        {isGuest ? <UserCheck size={18} /> : userInitials}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-slate-900 truncate">{userProfile?.name || 'Admin LSI'}</div>
-                        <div className="text-xs text-slate-500 truncate">admin@sucofindo.co.id</div>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <div className="text-sm font-bold text-slate-900 truncate">{displayName}</div>
+                          {isGuest && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold text-amber-700 bg-amber-100 rounded">
+                              GUEST
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 truncate">{displayEmail}</div>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="py-2">
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        navigate('/settings');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <User size={16} />
-                      <span>Profil Saya</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        navigate('/settings');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <Settings size={16} />
-                      <span>Pengaturan</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        // TODO: Implement help
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <HelpCircle size={16} />
-                      <span>Bantuan</span>
-                    </button>
-                  </div>
+                  {!isGuest && (
+                    <div className="py-2">
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          navigate('/settings');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <User size={16} />
+                        <span>Profil Saya</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          navigate('/settings');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <Settings size={16} />
+                        <span>Pengaturan</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          // TODO: Implement help
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <HelpCircle size={16} />
+                        <span>Bantuan</span>
+                      </button>
+                    </div>
+                  )}
                   
-                  <div className="p-2 border-t border-slate-200">
+                  <div className={`p-2 ${!isGuest ? 'border-t border-slate-200' : ''}`}>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setShowUserMenu(false);
-                        // TODO: Implement logout
-                        console.log('Logout');
+                        await signOut();
+                        navigate('/login', { replace: true });
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >

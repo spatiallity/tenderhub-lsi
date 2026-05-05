@@ -4,6 +4,7 @@ import { Badge, Stars, Btn, Card } from '../UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../../utils/constants';
 import { formatRupiah, initials } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ExpertDetail({ expert }) {
   const {
@@ -11,6 +12,8 @@ export default function ExpertDetail({ expert }) {
     historyDraft, setHistoryDraft, addHistory,
     updateExpertProfile, deleteExpert, deleteExpertHistory
   } = useAppContext();
+  
+  const { profile, canAddReview } = useAuth();
 
   if (!expert) return null;
 
@@ -244,26 +247,48 @@ export default function ExpertDetail({ expert }) {
 
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
           <div className="font-extrabold text-[13px] mb-2">Tambah Review</div>
-          <div className="flex flex-col gap-2">
-            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama reviewer" value={reviewDraft.reviewer} onChange={e => setReviewDraft(p => ({ ...p, reviewer: e.target.value }))} />
-            <Stars rating={reviewDraft.rating} size={22} onRate={(rating) => setReviewDraft(p => ({ ...p, rating }))} />
-            <textarea className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none min-h-[76px] resize-y" placeholder="Komentar review..." value={reviewDraft.komentar} onChange={e => setReviewDraft(p => ({ ...p, komentar: e.target.value }))} />
-            <Btn 
-              className="primary small self-start" 
-              onClick={async () => {
-                if (isSavingReview) return;
-                setIsSavingReview(true);
-                try {
-                  await addReview(expert.id);
-                } finally {
-                  setIsSavingReview(false);
-                }
-              }}
-              disabled={isSavingReview}
-            >
-              <Save size={14} />{isSavingReview ? 'Menyimpan...' : 'Simpan Review'}
-            </Btn>
-          </div>
+          
+          {!canAddReview ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-xs text-amber-700">
+                Anda harus login sebagai user terdaftar untuk menambahkan review.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <input 
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-100 focus:ring-2 focus:ring-blue-100 outline-none" 
+                placeholder="Nama reviewer" 
+                value={profile?.name || 'User'}
+                disabled
+                title="Reviewer otomatis terisi dengan nama Anda"
+              />
+              <Stars rating={reviewDraft.rating} size={22} onRate={(rating) => setReviewDraft(p => ({ ...p, rating }))} />
+              <textarea 
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none min-h-[76px] resize-y" 
+                placeholder="Komentar review..." 
+                value={reviewDraft.komentar} 
+                onChange={e => setReviewDraft(p => ({ ...p, komentar: e.target.value }))} 
+              />
+              <Btn 
+                className="primary small self-start" 
+                onClick={async () => {
+                  if (isSavingReview) return;
+                  setIsSavingReview(true);
+                  try {
+                    // Set reviewer name before saving
+                    setReviewDraft(p => ({ ...p, reviewer: profile?.name || 'User' }));
+                    await addReview(expert.id);
+                  } finally {
+                    setIsSavingReview(false);
+                  }
+                }}
+                disabled={isSavingReview}
+              >
+                <Save size={14} />{isSavingReview ? 'Menyimpan...' : 'Simpan Review'}
+              </Btn>
+            </div>
+          )}
         </div>
       </div>
 

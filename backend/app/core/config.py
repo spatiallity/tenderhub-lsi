@@ -9,6 +9,15 @@ class Settings(BaseSettings):
     USE_DUMMY_DATA: bool = True
     CACHE_TTL_MINUTES: int = 15
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    
+    # Supabase Configuration
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_JWT_SECRET: str = ""
+    
+    # Development settings
+    SKIP_AUTH: bool = False
 
     @property
     def cors_origins_list(self) -> List[str]:
