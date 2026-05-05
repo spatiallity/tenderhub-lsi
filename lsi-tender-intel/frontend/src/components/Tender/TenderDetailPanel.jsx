@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { SidePanel, Badge, Button, RelevanceBar, CountdownBadge } from '../UI';
 import TenderTimeline from './TenderTimeline';
 import { formatRupiah, portfolioColor, internalStatusColor } from '../../utils/format';
-import { ExternalLink, Users, Save } from 'lucide-react';
+import { ExternalLink, Users, Save, Lock } from 'lucide-react';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
 const TenderDetailPanel = ({ tender, onClose }) => {
   const { showToast, updateTenderStatus } = useAppContext();
+  const { canEditInternalStatus } = useAuth();
   const [selectedStatus, setSelectedStatus] = useState('Dipantau');
 
   useEffect(() => {
@@ -53,13 +55,23 @@ const TenderDetailPanel = ({ tender, onClose }) => {
 
       <div className="form-grid" style={{ marginBottom: '24px' }}>
         <div>
-          <label className="muted" style={{ fontSize: '12px', fontWeight: 800 }}>Ubah Status Internal</label>
-          <select style={{ width: '100%', marginTop: '4px' }} value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
-            <option>Dipantau</option>
-            <option>Akan Diikuti</option>
-            <option>Sudah Diikuti</option>
-            <option>Tidak Relevan</option>
-          </select>
+          <label className="muted" style={{ fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            Ubah Status Internal
+            {!canEditInternalStatus && <Lock size={11} style={{ color: '#94a3b8' }} />}
+          </label>
+          {canEditInternalStatus ? (
+            <select style={{ width: '100%', marginTop: '4px' }} value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+              <option>Dipantau</option>
+              <option>Akan Diikuti</option>
+              <option>Sudah Diikuti</option>
+              <option>Tidak Relevan</option>
+            </select>
+          ) : (
+            <div style={{ marginTop: '4px', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#64748b', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Lock size={13} />
+              {selectedStatus} <span style={{ fontSize: '11px', color: '#94a3b8' }}>(hanya Manager/Admin)</span>
+            </div>
+          )}
         </div>
         <div>
           <label className="muted" style={{ fontSize: '12px', fontWeight: 800 }}>Assign Tenaga Ahli</label>
@@ -71,8 +83,8 @@ const TenderDetailPanel = ({ tender, onClose }) => {
       </div>
       
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-        <Button className="primary" style={{ flex: 1 }} onClick={handleSaveWatchlist}>
-          <Save size={16} /> Simpan Perubahan
+        <Button className="primary" style={{ flex: 1 }} onClick={handleSaveWatchlist} disabled={!canEditInternalStatus}>
+          <Save size={16} /> {canEditInternalStatus ? 'Simpan Perubahan' : 'Tidak Ada Akses Edit'}
         </Button>
         {tender.lpse && (
           <a href={tender.lpse} target="_blank" rel="noreferrer" className="btn ghost">

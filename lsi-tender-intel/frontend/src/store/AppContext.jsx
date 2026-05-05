@@ -7,6 +7,17 @@ import { FALLBACK_RUP } from '../data/rupDummy';
 import { FALLBACK_TENDERS, FALLBACK_EXPERTS } from '../data/demoData';
 import { useToast } from '../components/UI/Toast';
 
+// Keys that used to be written to localStorage — purge them on load so old
+// data from previous users never leaks back into the application state.
+const STALE_LOCALSTORAGE_KEYS = [
+  'lsi-internal-statuses',
+  'lsi-tender-notes',
+  'lsi-assigned-pics',
+];
+STALE_LOCALSTORAGE_KEYS.forEach(k => {
+  try { localStorage.removeItem(k); } catch { /* ignore */ }
+});
+
 const AppContext = createContext();
 
 const readStoredIds = (key) => {
@@ -51,26 +62,11 @@ export const AppProvider = ({ children }) => {
   const [loadingRup, setLoadingRup] = useState(true);
   const [loadingExperts, setLoadingExperts] = useState(true);
 
-  // Internal state (like mockup)
-  const [internalStatuses, setInternalStatuses] = useState(() => {
-    try {
-      const stored = localStorage.getItem('lsi-internal-statuses');
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
-  const [tenderNotes, setTenderNotes] = useState(() => {
-    try {
-      const stored = localStorage.getItem('lsi-tender-notes');
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
+  // Internal state — API/Supabase is the single source of truth; no localStorage
+  const [internalStatuses, setInternalStatuses] = useState({});
+  const [tenderNotes, setTenderNotes] = useState({});
   const [noteSaved, setNoteSaved] = useState({});
-  const [assignedPICs, setAssignedPICs] = useState(() => {
-    try {
-      const stored = localStorage.getItem('lsi-assigned-pics');
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
+  const [assignedPICs, setAssignedPICs] = useState({});
   const [expertCVs, setExpertCVs] = useState({});
   const [users, setUsers] = useState(DEFAULT_USERS);
   const [notifications, setNotifications] = useState({ baru: true, deadline: true, status: true, ta: true });
@@ -142,18 +138,15 @@ export const AppProvider = ({ children }) => {
         setTenderNotes(notesMap);
       })
       .catch(() => {
-        // Offline fallback: use localStorage as last resort
+        // Offline fallback: load demo data with default statuses only
         setTendersRaw(FALLBACK_TENDERS);
-        const localStatuses = (() => {
-          try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
-        })();
         const statusMap = {};
         FALLBACK_TENDERS.forEach(t => {
           t.id = t.id || t.kd_tender;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = localStatuses[t.id] || s;
+          statusMap[t.id] = s;
         });
         setInternalStatuses(statusMap);
       })
@@ -343,40 +336,7 @@ export const AppProvider = ({ children }) => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [fetchTenders, fetchExperts]);
 
-  // localStorage is no longer used for experts — API/Supabase is source of truth
-
-  // Save internalStatuses to localStorage
-  useEffect(() => {
-    try {
-      if (Object.keys(internalStatuses).length > 0) {
-        localStorage.setItem('lsi-internal-statuses', JSON.stringify(internalStatuses));
-      }
-    } catch (err) {
-      console.error('Failed to save internalStatuses to localStorage:', err);
-    }
-  }, [internalStatuses]);
-
-  // Save tenderNotes to localStorage
-  useEffect(() => {
-    try {
-      if (Object.keys(tenderNotes).length > 0) {
-        localStorage.setItem('lsi-tender-notes', JSON.stringify(tenderNotes));
-      }
-    } catch (err) {
-      console.error('Failed to save tenderNotes to localStorage:', err);
-    }
-  }, [tenderNotes]);
-
-  // Save assignedPICs to localStorage
-  useEffect(() => {
-    try {
-      if (Object.keys(assignedPICs).length > 0) {
-        localStorage.setItem('lsi-assigned-pics', JSON.stringify(assignedPICs));
-      }
-    } catch (err) {
-      console.error('Failed to save assignedPICs to localStorage:', err);
-    }
-  }, [assignedPICs]);
+  // API/Supabase is the source of truth for all tender state — no localStorage writes
 
   // Phase 1: Heavy enrichment (relevance, stages, deadlines) — only re-runs when raw data or keywords change
   const tendersEnriched = useMemo(() =>

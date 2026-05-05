@@ -1,28 +1,36 @@
-import React, { useState } from 'react';
-import { Settings, Save, Pencil, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Save, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../store/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { PageTitle, Card, Btn, Badge } from '../components/UI/index';
 import { portfolioColor, PROVINCES } from '../utils/constants';
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const {
     keywords, addKeyword, removeKeyword, deleteGlobalKeyword,
-    users, addUser, updateUser, deleteUser,
     coverage, setCoverage,
     hpsThreshold, setHpsThreshold,
-    userProfile, setUserProfile,
     showToast
   } = useAppContext();
 
+  const { profile, updateProfile, isAdmin } = useAuth();
+
   const [kwDraft, setKwDraft] = useState({ text: '', portfolio: 'SDA' });
-  const [userDraft, setUserDraft] = useState({ nama: '', role: 'PIC', aktif: true });
-  const [editingUserId, setEditingUserId] = useState(null);
-  
-  // Profile Draft State
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Profile Draft State (synced from auth profile)
   const [profileDraft, setProfileDraft] = useState({
-    name: userProfile?.name || 'Admin LSI',
-    title: userProfile?.title || 'Sales & Marketing'
+    name: profile?.name || '',
+    title: profile?.title || ''
   });
+
+  useEffect(() => {
+    if (profile) {
+      setProfileDraft({ name: profile.name || '', title: profile.title || '' });
+    }
+  }, [profile]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -150,133 +158,34 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="flex justify-end mt-1">
-                <Btn className="primary" onClick={() => {
-                  setUserProfile(profileDraft);
-                  showToast('Profil berhasil diperbarui');
-                }}><Save size={16} />Simpan Profil</Btn>
+                <Btn className="primary" disabled={savingProfile} onClick={async () => {
+                  setSavingProfile(true);
+                  const { error } = await updateProfile(profileDraft);
+                  setSavingProfile(false);
+                  if (!error) showToast('Profil berhasil diperbarui');
+                  else showToast('Gagal memperbarui profil', 'error');
+                }}>
+                  <Save size={16} />{savingProfile ? 'Menyimpan...' : 'Simpan Profil'}
+                </Btn>
               </div>
             </div>
           </Card>
 
-          {/* Manajemen User (Mock) */}
-          <Card>
-            <h2 className="text-base font-extrabold tracking-tight mb-1">Manajemen Pengguna (PIC)</h2>
-            <p className="text-slate-500 text-xs mb-3">Daftar akun SBU LSI yang dapat di-assign sebagai PIC tender.</p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
-              <input
-                placeholder="Nama pengguna"
-                value={userDraft.nama}
-                onChange={e => setUserDraft(prev => ({ ...prev, nama: e.target.value }))}
-                className="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-              />
-              <select
-                value={userDraft.role}
-                onChange={e => setUserDraft(prev => ({ ...prev, role: e.target.value }))}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+          {/* Manajemen Pengguna — link to dedicated page (admin only) */}
+          {isAdmin && (
+            <Card>
+              <h2 className="text-base font-extrabold tracking-tight mb-1">Manajemen Pengguna</h2>
+              <p className="text-slate-500 text-xs mb-3">Kelola akun, role akses, dan status pengguna TenderHub.</p>
+              <button
+                onClick={() => navigate('/users')}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white rounded-xl transition-all"
+                style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 2px 8px rgba(37,99,235,0.3)' }}
               >
-                <option value="PIC">PIC</option>
-                <option value="Admin">Admin</option>
-                <option value="Reviewer">Reviewer</option>
-              </select>
-              <Btn className="primary" onClick={() => {
-                addUser(userDraft);
-                setUserDraft({ nama: '', role: 'PIC', aktif: true });
-              }}>
-                Tambah Pengguna
-              </Btn>
-            </div>
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase">Nama</th>
-                    <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase">Role</th>
-                    <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase">Status</th>
-                    <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {users.map(u => (
-                    <tr key={u.id} className="bg-white">
-                      <td className="px-3 py-2 font-bold">
-                        {editingUserId === u.id ? (
-                          <input
-                            value={userDraft.nama}
-                            onChange={e => setUserDraft(prev => ({ ...prev, nama: e.target.value }))}
-                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                          />
-                        ) : u.nama}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-slate-600">
-                        {editingUserId === u.id ? (
-                          <select
-                            value={userDraft.role}
-                            onChange={e => setUserDraft(prev => ({ ...prev, role: e.target.value }))}
-                            className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-100 outline-none"
-                          >
-                            <option value="PIC">PIC</option>
-                            <option value="Admin">Admin</option>
-                            <option value="Reviewer">Reviewer</option>
-                          </select>
-                        ) : u.role}
-                      </td>
-                      <td className="px-3 py-2">
-                        {editingUserId === u.id ? (
-                          <select
-                            value={userDraft.aktif ? 'aktif' : 'nonaktif'}
-                            onChange={e => setUserDraft(prev => ({ ...prev, aktif: e.target.value === 'aktif' }))}
-                            className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-100 outline-none"
-                          >
-                            <option value="aktif">Aktif</option>
-                            <option value="nonaktif">Non-aktif</option>
-                          </select>
-                        ) : (
-                          <Badge color={u.aktif ? 'green' : 'gray'}>{u.aktif ? 'Aktif' : 'Non-aktif'}</Badge>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {editingUserId === u.id ? (
-                            <>
-                              <Btn className="primary small" onClick={() => {
-                                updateUser(u.id, userDraft);
-                                setEditingUserId(null);
-                                setUserDraft({ nama: '', role: 'PIC', aktif: true });
-                              }}>Simpan</Btn>
-                              <Btn className="ghost small" onClick={() => {
-                                setEditingUserId(null);
-                                setUserDraft({ nama: '', role: 'PIC', aktif: true });
-                              }}>Batal</Btn>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 hover:bg-slate-100"
-                                onClick={() => {
-                                  setEditingUserId(u.id);
-                                  setUserDraft({ nama: u.nama, role: u.role, aktif: u.aktif });
-                                }}
-                                title="Edit pengguna"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50"
-                                onClick={() => deleteUser(u.id)}
-                                title="Hapus pengguna"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                <ExternalLink size={15} />
+                Buka Halaman Manajemen Pengguna
+              </button>
+            </Card>
+          )}
         </div>
       </div>
     </div>

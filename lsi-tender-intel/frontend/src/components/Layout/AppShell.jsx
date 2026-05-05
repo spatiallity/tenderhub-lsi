@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Home, Target, Calendar, ListChecks, 
+import {
+  Home, Target, Calendar, ListChecks,
   Users, Settings, ChevronLeft, ChevronRight, Menu, X,
-  Bell, User
+  Bell, User, UserCog
 } from 'lucide-react';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import useKeyboardShortcut from '../../hooks/useKeyboardShortcut';
 import Header from './Header';
 import TenderDetail from '../Tender/TenderDetail';
@@ -25,7 +26,7 @@ export default function AppShell() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { 
+  const {
     selectedTenderId, setSelectedTenderId, tenders,
     selectedRupId, setSelectedRupId, rupList,
     selectedExpertId, setSelectedExpertId, experts,
@@ -37,6 +38,7 @@ export default function AppShell() {
     newTenderCount,
     newRupCount,
   } = useAppContext();
+  const { profile, isAdmin, signOut } = useAuth();
   
   // Global keyboard shortcut: Cmd+K or Ctrl+K for search
   useKeyboardShortcut('k', () => setShowGlobalSearch(true), { meta: true, ctrl: true });
@@ -90,6 +92,7 @@ export default function AppShell() {
     { section: 'Support Layanan Pusat', items: [
       { id: '/experts', icon: Users, label: 'Tenaga Ahli', tooltip: 'Kelola database tenaga ahli, ketersediaan, dan riwayat pekerjaan.' },
       { id: '/settings', icon: Settings, label: 'Pengaturan', tooltip: 'Atur keyword, threshold, coverage wilayah, dan pengguna.' },
+      ...(isAdmin ? [{ id: '/users', icon: UserCog, label: 'Manajemen User', tooltip: 'Kelola akun dan role pengguna TenderHub.' }] : []),
     ]}
   ];
 
@@ -234,12 +237,12 @@ export default function AppShell() {
           {/* Footer Sidebar */}
           <div className={`mt-auto pt-4 border-t border-slate-100 overflow-hidden whitespace-nowrap transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-extrabold flex items-center justify-center text-xs shadow-md">
-                AM
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-extrabold flex items-center justify-center text-xs shadow-md shrink-0">
+                {(profile?.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-extrabold truncate">Admin LSI</div>
-                <div className="text-[10px] text-slate-500 truncate">Sales & Marketing</div>
+                <div className="text-xs font-extrabold truncate">{profile?.name || 'Pengguna'}</div>
+                <div className="text-[10px] text-slate-500 truncate">{profile?.title || profile?.role || ''}</div>
               </div>
             </div>
           </div>

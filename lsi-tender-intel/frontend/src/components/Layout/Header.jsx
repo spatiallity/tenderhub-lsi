@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Bell, 
-  User, 
-  ChevronRight, 
+import {
+  Bell,
+  User,
+  ChevronRight,
   Search,
   Settings,
   LogOut,
-  HelpCircle
+  HelpCircle,
+  Users
 } from 'lucide-react';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import useKeyboardShortcut from '../../hooks/useKeyboardShortcut';
 import GlobalSearch from '../UI/GlobalSearch';
 
@@ -22,10 +24,15 @@ const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
-  const { newTenderCount, newRupCount, userProfile } = useAppContext();
-  
+  const { newTenderCount, newRupCount } = useAppContext();
+  const { profile, signOut, isAdmin } = useAuth();
+
+  const displayName = profile?.name || 'Pengguna';
+  const displayTitle = profile?.title || profile?.role || '';
+  const displayEmail = profile?.email || '';
+
   // Calculate user initials
-  const userInitials = (userProfile?.name || 'Admin LSI')
+  const userInitials = displayName
     .split(' ')
     .map(n => n[0])
     .join('')
@@ -213,8 +220,8 @@ const Header = () => {
                 {userInitials}
               </div>
               <div className="hidden lg:block text-left">
-                <div className="text-xs font-bold text-slate-900">{userProfile?.name || 'Admin LSI'}</div>
-                <div className="text-[10px] text-slate-500">{userProfile?.title || 'Sales & Marketing'}</div>
+                <div className="text-xs font-bold text-slate-900">{displayName}</div>
+                <div className="text-[10px] text-slate-500">{displayTitle}</div>
               </div>
             </button>
             
@@ -232,52 +239,41 @@ const Header = () => {
                         {userInitials}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-slate-900 truncate">{userProfile?.name || 'Admin LSI'}</div>
-                        <div className="text-xs text-slate-500 truncate">admin@sucofindo.co.id</div>
+                        <div className="text-sm font-bold text-slate-900 truncate">{displayName}</div>
+                        <div className="text-xs text-slate-500 truncate">{displayEmail}</div>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="py-2">
                     <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        navigate('/settings');
-                      }}
+                      onClick={() => { setShowUserMenu(false); navigate('/settings'); }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <User size={16} />
                       <span>Profil Saya</span>
                     </button>
                     <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        navigate('/settings');
-                      }}
+                      onClick={() => { setShowUserMenu(false); navigate('/settings'); }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       <Settings size={16} />
                       <span>Pengaturan</span>
                     </button>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        // TODO: Implement help
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <HelpCircle size={16} />
-                      <span>Bantuan</span>
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setShowUserMenu(false); navigate('/users'); }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <Users size={16} />
+                        <span>Manajemen Pengguna</span>
+                      </button>
+                    )}
                   </div>
-                  
+
                   <div className="p-2 border-t border-slate-200">
                     <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        // TODO: Implement logout
-                        console.log('Logout');
-                      }}
+                      onClick={async () => { setShowUserMenu(false); await signOut(); navigate('/login'); }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <LogOut size={16} />
