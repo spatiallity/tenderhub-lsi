@@ -132,6 +132,7 @@ class WatchlistBase(BaseModel):
     hps: Optional[float] = None
     status_internal: str = "Dipantau"
     catatan_internal: Optional[str] = None
+    assigned_pic: Optional[str] = None
     assigned_expert_ids: List[int] = []
     subporto_rekomendasi: Optional[str] = None
     relevance_score: Optional[float] = None
@@ -144,6 +145,7 @@ class WatchlistCreate(WatchlistBase):
 class WatchlistUpdate(BaseModel):
     status_internal: Optional[str] = None
     catatan_internal: Optional[str] = None
+    assigned_pic: Optional[str] = None
     assigned_expert_ids: Optional[List[int]] = None
     subporto_rekomendasi: Optional[str] = None
     relevance_score: Optional[float] = None
@@ -189,6 +191,7 @@ class TenderOut(BaseModel):
     status: Optional[str] = None
     internalStatus: Optional[str] = None
     catatan_internal: Optional[str] = None
+    assigned_pic: Optional[str] = None
     assigned_expert_ids: List[int] = []
     followed: bool = False
     won: bool = False

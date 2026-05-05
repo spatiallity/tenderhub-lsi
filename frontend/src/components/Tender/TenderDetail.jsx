@@ -15,40 +15,66 @@ export default function TenderDetail({ tender }) {
     users, showToast
   } = useAppContext();
 
-  if (!tender) return null;
-
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   const [isSavingNote, setIsSavingNote] = React.useState(false);
+  const [isAssigningPIC, setIsAssigningPIC] = React.useState(false);
 
-  const status = internalStatuses[tender.id] || tender.internalStatus || 'Dipantau';
-  const setStatus = async (val) => {
+  // Local state: tracks pending edits before explicit save
+  const [localStatus, setLocalStatus] = React.useState(
+    internalStatuses[tender?.id] || tender?.internalStatus || 'Dipantau'
+  );
+  const [localPIC, setLocalPIC] = React.useState(
+    assignedPICs[tender?.id] || ''
+  );
+  const [newNote, setNewNote] = React.useState('');
+
+  // Sync local state when global state refreshes (e.g. after fetchTenders)
+  React.useEffect(() => {
+    if (!tender) return;
+    setLocalStatus(internalStatuses[tender.id] || tender.internalStatus || 'Dipantau');
+  }, [internalStatuses, tender?.id]);
+
+  React.useEffect(() => {
+    if (!tender) return;
+    setLocalPIC(assignedPICs[tender.id] || '');
+  }, [assignedPICs, tender?.id]);
+
+  // Early return AFTER all hooks
+  if (!tender) return null;
+
+
+  const committedStatus = internalStatuses[tender.id] || tender.internalStatus || 'Dipantau';
+  const committedPIC = assignedPICs[tender.id] || '';
+
+  const handleSaveStatus = async () => {
     if (isUpdatingStatus) return;
     setIsUpdatingStatus(true);
     try {
-      await updateTenderStatus(tender.id, val);
+      await updateTenderStatus(tender.id, localStatus);
+      showToast('Status tender berhasil diperbarui');
+    } catch {
+      showToast('Gagal menyimpan perubahan. Silakan coba lagi.', 'error');
     } finally {
       setIsUpdatingStatus(false);
     }
   };
-  const assignedPIC = assignedPICs[tender.id] || '';
-  const assignPIC = (userId) => updateTenderPIC(tender.id, userId);
 
-  // Removed auto-save logic as we now use an array of explicit notes
+  const handleSavePIC = async () => {
+    if (isAssigningPIC) return;
+    setIsAssigningPIC(true);
+    try {
+      await updateTenderPIC(tender.id, localPIC);
+      showToast('PIC berhasil ditugaskan');
+    } catch {
+      showToast('Gagal menyimpan perubahan. Silakan coba lagi.', 'error');
+    } finally {
+      setIsAssigningPIC(false);
+    }
+  };
 
-
-
-  const stages = tender.metode === 'Prakualifikasi' ? PRAKUAL_STAGES : PASCAKUAL_STAGES;
-  const currentStage = tender.currentStage || 1;
-  const currentStageName = stages[currentStage - 1]?.[0] || '';
-  const isWinnerAnnouncementReached = currentStageName === 'Pengumuman Pemenang' || currentStageName === 'Masa Sanggah Pemenang' || currentStageName.includes('Pemenang');
-  
-  const deadlineLabel = tender.daysLeft < 0 ? `${Math.abs(tender.daysLeft)}h lewat` : `${tender.daysLeft}h`;
-  const progressPercentage = ((currentStage - 1) / (stages.length - 1)) * 100;
-  
   // Note state
   const notes = tenderNotes[tender.id] || [];
-  const [newNote, setNewNote] = React.useState('');
-  
+
   const handleAddNote = async () => {
     if (!newNote.trim()) {
       showToast('Catatan tidak boleh kosong', 'error');
@@ -61,19 +87,30 @@ export default function TenderDetail({ tender }) {
       const now = new Date();
       const dateStr = now.toLocaleDateString('id-ID');
       const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      
       await addTenderNote(tender.id, { author: 'Admin LSI', content: newNote, date: dateStr, time: timeStr });
       setNewNote('');
+      showToast('Catatan berhasil disimpan');
+    } catch {
+      showToast('Gagal menyimpan perubahan. Silakan coba lagi.', 'error');
     } finally {
       setIsSavingNote(false);
     }
   };
+
+
+  const stages = tender.metode === 'Prakualifikasi' ? PRAKUAL_STAGES : PASCAKUAL_STAGES;
+  const currentStage = tender.currentStage || 1;
+  const currentStageName = stages[currentStage - 1]?.[0] || '';
+  const isWinnerAnnouncementReached = currentStageName === 'Pengumuman Pemenang' || currentStageName === 'Masa Sanggah Pemenang' || currentStageName.includes('Pemenang');
+  const deadlineLabel = tender.daysLeft < 0 ? `${Math.abs(tender.daysLeft)}h lewat` : `${tender.daysLeft}h`;
+  const progressPercentage = ((currentStage - 1) / (stages.length - 1)) * 100;
 
   // Compute Tgl Pengumuman dynamically based on Stage 1
   const tglPengumumanDate = new Date(
     tender.deadlineStage ? `${tender.deadlineStage}T00:00:00+07:00` : new Date()
   );
   tglPengumumanDate.setDate(tglPengumumanDate.getDate() + (1 - currentStage) * 3 - 2);
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -257,21 +294,30 @@ export default function TenderDetail({ tender }) {
         <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
           Status Internal
         </div>
-        <select 
-          value={status} 
-          onChange={e => setStatus(e.target.value)}
-          disabled={isUpdatingStatus}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'].map(s => {
-            const isDisabled = s === 'Menang' && !isWinnerAnnouncementReached;
-            return (
-              <option key={s} value={s} disabled={isDisabled}>
-                {s} {isDisabled ? '(Belum Pengumuman)' : ''}
-              </option>
-            );
-          })}
-        </select>
+        <div className="flex gap-2 mb-3 items-center">
+          <select 
+            value={localStatus} 
+            onChange={e => setLocalStatus(e.target.value)}
+            disabled={isUpdatingStatus}
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'].map(s => {
+              const isDisabled = s === 'Menang' && !isWinnerAnnouncementReached;
+              return (
+                <option key={s} value={s} disabled={isDisabled}>
+                  {s} {isDisabled ? '(Belum Pengumuman)' : ''}
+                </option>
+              );
+            })}
+          </select>
+          <Btn 
+            className="primary small whitespace-nowrap"
+            onClick={handleSaveStatus}
+            disabled={isUpdatingStatus || localStatus === committedStatus}
+          >
+            <Save size={14} />{isUpdatingStatus ? 'Menyimpan...' : 'Simpan'}
+          </Btn>
+        </div>
         
         <div className="flex items-center justify-between mb-2">
           <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
@@ -318,16 +364,26 @@ export default function TenderDetail({ tender }) {
         <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
           Assign PIC Tender
         </div>
-        <select 
-          value={assignedPIC} 
-          onChange={e => assignPIC(e.target.value)} 
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
-        >
-          <option value="">-- Pilih PIC Tender --</option>
-          {users.filter(u => u.aktif).map(u => (
-            <option key={u.id} value={u.id}>{u.nama} ({u.role})</option>
-          ))}
-        </select>
+        <div className="flex gap-2 items-center">
+          <select 
+            value={localPIC} 
+            onChange={e => setLocalPIC(e.target.value)} 
+            disabled={isAssigningPIC}
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">-- Pilih PIC Tender --</option>
+            {users.filter(u => u.aktif).map(u => (
+              <option key={u.id} value={u.id}>{u.nama} ({u.role})</option>
+            ))}
+          </select>
+          <Btn 
+            className="primary small whitespace-nowrap"
+            onClick={handleSavePIC}
+            disabled={isAssigningPIC || localPIC === committedPIC}
+          >
+            <Save size={14} />{isAssigningPIC ? 'Menyimpan...' : 'Simpan'}
+          </Btn>
+        </div>
       </div>
 
       {/* Add shimmer animation styles */}

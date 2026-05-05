@@ -32,6 +32,22 @@ async def add_to_watchlist(item_in: WatchlistCreate, db: AsyncSession = Depends(
     await db.refresh(item)
     return item
 
+@router.patch("/{kd_tender}", response_model=WatchlistOut)
+async def patch_watchlist_by_kd_tender(kd_tender: int, item_in: WatchlistUpdate, db: AsyncSession = Depends(get_db)):
+    """Partial update of a watchlist entry by kd_tender (status, catatan, PIC)."""
+    result = await db.execute(select(TenderWatchlist).where(TenderWatchlist.kd_tender == kd_tender))
+    item = result.scalars().first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Watchlist item not found for this kd_tender")
+
+    update_data = item_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(item, key, value)
+
+    await db.commit()
+    await db.refresh(item)
+    return item
+
 @router.put("/{item_id}", response_model=WatchlistOut)
 async def update_watchlist(item_id: int, item_in: WatchlistUpdate, db: AsyncSession = Depends(get_db)):
     item = await db.get(TenderWatchlist, item_id)

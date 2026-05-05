@@ -51,26 +51,11 @@ export const AppProvider = ({ children }) => {
   const [loadingRup, setLoadingRup] = useState(true);
   const [loadingExperts, setLoadingExperts] = useState(true);
 
-  // Internal state (like mockup)
-  const [internalStatuses, setInternalStatuses] = useState(() => {
-    try {
-      const stored = localStorage.getItem('lsi-internal-statuses');
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
-  const [tenderNotes, setTenderNotes] = useState(() => {
-    try {
-      const stored = localStorage.getItem('lsi-tender-notes');
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
+  // Internal state — source of truth is backend, not localStorage
+  const [internalStatuses, setInternalStatuses] = useState({});
+  const [tenderNotes, setTenderNotes] = useState({});
   const [noteSaved, setNoteSaved] = useState({});
-  const [assignedPICs, setAssignedPICs] = useState(() => {
-    try {
-      const stored = localStorage.getItem('lsi-assigned-pics');
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
+  const [assignedPICs, setAssignedPICs] = useState({});
   const [expertCVs, setExpertCVs] = useState({});
   const [users, setUsers] = useState(DEFAULT_USERS);
   const [notifications, setNotifications] = useState({ baru: true, deadline: true, status: true, ta: true });
@@ -121,39 +106,60 @@ export const AppProvider = ({ children }) => {
   // ─── Reusable fetch functions ──────────────────────────────────────────────
 
   const fetchTenders = useCallback(() => {
-    api.get('/tender/search', { params: { limit: 200 } })
-      .then(res => {
-        setTendersRaw(res.data || []);
+    // Fetch tenders AND watchlist in parallel for full state hydration
+    const tenderReq = api.get('/tender/search', { params: { limit: 200 } });
+    const watchlistReq = api.get('/watchlist').catch(() => ({ data: [] }));
+
+    Promise.all([tenderReq, watchlistReq])
+      .then(([tRes, wRes]) => {
+        const watchlistMap = {};
+        (wRes.data || []).forEach(w => {
+          watchlistMap[w.kd_tender] = w;
+        });
+
+        setTendersRaw(tRes.data || []);
+
         const statusMap = {};
         const notesMap = {};
-        (res.data || []).forEach(t => {
+        const picMap = {};
+
+        (tRes.data || []).forEach(t => {
           t.id = t.kd_tender || t.id;
-          let s = t.internalStatus || 'Dipantau';
+          const w = watchlistMap[t.id];
+
+          // Status: watchlist DB > tender API field > default
+          let s = (w?.status_internal) || t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          // API/Supabase data always wins for cross-user sync
           statusMap[t.id] = s;
-          if (t.catatan_internal) {
+
+          // Notes from watchlist
+          if (w?.catatan_internal) {
+            try { notesMap[t.id] = JSON.parse(w.catatan_internal); } catch { /* ignore */ }
+          } else if (t.catatan_internal) {
             try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
           }
+
+          // PIC from watchlist
+          if (w?.assigned_pic) {
+            picMap[t.id] = w.assigned_pic;
+          }
         });
-        // API data is source of truth — replaces localStorage values
+
         setInternalStatuses(statusMap);
         setTenderNotes(notesMap);
+        setAssignedPICs(picMap);
       })
       .catch(() => {
-        // Offline fallback: use localStorage as last resort
+        // Offline fallback
         setTendersRaw(FALLBACK_TENDERS);
-        const localStatuses = (() => {
-          try { return JSON.parse(localStorage.getItem('lsi-internal-statuses') || '{}'); } catch { return {}; }
-        })();
         const statusMap = {};
         FALLBACK_TENDERS.forEach(t => {
           t.id = t.id || t.kd_tender;
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = localStatuses[t.id] || s;
+          statusMap[t.id] = s;
         });
         setInternalStatuses(statusMap);
       })
@@ -343,40 +349,8 @@ export const AppProvider = ({ children }) => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [fetchTenders, fetchExperts]);
 
-  // localStorage is no longer used for experts — API/Supabase is source of truth
-
-  // Save internalStatuses to localStorage
-  useEffect(() => {
-    try {
-      if (Object.keys(internalStatuses).length > 0) {
-        localStorage.setItem('lsi-internal-statuses', JSON.stringify(internalStatuses));
-      }
-    } catch (err) {
-      console.error('Failed to save internalStatuses to localStorage:', err);
-    }
-  }, [internalStatuses]);
-
-  // Save tenderNotes to localStorage
-  useEffect(() => {
-    try {
-      if (Object.keys(tenderNotes).length > 0) {
-        localStorage.setItem('lsi-tender-notes', JSON.stringify(tenderNotes));
-      }
-    } catch (err) {
-      console.error('Failed to save tenderNotes to localStorage:', err);
-    }
-  }, [tenderNotes]);
-
-  // Save assignedPICs to localStorage
-  useEffect(() => {
-    try {
-      if (Object.keys(assignedPICs).length > 0) {
-        localStorage.setItem('lsi-assigned-pics', JSON.stringify(assignedPICs));
-      }
-    } catch (err) {
-      console.error('Failed to save assignedPICs to localStorage:', err);
-    }
-  }, [assignedPICs]);
+  // localStorage is no longer used for internalStatuses, tenderNotes, or assignedPICs.
+  // All three are hydrated from the backend on load and synced via PATCH on change.
 
   // Phase 1: Heavy enrichment (relevance, stages, deadlines) — only re-runs when raw data or keywords change
   const tendersEnriched = useMemo(() =>
@@ -447,51 +421,82 @@ export const AppProvider = ({ children }) => {
     });
   }, []);
 
-  const updateTenderStatus = useCallback((tenderId, newStatus) => {
+  // Helper: ensure a watchlist entry exists for kd_tender before patching
+  const ensureWatchlistEntry = useCallback(async (tenderId) => {
+    const tender = tenders.find(t => t.id === tenderId);
+    await api.post('/watchlist', {
+      kd_tender: parseInt(tenderId),
+      status_internal: internalStatuses[tenderId] || 'Dipantau',
+      nama_paket: tender?.nama || tender?.nama_paket || null,
+      hps: tender?.hps || null,
+    });
+  }, [tenders, internalStatuses]);
+
+  const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
     // OPTIMISTIC: Update UI immediately
     setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
-    showToast(`Status tender diperbarui menjadi ${newStatus}`);
-    
-    // BACKGROUND: Sync to API
-    const tender = tenders.find(t => t.id === tenderId);
-    api.post('/watchlist', {
-      kd_tender: parseInt(tenderId),
-      status_internal: newStatus,
-      nama_paket: tender?.nama || tender?.nama_paket,
-      hps: tender?.hps
-    }).catch(() => {
-      showToast("Gagal sinkronisasi status ke server", "warning");
-    });
-  }, [tenders, showToast]);
 
-  const updateTenderPIC = useCallback((tenderId, userId) => {
+    // SYNC: PATCH to backend
+    try {
+      await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        // Entry doesn't exist yet — create it first, then patch
+        try {
+          await ensureWatchlistEntry(tenderId);
+          await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
+    }
+  }, [ensureWatchlistEntry]);
+
+  const updateTenderPIC = useCallback(async (tenderId, userId) => {
     // OPTIMISTIC: Update UI immediately
     setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
-    showToast('PIC tender berhasil diatur');
-    
-    // BACKGROUND: Sync to API
-    api.post('/watchlist', {
-      kd_tender: parseInt(tenderId),
-      assigned_expert_ids: userId ? [parseInt(userId)] : []
-    }).catch(() => {
-      showToast("Gagal sinkronisasi PIC ke server", "warning");
-    });
-  }, [showToast]);
 
-  const addTenderNote = useCallback((tenderId, noteObj) => {
+    // SYNC: PATCH to backend
+    try {
+      await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        try {
+          await ensureWatchlistEntry(tenderId);
+          await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
+    }
+  }, [ensureWatchlistEntry]);
+
+  const addTenderNote = useCallback(async (tenderId, noteObj) => {
     // OPTIMISTIC: Update UI immediately
     const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
     setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
-    showToast('Catatan ditambahkan');
-    
-    // BACKGROUND: Sync to API
-    api.post('/watchlist', {
-      kd_tender: parseInt(tenderId),
-      catatan_internal: JSON.stringify(updatedNotes)
-    }).catch(() => {
-      showToast('Gagal sinkronisasi catatan ke server', 'warning');
-    });
-  }, [tenderNotes, showToast]);
+
+    // SYNC: PATCH to backend
+    const payload = { catatan_internal: JSON.stringify(updatedNotes) };
+    try {
+      await api.patch(`/watchlist/${tenderId}`, payload);
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        try {
+          await ensureWatchlistEntry(tenderId);
+          await api.patch(`/watchlist/${tenderId}`, payload);
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
+    }
+  }, [tenderNotes, ensureWatchlistEntry]);
 
   const openTender = useCallback((id) => {
     markTenderOpened(id);

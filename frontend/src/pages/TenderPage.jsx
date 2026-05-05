@@ -18,6 +18,79 @@ const stageBadgeClass = {
   teal: 'bg-teal-50 text-teal-700 border-teal-200',
 };
 
+function StatusCell({ tender, committedStatus, updateTenderStatus, showToast }) {
+  const [localStatus, setLocalStatus] = useState(committedStatus || 'Dipantau');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync if parent refreshes
+  useEffect(() => {
+    setLocalStatus(committedStatus || 'Dipantau');
+  }, [committedStatus]);
+
+  const isChanged = localStatus !== (committedStatus || 'Dipantau');
+
+  const canBeWon = tender.currentStageName && (
+    tender.currentStageName.toLowerCase().includes('pemenang') ||
+    tender.currentStageName.toLowerCase().includes('sanggah') ||
+    tender.currentStageName.toLowerCase().includes('klarifikasi') ||
+    tender.currentStageName.toLowerCase().includes('penunjukan') ||
+    tender.currentStageName.toLowerCase().includes('kontrak')
+  );
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await updateTenderStatus(tender.id, localStatus);
+      showToast('Status tender berhasil diperbarui');
+    } catch {
+      showToast('Gagal menyimpan perubahan. Silakan coba lagi.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+      <select
+        value={localStatus}
+        onChange={e => setLocalStatus(e.target.value)}
+        disabled={isSaving}
+        className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold cursor-pointer outline-none focus:ring-2 focus:ring-blue-200 transition-colors disabled:opacity-50 ${
+          {
+            'Dipantau':     'bg-slate-50 text-slate-700 border-slate-200',
+            'Akan Diikuti': 'bg-blue-50 text-blue-700 border-blue-200',
+            'Sudah Diikuti':'bg-indigo-50 text-indigo-700 border-indigo-200',
+            'Menang':       'bg-green-50 text-green-700 border-green-200',
+            'Kalah':        'bg-red-50 text-red-700 border-red-200',
+            'Tidak Relevan':'bg-amber-50 text-amber-700 border-amber-200',
+          }[localStatus] || 'bg-slate-50 text-slate-700 border-slate-200'
+        }`}
+      >
+        {(INTERNAL_STATUS_OPTIONS || ['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan']).map(opt => {
+          const isDisabled = opt === 'Menang' && !canBeWon;
+          return (
+            <option key={opt} value={opt} disabled={isDisabled}>
+              {opt}{isDisabled ? ' (Belum Pengumuman)' : ''}
+            </option>
+          );
+        })}
+      </select>
+      {isChanged && (
+        <Btn
+          className="primary w-full justify-center"
+          style={{ fontSize: '10px', padding: '3px 8px' }}
+          onClick={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? 'Menyimpan...' : 'Simpan'}
+        </Btn>
+      )}
+    </div>
+  );
+}
+
 export default function TenderPage() {
   const {
     tenders, keywords, loadingTenders,
@@ -28,6 +101,7 @@ export default function TenderPage() {
     newTenderIds,
     dashboardChartFilter,
     setDashboardChartFilter,
+    showToast,
   } = useAppContext();
 
   const [portfolioFilter, setPortfolioFilter] = useState('Semua');
@@ -446,37 +520,12 @@ export default function TenderPage() {
                         <div className="text-slate-500 text-[10px] mt-1">{t.kualifikasi_paket}</div>
                       </td>
                       <td className="px-3 py-3 align-top">
-                        <select
-                          value={internalStatuses[t.id] || 'Dipantau'}
-                          onChange={e => updateTenderStatus(t.id, e.target.value)}
-                          onClick={e => e.stopPropagation()}
-                          className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold cursor-pointer outline-none focus:ring-2 focus:ring-blue-200 transition-colors ${
-                            {
-                              'Dipantau': 'bg-slate-50 text-slate-700 border-slate-200',
-                              'Akan Diikuti': 'bg-blue-50 text-blue-700 border-blue-200',
-                              'Sudah Diikuti': 'bg-indigo-50 text-indigo-700 border-indigo-200',
-                              'Menang': 'bg-green-50 text-green-700 border-green-200',
-                              'Kalah': 'bg-red-50 text-red-700 border-red-200',
-                              'Tidak Relevan': 'bg-amber-50 text-amber-700 border-amber-200',
-                            }[internalStatuses[t.id] || 'Dipantau'] || 'bg-slate-50 text-slate-700 border-slate-200'
-                          }`}
-                        >
-                          {(INTERNAL_STATUS_OPTIONS || ['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan']).map(opt => {
-                            const canBeWon = t.currentStageName && (
-                              t.currentStageName.toLowerCase().includes('pemenang') ||
-                              t.currentStageName.toLowerCase().includes('sanggah') ||
-                              t.currentStageName.toLowerCase().includes('klarifikasi') ||
-                              t.currentStageName.toLowerCase().includes('penunjukan') ||
-                              t.currentStageName.toLowerCase().includes('kontrak')
-                            );
-                            const isDisabled = opt === 'Menang' && !canBeWon;
-                            return (
-                              <option key={opt} value={opt} disabled={isDisabled}>
-                                {opt} {isDisabled ? '(Belum Pengumuman)' : ''}
-                              </option>
-                            );
-                          })}
-                        </select>
+                        <StatusCell
+                          tender={t}
+                          committedStatus={internalStatuses[t.id]}
+                          updateTenderStatus={updateTenderStatus}
+                          showToast={showToast}
+                        />
                       </td>
                       <td className={`px-3 py-3 align-top sticky right-0 backdrop-blur-sm ${isNew ? 'bg-amber-50/95' : 'bg-white/95'}`}>
                         <Btn className="primary small" onClick={() => setSelectedTenderId(t.id)}>
