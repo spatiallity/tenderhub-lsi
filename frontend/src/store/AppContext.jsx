@@ -107,8 +107,9 @@ export const AppProvider = ({ children }) => {
 
   const fetchTenders = useCallback(() => {
     // Fetch tenders AND watchlist in parallel for full state hydration
-    const tenderReq = api.get('/tender/search', { params: { limit: 200 } });
-    const watchlistReq = api.get('/watchlist').catch(() => ({ data: [] }));
+    const ts = Date.now();
+    const tenderReq = api.get('/tender/search', { params: { limit: 200, _t: ts } });
+    const watchlistReq = api.get('/watchlist', { params: { _t: ts } }).catch(() => ({ data: [] }));
 
     Promise.all([tenderReq, watchlistReq])
       .then(([tRes, wRes]) => {
@@ -422,11 +423,11 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // Helper: ensure a watchlist entry exists for kd_tender before patching
-  const ensureWatchlistEntry = useCallback(async (tenderId) => {
+  const ensureWatchlistEntry = useCallback(async (tenderId, forcedStatus) => {
     const tender = tenders.find(t => t.id === tenderId);
     await api.post('/watchlist', {
       kd_tender: parseInt(tenderId),
-      status_internal: internalStatuses[tenderId] || 'Dipantau',
+      status_internal: forcedStatus !== undefined ? forcedStatus : (internalStatuses[tenderId] || 'Dipantau'),
       nama_paket: tender?.nama || tender?.nama_paket || null,
       hps: tender?.hps || null,
     });
@@ -443,7 +444,7 @@ export const AppProvider = ({ children }) => {
       if (err?.response?.status === 404) {
         // Entry doesn't exist yet — create it first, then patch
         try {
-          await ensureWatchlistEntry(tenderId);
+          await ensureWatchlistEntry(tenderId, newStatus);
           await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
         } catch {
           throw new Error('sync_failed');
