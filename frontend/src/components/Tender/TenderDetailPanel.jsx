@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { SidePanel, Badge, Button, RelevanceBar, CountdownBadge } from '../UI';
 import TenderTimeline from './TenderTimeline';
 import { formatRupiah, portfolioColor, internalStatusColor } from '../../utils/format';
@@ -7,30 +7,15 @@ import { useAppContext } from '../../store/AppContext';
 import api from '../../services/api';
 
 const TenderDetailPanel = ({ tender, onClose }) => {
-  const { showToast, updateTenderStatus } = useAppContext();
-  const [selectedStatus, setSelectedStatus] = useState('Dipantau');
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (tender) {
-      setSelectedStatus(tender.internalStatus || tender.status_internal || 'Dipantau');
-    }
-  }, [tender]);
+  const { showToast } = useAppContext();
   
   if (!tender) return null;
 
-  const handleSaveWatchlist = async () => {
-    if (isSaving) return;
-    setIsSaving(true);
-    try {
-      await updateTenderStatus(tender.kd_tender || tender.id, selectedStatus);
-      showToast('Status tender berhasil diperbarui');
-      onClose();
-    } catch {
-      showToast('Gagal menyimpan perubahan. Silakan coba lagi.', 'error');
-    } finally {
-      setIsSaving(false);
-    }
+  const handleSaveWatchlist = () => {
+    // API call to watchlist logic
+    api.post('/watchlist', { kd_tender: tender.kd_tender || tender.id, nama_paket: tender.nama, hps: tender.hps })
+      .then(() => showToast("Tender ditambahkan ke Watchlist!"))
+      .catch(() => showToast("Gagal menyimpan tender", "error"));
   };
 
   return (
@@ -64,7 +49,7 @@ const TenderDetailPanel = ({ tender, onClose }) => {
       <div className="form-grid" style={{ marginBottom: '24px' }}>
         <div>
           <label className="muted" style={{ fontSize: '12px', fontWeight: 800 }}>Ubah Status Internal</label>
-          <select style={{ width: '100%', marginTop: '4px' }} value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+          <select style={{ width: '100%', marginTop: '4px' }} defaultValue={tender.internalStatus || tender.status_internal || 'Dipantau'}>
             <option>Dipantau</option>
             <option>Akan Diikuti</option>
             <option>Sudah Diikuti</option>
@@ -81,8 +66,8 @@ const TenderDetailPanel = ({ tender, onClose }) => {
       </div>
       
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-        <Button className="primary" style={{ flex: 1 }} onClick={handleSaveWatchlist} disabled={isSaving}>
-          <Save size={16} /> {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+        <Button className="primary" style={{ flex: 1 }} onClick={handleSaveWatchlist}>
+          <Save size={16} /> Simpan Perubahan
         </Button>
         {tender.lpse && (
           <a href={tender.lpse} target="_blank" rel="noreferrer" className="btn ghost">

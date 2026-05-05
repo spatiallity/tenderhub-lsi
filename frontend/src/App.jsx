@@ -24,10 +24,9 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 1000, // 30 seconds - data considered fresh for shorter time
+      staleTime: 5 * 60 * 1000, // 5 minutes
       cacheTime: 10 * 60 * 1000, // 10 minutes
-      refetchOnWindowFocus: true, // Auto-refetch when user focuses window
-      refetchInterval: 60 * 1000, // Auto-refetch every 60 seconds when tab is active
+      refetchOnWindowFocus: false,
       retry: 1,
     },
   },
