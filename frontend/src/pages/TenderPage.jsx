@@ -5,6 +5,7 @@ import { Badge, CountdownBadge, PageTitle, Card, Btn } from '../components/UI/in
 import { portfolioColor, internalStatusColor, PROVINCES, INTERNAL_STATUS_OPTIONS } from '../utils/constants';
 import { formatRupiah, activeKeywordCount, exportTendersExcel } from '../utils/helpers';
 import { useDebounce } from '../hooks/useDebounce';
+import { useWatchlistRealtime } from '../hooks/useWatchlistRealtime';
 
 const stageBadgeClass = {
   gray: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -92,6 +93,9 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast }) 
 }
 
 export default function TenderPage() {
+  // Subscribe to realtime watchlist changes
+  useWatchlistRealtime();
+
   const {
     tenders, keywords, loadingTenders,
     addKeyword, removeKeyword,
