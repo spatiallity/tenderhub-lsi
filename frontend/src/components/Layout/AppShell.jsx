@@ -146,7 +146,7 @@ export default function AppShell() {
             <div className={`overflow-hidden transition-all duration-300 flex flex-col ${sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 hidden'}`}>
               {/* Logo Sucofindo - Left Aligned & Larger */}
               <img 
-                src="/assets/sucofindo-logo.png" 
+                src="https://raw.githubusercontent.com/spatiallity/tenderhub-lsi/main/frontend/public/assets/sucofindo-logo.png" 
                 alt="Sucofindo Logo" 
                 className="h-12 w-auto object-contain mb-4"
               />
