@@ -22,15 +22,7 @@ const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
-  const { newTenderCount, newRupCount, userProfile } = useAppContext();
-  
-  // Calculate user initials
-  const userInitials = (userProfile?.name || 'Admin LSI')
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase();
+  const { newTenderCount, newRupCount } = useAppContext();
   
   // Keyboard shortcut: Cmd+K or Ctrl+K for search
   useKeyboardShortcut('k', () => setShowGlobalSearch(true), { meta: true, ctrl: true });
@@ -210,11 +202,11 @@ const Header = () => {
               aria-expanded={showUserMenu}
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-extrabold flex items-center justify-center text-xs shadow-md">
-                {userInitials}
+                AM
               </div>
               <div className="hidden lg:block text-left">
-                <div className="text-xs font-bold text-slate-900">{userProfile?.name || 'Admin LSI'}</div>
-                <div className="text-[10px] text-slate-500">{userProfile?.title || 'Sales & Marketing'}</div>
+                <div className="text-xs font-bold text-slate-900">Admin LSI</div>
+                <div className="text-[10px] text-slate-500">Sales & Marketing</div>
               </div>
             </button>
             
@@ -229,10 +221,10 @@ const Header = () => {
                   <div className="p-4 border-b border-slate-200">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-extrabold flex items-center justify-center text-sm shadow-md">
-                        {userInitials}
+                        AM
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-slate-900 truncate">{userProfile?.name || 'Admin LSI'}</div>
+                        <div className="text-sm font-bold text-slate-900 truncate">Admin LSI</div>
                         <div className="text-xs text-slate-500 truncate">admin@sucofindo.co.id</div>
                       </div>
                     </div>

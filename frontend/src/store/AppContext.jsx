@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
-import supabase from '../services/supabase';
 import { DEFAULT_KEYWORDS, DEFAULT_USERS, PROVINCES } from '../utils/constants';
 import { calcRupMatch, enrichTender, activeKeywordCount } from '../utils/helpers';
 import { FALLBACK_RUP } from '../data/rupDummy';
@@ -33,11 +32,6 @@ const isInitialAnnouncementTender = (tender) => {
 export const AppProvider = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toast = useToast();
-  
-  // Track if initial data has been loaded
-  const expertsLoadedRef = useRef(false);
-  // Track IDs being deleted to prevent auto-refresh from resurrecting them
-  const pendingDeleteIdsRef = useRef(new Set());
 
   // Keywords state
   const [keywords, setKeywords] = useState(DEFAULT_KEYWORDS);
@@ -45,13 +39,12 @@ export const AppProvider = ({ children }) => {
   // Tenders state from API
   const [tendersRaw, setTendersRaw] = useState([]);
   const [rupRaw, setRupRaw] = useState([]);
-  // Always start empty — API/Supabase is the single source of truth
   const [expertsRaw, setExpertsRaw] = useState([]);
   const [loadingTenders, setLoadingTenders] = useState(true);
   const [loadingRup, setLoadingRup] = useState(true);
   const [loadingExperts, setLoadingExperts] = useState(true);
 
-  // Internal state — source of truth is backend, not localStorage
+  // Internal state (like mockup)
   const [internalStatuses, setInternalStatuses] = useState({});
   const [tenderNotes, setTenderNotes] = useState({});
   const [noteSaved, setNoteSaved] = useState({});
@@ -59,20 +52,8 @@ export const AppProvider = ({ children }) => {
   const [expertCVs, setExpertCVs] = useState({});
   const [users, setUsers] = useState(DEFAULT_USERS);
   const [notifications, setNotifications] = useState({ baru: true, deadline: true, status: true, ta: true });
-  const [coverage, setCoverage] = useState(() => PROVINCES.map((name) => ({ name, active: true })));
+  const [coverage, setCoverage] = useState(() => PROVINCES.map((name, i) => ({ name, active: i < 10 })));
   const [hpsThreshold, setHpsThreshold] = useState(200);
-
-  const [userProfile, setUserProfile] = useState(() => {
-    try {
-      const stored = localStorage.getItem('lsi-user-profile');
-      return stored ? JSON.parse(stored) : { name: 'Admin LSI', title: 'Sales & Marketing' };
-    } catch { return { name: 'Admin LSI', title: 'Sales & Marketing' }; }
-  });
-
-  // Save profile changes
-  useEffect(() => {
-    localStorage.setItem('lsi-user-profile', JSON.stringify(userProfile));
-  }, [userProfile]);
 
   // Panel state
   const [selectedTenderId, setSelectedTenderId] = useState(null);
@@ -103,60 +84,14 @@ export const AppProvider = ({ children }) => {
     (toastConfig[type] || toastConfig.info)();
   }, [toast]);
 
-  // ─── Reusable fetch functions ──────────────────────────────────────────────
-
-  const fetchTenders = useCallback(() => {
-    // Fetch tenders AND watchlist in parallel for full state hydration
-    const ts = Date.now();
-    const tenderReq = api.get('/tender/search', { params: { limit: 200, _t: ts } });
-    const watchlistReq = api.get('/watchlist', { params: { _t: ts } }).catch(() => ({ data: [] }));
-
-    Promise.all([tenderReq, watchlistReq])
-      .then(([tRes, wRes]) => {
-        const watchlistMap = {};
-        (wRes.data || []).forEach(w => {
-          watchlistMap[w.kd_tender] = w;
-        });
-
-        setTendersRaw(tRes.data || []);
-
+  // Load data from API
+  useEffect(() => {
+    api.get('/tender/search', { params: { limit: 200 } })
+      .then(res => {
+        setTendersRaw(res.data || []);
+        // Initialize internalStatuses — normalize won/followed flags
         const statusMap = {};
-        const notesMap = {};
-        const picMap = {};
-
-        (tRes.data || []).forEach(t => {
-          t.id = t.kd_tender || t.id;
-          const w = watchlistMap[t.id];
-
-          // Status: watchlist DB > tender API field > default
-          let s = (w?.status_internal) || t.internalStatus || 'Dipantau';
-          if (t.won === true) s = 'Menang';
-          else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = s;
-
-          // Notes from watchlist
-          if (w?.catatan_internal) {
-            try { notesMap[t.id] = JSON.parse(w.catatan_internal); } catch { /* ignore */ }
-          } else if (t.catatan_internal) {
-            try { notesMap[t.id] = JSON.parse(t.catatan_internal); } catch { /* ignore */ }
-          }
-
-          // PIC from watchlist
-          if (w?.assigned_pic) {
-            picMap[t.id] = w.assigned_pic;
-          }
-        });
-
-        setInternalStatuses(statusMap);
-        setTenderNotes(notesMap);
-        setAssignedPICs(picMap);
-      })
-      .catch(() => {
-        // Offline fallback
-        setTendersRaw(FALLBACK_TENDERS);
-        const statusMap = {};
-        FALLBACK_TENDERS.forEach(t => {
-          t.id = t.id || t.kd_tender;
+        (res.data || []).forEach(t => {
           let s = t.internalStatus || 'Dipantau';
           if (t.won === true) s = 'Menang';
           else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
@@ -164,53 +99,20 @@ export const AppProvider = ({ children }) => {
         });
         setInternalStatuses(statusMap);
       })
+      .catch(() => {
+        setTendersRaw(FALLBACK_TENDERS);
+        const statusMap = {};
+        FALLBACK_TENDERS.forEach(t => {
+          let s = t.internalStatus || 'Dipantau';
+          if (t.won === true) s = 'Menang';
+          else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
+          statusMap[t.id] = s;
+        });
+        setInternalStatuses(statusMap);
+        showToast('API tender belum tersambung. Dummy tender lokal dimuat.', 'error');
+      })
       .finally(() => setLoadingTenders(false));
   }, []);
-
-  const fetchExperts = useCallback(() => {
-    api.get('/experts')
-      .then(res => {
-        const apiExperts = (res.data || []).map(e => ({
-          ...e,
-          noHp: e.no_hp || '',
-          portofolio: e.subporto || [],
-          rating: e.rating_avg || 0,
-          proyek: e.jumlah_proyek || 0,
-          history: (e.projects || []).map(p => ({
-            id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
-            peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
-          })),
-          reviews: (e.reviews || []).map(r => ({
-            id: r.id, reviewer: r.reviewer_nama, rating: r.rating, komentar: r.komentar,
-            tanggal: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : ''
-          }))
-        }));
-        setExpertsRaw(prev => {
-          // Keep only optimistic entries (temp IDs) that haven't synced yet
-          const pendingOnly = prev.filter(e => String(e.id).startsWith('temp-'));
-          // Filter out experts that are pending deletion
-          const filtered = apiExperts.filter(e => !pendingDeleteIdsRef.current.has(String(e.id)));
-          return [...pendingOnly, ...filtered];
-        });
-      })
-      .catch(() => {
-        setExpertsRaw(prev => prev.length > 0 ? prev : FALLBACK_EXPERTS);
-      })
-      .finally(() => setLoadingExperts(false));
-  }, []);
-
-  // ─── Initial data load ─────────────────────────────────────────────────────
-
-  useEffect(() => {
-    fetchTenders();
-    
-    // Fallback polling every 5 minutes (Realtime handles instant sync)
-    const intervalId = setInterval(() => {
-      fetchTenders();
-    }, 5 * 60 * 1000);
-    
-    return () => clearInterval(intervalId);
-  }, [fetchTenders]);
 
   useEffect(() => {
     api.get('/rup/search', { params: { limit: 100 } })
@@ -220,138 +122,17 @@ export const AppProvider = ({ children }) => {
         showToast('API RUP belum tersambung. Dummy RUP lokal dimuat.', 'error');
       })
       .finally(() => setLoadingRup(false));
-  }, []); // Empty dependency - only run once on mount
+  }, [showToast]);
 
-  const fetchKeywords = useCallback(() => {
-    api.get('/keyword')
-      .then(res => {
-        const data = res.data || [];
-        const grouped = { SDA: [], FLP: [], FITI: [] };
-        data.forEach(k => {
-          if (grouped[k.subporto]) {
-            grouped[k.subporto].push({
-              id: k.id,
-              text: k.keyword_text,
-              active: k.is_active,
-              isGlobal: true
-            });
-          }
-        });
-        
-        setKeywords(prev => {
-          const merged = { SDA: [], FLP: [], FITI: [] };
-          ['SDA', 'FLP', 'FITI'].forEach(port => {
-            const localOnly = (prev[port] || []).filter(k => !k.isGlobal);
-            // Replace global keywords with fresh API data, keep local ones
-            merged[port] = [...grouped[port], ...localOnly];
-          });
-          return merged;
-        });
-      })
+  useEffect(() => {
+    api.get('/experts')
+      .then(res => setExpertsRaw(res.data || []))
       .catch(() => {
-        setKeywords(prev => {
-          if (Object.values(prev).flat().length === 0) return DEFAULT_KEYWORDS;
-          return prev;
-        });
-      });
-  }, []);
-
-  useEffect(() => {
-    if (expertsLoadedRef.current) return;
-    expertsLoadedRef.current = true;
-    fetchExperts();
-    fetchKeywords();
-    
-    // Fallback polling every 5 minutes (Realtime handles instant sync)
-    const intervalId = setInterval(() => {
-      fetchExperts();
-    }, 5 * 60 * 1000);
-    
-    return () => clearInterval(intervalId);
-  }, [fetchExperts, fetchKeywords]);
-
-  // ─── Supabase Realtime: instant cross-user sync ────────────────────────────
-
-  useEffect(() => {
-    // Debounce rapid-fire events (e.g. bulk seed inserts)
-    let expertTimer = null;
-    let tenderTimer = null;
-    const debounceRefresh = (fn, timerRef, delay = 1000) => {
-      return () => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(fn, delay);
-      };
-    };
-    const expertTimerRef = { current: null };
-    const tenderTimerRef = { current: null };
-    const keywordTimerRef = { current: null };
-
-    const debouncedFetchExperts = () => {
-      if (expertTimerRef.current) clearTimeout(expertTimerRef.current);
-      expertTimerRef.current = setTimeout(() => fetchExperts(), 800);
-    };
-    const debouncedFetchTenders = () => {
-      if (tenderTimerRef.current) clearTimeout(tenderTimerRef.current);
-      tenderTimerRef.current = setTimeout(() => fetchTenders(), 800);
-    };
-
-    const debouncedFetchKeywords = () => {
-      if (keywordTimerRef.current) clearTimeout(keywordTimerRef.current);
-      keywordTimerRef.current = setTimeout(() => fetchKeywords(), 800);
-    };
-
-    // Subscribe to experts table changes
-    const channel = supabase
-      .channel('tenderhub-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'experts' }, () => {
-        console.log('[Realtime] experts changed');
-        debouncedFetchExperts();
+        setExpertsRaw(FALLBACK_EXPERTS);
+        showToast('API expert belum tersambung. Dummy tenaga ahli lokal dimuat.', 'error');
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_projects' }, () => {
-        console.log('[Realtime] expert_projects changed');
-        debouncedFetchExperts();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expert_reviews' }, () => {
-        console.log('[Realtime] expert_reviews changed');
-        debouncedFetchExperts();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tender_watchlist' }, () => {
-        console.log('[Realtime] tender_watchlist changed');
-        debouncedFetchTenders();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'keywords' }, () => {
-        console.log('[Realtime] keywords changed');
-        debouncedFetchKeywords();
-      })
-      .subscribe((status) => {
-        console.log('[Realtime] subscription status:', status);
-      });
-
-    return () => {
-      if (expertTimerRef.current) clearTimeout(expertTimerRef.current);
-      if (tenderTimerRef.current) clearTimeout(tenderTimerRef.current);
-      supabase.removeChannel(channel);
-    };
-  }, [fetchExperts, fetchTenders]);
-
-  // ─── Refresh on tab focus (sync changes from other users) ─────────────────
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // Re-fetch everything when user returns to tab
-        fetchTenders();
-        fetchExperts();
-        fetchKeywords();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [fetchTenders, fetchExperts]);
-
-  // localStorage is no longer used for internalStatuses, tenderNotes, or assignedPICs.
-  // All three are hydrated from the backend on load and synced via PATCH on change.
+      .finally(() => setLoadingExperts(false));
+  }, [showToast]);
 
   // Phase 1: Heavy enrichment (relevance, stages, deadlines) — only re-runs when raw data or keywords change
   const tendersEnriched = useMemo(() =>
@@ -422,83 +203,6 @@ export const AppProvider = ({ children }) => {
     });
   }, []);
 
-  // Helper: ensure a watchlist entry exists for kd_tender before patching
-  const ensureWatchlistEntry = useCallback(async (tenderId, forcedStatus) => {
-    const tender = tenders.find(t => t.id === tenderId);
-    await api.post('/watchlist', {
-      kd_tender: parseInt(tenderId),
-      status_internal: forcedStatus !== undefined ? forcedStatus : (internalStatuses[tenderId] || 'Dipantau'),
-      nama_paket: tender?.nama || tender?.nama_paket || null,
-      hps: tender?.hps || null,
-    });
-  }, [tenders, internalStatuses]);
-
-  const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
-    // OPTIMISTIC: Update UI immediately
-    setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
-
-    // SYNC: PATCH to backend
-    try {
-      await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
-    } catch (err) {
-      if (err?.response?.status === 404) {
-        // Entry doesn't exist yet — create it first, then patch
-        try {
-          await ensureWatchlistEntry(tenderId, newStatus);
-          await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
-    }
-  }, [ensureWatchlistEntry]);
-
-  const updateTenderPIC = useCallback(async (tenderId, userId) => {
-    // OPTIMISTIC: Update UI immediately
-    setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
-
-    // SYNC: PATCH to backend
-    try {
-      await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
-    } catch (err) {
-      if (err?.response?.status === 404) {
-        try {
-          await ensureWatchlistEntry(tenderId);
-          await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
-    }
-  }, [ensureWatchlistEntry]);
-
-  const addTenderNote = useCallback(async (tenderId, noteObj) => {
-    // OPTIMISTIC: Update UI immediately
-    const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
-    setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
-
-    // SYNC: PATCH to backend
-    const payload = { catatan_internal: JSON.stringify(updatedNotes) };
-    try {
-      await api.patch(`/watchlist/${tenderId}`, payload);
-    } catch (err) {
-      if (err?.response?.status === 404) {
-        try {
-          await ensureWatchlistEntry(tenderId);
-          await api.patch(`/watchlist/${tenderId}`, payload);
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
-    }
-  }, [tenderNotes, ensureWatchlistEntry]);
-
   const openTender = useCallback((id) => {
     markTenderOpened(id);
     setSelectedTenderId(id);
@@ -510,156 +214,61 @@ export const AppProvider = ({ children }) => {
   }, [markRupOpened]);
 
   // Keyword actions
-  const addKeyword = useCallback((portfolio, text, isGlobal = false) => {
+  const addKeyword = useCallback((portfolio, text) => {
     if (!text?.trim()) return;
-    
-    if (isGlobal) {
-      api.post('/keyword', { keyword_text: text.trim(), subporto: portfolio, is_active: true })
-        .then(() => showToast('Keyword global berhasil ditambahkan'))
-        .catch(() => showToast('Gagal menambah keyword global', 'error'));
-        
-      setKeywords(prev => ({
-        ...prev,
-        [portfolio]: [...prev[portfolio], { id: `temp-${Date.now()}`, text: text.trim(), active: true, isGlobal: true }]
-      }));
-    } else {
-      setKeywords(prev => ({
-        ...prev,
-        [portfolio]: [...prev[portfolio], { id: `local-${Date.now()}`, text: text.trim(), active: true, isGlobal: false }]
-      }));
-    }
+    setKeywords(prev => ({
+      ...prev,
+      [portfolio]: [...prev[portfolio], { id: `${portfolio}-${Date.now()}`, text: text.trim(), active: true }]
+    }));
   }, [showToast]);
 
   const removeKeyword = useCallback((portfolio, id) => {
-    // Local remove (hides it from current session even if global)
     setKeywords(prev => ({ ...prev, [portfolio]: prev[portfolio].filter(k => k.id !== id) }));
   }, []);
 
-  const deleteGlobalKeyword = useCallback((portfolio, id) => {
-    // Global remove via API
-    if (!String(id).startsWith('temp-') && !String(id).startsWith('local-')) {
-      api.delete(`/keyword/${id}`)
-        .then(() => showToast('Keyword global dihapus'))
-        .catch(() => showToast('Gagal menghapus keyword', 'error'));
-    }
-    setKeywords(prev => ({ ...prev, [portfolio]: prev[portfolio].filter(k => k.id !== id) }));
-  }, [showToast]);
-
   const clearKeywords = useCallback(() => {
-    // Reset local filter state (deactivate all)
-    setKeywords(prev => {
-      const cleared = { SDA: [], FLP: [], FITI: [] };
-      ['SDA', 'FLP', 'FITI'].forEach(port => {
-        cleared[port] = prev[port].map(k => ({ ...k, active: false }));
-      });
-      return cleared;
-    });
-    showToast('Filter keyword dinonaktifkan');
+    setKeywords(prev => Object.fromEntries(Object.keys(prev).map(portfolio => [portfolio, []])));
+    showToast('Semua keyword berhasil dibersihkan');
   }, [showToast]);
 
   const updateKeyword = useCallback((portfolio, id, patch) => {
-    const keyword = keywords[portfolio]?.find(k => k.id === id);
-    if (keyword?.isGlobal && !String(id).startsWith('temp-') && patch.active !== undefined) {
-      api.put(`/keyword/${id}`, { is_active: patch.active })
-        .catch(() => showToast('Gagal update status keyword', 'error'));
-    }
     setKeywords(prev => ({
       ...prev,
       [portfolio]: prev[portfolio].map(k => k.id === id ? { ...k, ...patch } : k)
     }));
-  }, [keywords, showToast]);
+  }, []);
 
   // Expert actions
-  const addExpert = useCallback((draft) => {
-    // Handle keahlian - could be array or string
-    let keahlianClean = [];
-    if (Array.isArray(draft.keahlian)) {
-      keahlianClean = draft.keahlian.filter(Boolean).map(s => String(s).trim()).filter(Boolean);
-    } else if (typeof draft.keahlian === 'string') {
-      keahlianClean = draft.keahlian.split(',').map(s => s.trim()).filter(Boolean);
-    }
-    
-    if (!draft.nama?.trim()) {
-      showToast('Nama tenaga ahli wajib diisi', 'error');
-      return false;
-    }
-    
-    if (keahlianClean.length === 0) {
-      showToast('Minimal satu keahlian harus diisi', 'error');
-      return false;
-    }
-    
+  const addExpert = useCallback(async (draft) => {
+    if (!draft.nama?.trim() || !draft.keahlian?.trim()) return;
     const body = {
       nama: draft.nama.trim(),
-      no_hp: draft.noHp?.trim() || null,
       instansi: draft.instansi?.trim() || 'Eksternal SUCOFINDO',
-      keahlian: keahlianClean,
+      keahlian: [draft.keahlian.trim()],
       availability: draft.availability || 'Tersedia',
-      subporto: [draft.portfolio || 'SDA'],
-      projects: (draft.history || []).map(h => ({
-        nama_proyek: h.proyek,
-        pemberi_kerja: h.klien || '-',
-        tahun: h.tahun || new Date().getFullYear(),
-        nilai_proyek: Number(h.nilai || 0),
-        peran: h.peran || 'Tenaga Ahli',
-        bersama: h.bersama || 'Sucofindo',
-        status_proyek: h.status || 'Selesai'
-      }))
+      portofolio: [draft.portfolio || 'SDA'],
+      rating: 4.2,
+      proyek: 0,
     };
-    
-    // OPTIMISTIC: Add to UI immediately with a temporary ID
-    const tempId = `temp-${Date.now()}`;
-    const optimisticExpert = {
-      ...body,
-      id: tempId,
-      noHp: draft.noHp || '',
-      portofolio: body.subporto,
-      rating: 0,
-      rating_avg: 0,
-      proyek: draft.history?.length || 0,
-      jumlah_proyek: draft.history?.length || 0,
-      history: draft.history || [],
-      reviews: [],
-      _syncing: true,
-    };
-    setExpertsRaw(prev => [optimisticExpert, ...prev]);
-    showToast('Tenaga ahli berhasil ditambahkan');
-    
-    // BACKGROUND: Sync to API
-    api.post('/experts', body)
-      .then(res => {
-        const serverExpert = {
-          ...res.data,
-          noHp: res.data.no_hp || '',
-          portofolio: res.data.subporto || [],
-          rating: res.data.rating_avg || 0,
-          proyek: res.data.jumlah_proyek,
-          history: (res.data.projects || []).map(p => ({
-            id: p.id, proyek: p.nama_proyek, klien: p.pemberi_kerja, tahun: p.tahun,
-            peran: p.peran, nilai: p.nilai_proyek, bersama: p.bersama, status: p.status_proyek
-          })),
-          reviews: [],
-        };
-        // Replace temp entry with real server data
-        setExpertsRaw(prev => prev.map(e => e.id === tempId ? serverExpert : e));
-      })
-      .catch(() => {
-        // Keep the optimistic entry but mark as local-only
-        setExpertsRaw(prev => prev.map(e => e.id === tempId ? { ...e, _syncing: false } : e));
-        showToast('Gagal sinkronisasi ke server. Data tersimpan lokal.', 'warning');
-      });
-    
-    return true;
+    try {
+      const res = await api.post('/experts', body);
+      setExpertsRaw(prev => [...prev, res.data]);
+      showToast('Tenaga ahli berhasil ditambahkan');
+    } catch (e) {
+      const fallbackExpert = { ...body, id: Date.now(), noHp: draft.noHp || '', history: [], reviews: [] };
+      setExpertsRaw(prev => [...prev, fallbackExpert]);
+      showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'error');
+    }
   }, [showToast]);
 
   const updateExpertName = useCallback((expertId, nama) => {
-    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? { ...e, nama } : e));
+    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { ...e, nama } : e));
   }, [showToast]);
 
   const updateExpertProfile = useCallback(async (expertId, patch) => {
     const safePatch = {
       nama: patch?.nama?.trim(),
-      no_hp: patch?.noHp?.trim(),
+      noHp: patch?.noHp?.trim(),
       instansi: patch?.instansi?.trim(),
     };
     try {
@@ -667,149 +276,51 @@ export const AppProvider = ({ children }) => {
     } catch {
       // Keep local fallback update when API is unavailable.
     }
-    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? { ...e, nama: safePatch.nama, noHp: patch?.noHp?.trim(), instansi: safePatch.instansi } : e));
+    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { ...e, ...safePatch } : e));
     showToast('Profil tenaga ahli berhasil diperbarui');
   }, [showToast]);
 
-  const deleteExpert = useCallback((expertId) => {
-    // Track this ID as pending deletion — prevents auto-refresh from bringing it back
-    pendingDeleteIdsRef.current.add(String(expertId));
-    
-    // OPTIMISTIC: Remove from UI immediately
-    const removedExpert = expertsRaw.find(e => String(e.id) === String(expertId));
-    setExpertsRaw(prev => prev.filter(e => String(e.id) !== String(expertId)));
-    setSelectedExpertId(null);
-    showToast('Tenaga ahli berhasil dihapus');
-    
-    // BACKGROUND: Sync to API
-    api.delete(`/experts/${expertId}`)
-      .then(() => {
-        // Delete confirmed — safe to remove from pending set
-        pendingDeleteIdsRef.current.delete(String(expertId));
-      })
-      .catch(() => {
-        // Rollback: remove from pending set and re-add to list
-        pendingDeleteIdsRef.current.delete(String(expertId));
-        if (removedExpert) {
-          setExpertsRaw(prev => [...prev, removedExpert]);
-          showToast('Gagal menghapus dari server. Data dikembalikan.', 'warning');
-        }
-      });
-  }, [showToast, setSelectedExpertId, expertsRaw]);
+  const deleteExpert = useCallback(async (expertId) => {
+    try {
+      await api.delete(`/experts/${expertId}`);
+      setExpertsRaw(prev => prev.filter(e => e.id !== expertId));
+      setSelectedExpertId(prev => prev === expertId ? null : prev);
+      showToast('Tenaga ahli dihapus');
+    } catch {
+      setExpertsRaw(prev => prev.filter(e => e.id !== expertId));
+      setSelectedExpertId(prev => prev === expertId ? null : prev);
+    }
+  }, []);
 
   const addReview = useCallback((expertId) => {
-    if (!reviewDraft.reviewer?.trim() || !reviewDraft.komentar?.trim()) {
-      showToast('Nama reviewer dan komentar wajib diisi', 'error');
-      return;
-    }
-    
-    // OPTIMISTIC: Add review to UI immediately
-    const tempReview = {
-      id: `temp-${Date.now()}`,
-      reviewer: reviewDraft.reviewer,
-      rating: reviewDraft.rating,
-      komentar: reviewDraft.komentar,
-      tanggal: new Date().toLocaleDateString('id-ID'),
-    };
-    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+    if (!reviewDraft.reviewer.trim() || !reviewDraft.komentar.trim()) return;
+    setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
       ...e,
-      reviews: [...(e.reviews || []), tempReview],
+      reviews: [...(e.reviews || []), { ...reviewDraft, tanggal: new Date().toLocaleDateString('id-ID') }],
       rating: Number(((e.rating * (e.reviews || []).length + reviewDraft.rating) / ((e.reviews || []).length + 1)).toFixed(1))
     } : e));
-    const savedDraft = { ...reviewDraft };
     setReviewDraft({ reviewer: '', rating: 5, komentar: '' });
     showToast('Review berhasil disimpan');
-    
-    // BACKGROUND: Sync to API
-    api.post(`/experts/${expertId}/reviews`, {
-      reviewer_nama: savedDraft.reviewer,
-      rating: savedDraft.rating,
-      komentar: savedDraft.komentar
-    }).then(res => {
-      // Replace temp ID with server ID
-      setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
-        ...e,
-        reviews: (e.reviews || []).map(r => r.id === tempReview.id ? { ...r, id: res.data.id } : r)
-      } : e));
-    }).catch(() => {
-      showToast('Gagal sinkronisasi review ke server', 'warning');
-    });
-  }, [reviewDraft, showToast]);
+  }, [reviewDraft]);
 
   const addHistory = useCallback((expertId) => {
-    if (!historyDraft.proyek?.trim()) {
-      showToast('Nama proyek wajib diisi', 'error');
-      return;
-    }
-    
-    const apiPayload = {
-      nama_proyek: historyDraft.proyek,
-      pemberi_kerja: historyDraft.klien || '-',
-      tahun: historyDraft.tahun || new Date().getFullYear(),
-      nilai_proyek: Number(historyDraft.nilai || 0) * 1000000,
-      peran: historyDraft.peran || 'Tenaga Ahli',
-      bersama: historyDraft.bersama || 'Sucofindo',
-      status_proyek: 'Selesai'
-    };
-    
-    // OPTIMISTIC: Add to UI immediately
-    const tempProject = {
-      id: `temp-${Date.now()}`,
-      proyek: apiPayload.nama_proyek,
-      klien: apiPayload.pemberi_kerja,
-      tahun: apiPayload.tahun,
-      peran: apiPayload.peran,
-      nilai: apiPayload.nilai_proyek,
-      bersama: apiPayload.bersama,
-      status: apiPayload.status_proyek,
-    };
-    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
+    if (!historyDraft.proyek.trim() || !historyDraft.klien.trim()) return;
+    setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
       ...e,
-      history: [...(e.history || []), tempProject],
+      history: [...(e.history || []), {
+        proyek: historyDraft.proyek,
+        klien: historyDraft.klien,
+        tahun: historyDraft.tahun || new Date().getFullYear(),
+        nilai: Number(historyDraft.nilai || 0) * 1000000,
+        peran: historyDraft.peran || 'Tenaga Ahli',
+        bersama: historyDraft.bersama,
+        status: 'Selesai'
+      }],
       proyek: (e.proyek || 0) + 1
     } : e));
     setHistoryDraft({ proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo' });
     showToast('Riwayat berhasil disimpan');
-    
-    // BACKGROUND: Sync to API
-    api.post(`/experts/${expertId}/projects`, apiPayload)
-      .then(res => {
-        setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
-          ...e,
-          history: (e.history || []).map(h => h.id === tempProject.id ? { ...h, id: res.data.id } : h)
-        } : e));
-      })
-      .catch(() => {
-        showToast('Gagal sinkronisasi riwayat ke server', 'warning');
-      });
-  }, [historyDraft, showToast]);
-
-  const deleteExpertHistory = useCallback((expertId, projectId) => {
-    // OPTIMISTIC: Remove from UI immediately
-    const expert = expertsRaw.find(e => String(e.id) === String(expertId));
-    const removedProject = expert?.history?.find(h => String(h.id) === String(projectId));
-    setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
-      ...e,
-      history: (e.history || []).filter(h => String(h.id) !== String(projectId)),
-      proyek: Math.max((e.proyek || 0) - 1, 0)
-    } : e));
-    showToast('Riwayat berhasil dihapus');
-    
-    // BACKGROUND: Sync to API
-    api.delete(`/experts/${expertId}/projects/${projectId}`)
-      .catch(() => {
-        // Rollback on failure
-        if (removedProject) {
-          setExpertsRaw(prev => prev.map(e => String(e.id) === String(expertId) ? {
-            ...e,
-            history: [...(e.history || []), removedProject],
-            proyek: (e.proyek || 0) + 1
-          } : e));
-          showToast('Gagal menghapus dari server. Data dikembalikan.', 'warning');
-        }
-      });
-  }, [showToast, expertsRaw]);
-
+  }, [historyDraft]);
 
   const addUser = useCallback((draft) => {
     if (!draft?.nama?.trim()) return;
@@ -833,21 +344,6 @@ export const AppProvider = ({ children }) => {
     showToast('Pengguna berhasil dihapus');
   }, [showToast]);
 
-  // Manual refresh function for users to sync data
-  const refreshAllData = useCallback(async () => {
-    showToast('Menyinkronkan data...', 'info');
-    try {
-      await Promise.all([
-        fetchTenders(),
-        fetchExperts(),
-        fetchKeywords(),
-      ]);
-      showToast('Data berhasil disinkronkan');
-    } catch (error) {
-      showToast('Gagal menyinkronkan data', 'error');
-    }
-  }, [fetchTenders, fetchExperts, showToast]);
-
   const value = useMemo(() => ({
     // Sidebar
     sidebarCollapsed, setSidebarCollapsed,
@@ -864,19 +360,18 @@ export const AppProvider = ({ children }) => {
     // Derived
     keywordCount, totalPotensi, relevantCount, urgentCount,
     // Keywords
-    keywords, setKeywords, addKeyword, removeKeyword, deleteGlobalKeyword, clearKeywords, updateKeyword,
+    keywords, setKeywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
     // Internal state
-    internalStatuses, updateTenderStatus,
-    tenderNotes, setTenderNotes, addTenderNote,
+    internalStatuses, setInternalStatuses,
+    tenderNotes, setTenderNotes,
     noteSaved, setNoteSaved,
-    assignedPICs, setAssignedPICs, updateTenderPIC,
+    assignedPICs, setAssignedPICs,
     expertCVs, setExpertCVs,
     users, setUsers,
     addUser, updateUser, deleteUser,
     notifications, setNotifications,
     coverage, setCoverage,
     hpsThreshold, setHpsThreshold,
-    userProfile, setUserProfile,
     // Panel state
     selectedTenderId, setSelectedTenderId: openTender,
     selectedExpertId, setSelectedExpertId,
@@ -893,29 +388,25 @@ export const AppProvider = ({ children }) => {
     showKeywordManager, setShowKeywordManager,
     dashboardChartFilter, setDashboardChartFilter,
     // Expert actions
-    addExpert, updateExpertName, updateExpertProfile, deleteExpert, deleteExpertHistory,
+    addExpert, updateExpertName, updateExpertProfile, deleteExpert,
     reviewDraft, setReviewDraft, addReview,
     historyDraft, setHistoryDraft, addHistory,
-    // Data refresh
-    refreshAllData,
   }), [
     sidebarCollapsed, toast, showToast,
     tenders, rupPlans, expertsRaw,
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,
-    keywords, addKeyword, removeKeyword, deleteGlobalKeyword, clearKeywords, updateKeyword,
-    internalStatuses, updateTenderStatus, tenderNotes, setTenderNotes, addTenderNote,
-    assignedPICs, updateTenderPIC,
+    keywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
+    internalStatuses, tenderNotes, noteSaved, assignedPICs, expertCVs,
     users, addUser, updateUser, deleteUser,
-    notifications, coverage, hpsThreshold, userProfile,
+    notifications, coverage, hpsThreshold,
     selectedTenderId, selectedExpertId, selectedRupId,
     selectedTender, selectedExpert, selectedRup,
     newTenderIds, newRupIds, openTender, openRup,
     markTenderOpened, markRupOpened,
     showWinrateDetail, showStageRef, showPotensiChart, showUrgentPanel, showKeywordManager,
-    refreshAllData,
     dashboardChartFilter,
-    addExpert, updateExpertName, updateExpertProfile, deleteExpert, deleteExpertHistory,
+    addExpert, updateExpertName, updateExpertProfile, deleteExpert,
     reviewDraft, addReview, historyDraft, addHistory,
   ]);
 
