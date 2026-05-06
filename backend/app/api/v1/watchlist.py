@@ -10,8 +10,11 @@ router = APIRouter()
 
 @router.get("/", response_model=List[WatchlistOut])
 async def get_watchlist(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TenderWatchlist))
-    return result.scalars().all()
+    try:
+        result = await db.execute(select(TenderWatchlist))
+        return result.scalars().all()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {str(e)}")
 
 @router.post("/", response_model=WatchlistOut)
 async def add_to_watchlist(item_in: WatchlistCreate, db: AsyncSession = Depends(get_db)):

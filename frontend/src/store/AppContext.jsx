@@ -137,7 +137,7 @@ export const AppProvider = ({ children }) => {
 
         // Fetch watchlist from Supabase directly
         try {
-          const watchlistRes = await api.get('/watchlist');
+          const watchlistRes = await api.get('/watchlist', { timeout: 8000 });
           
           if (watchlistRes.data) {
             watchlistRes.data.forEach(w => {
@@ -645,7 +645,7 @@ export const AppProvider = ({ children }) => {
 
       // Fetch watchlist from Supabase
       try {
-        const watchlistRes = await api.get('/watchlist');
+        const watchlistRes = await api.get('/watchlist', { timeout: 8000 });
         
         if (watchlistRes.data) {
           watchlistRes.data.forEach(w => {

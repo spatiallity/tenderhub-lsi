@@ -22,18 +22,20 @@ else:
         settings.DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
-        pool_size=10,  # Reduced to prevent exhaustion
-        max_overflow=20,  # Reduced overflow
-        pool_timeout=30,  # Faster timeout
-        pool_recycle=1800,  # Recycle connections after 30 minutes (more aggressive)
+        pool_size=5,           # Keep small to avoid exhaustion
+        max_overflow=10,
+        pool_timeout=10,       # Fail fast if no connection available
+        pool_recycle=600,      # Recycle every 10 minutes
         connect_args={
             "ssl": ssl_ctx,
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0,
             "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4().hex}__",
+            "command_timeout": 15,   # Kill queries that take >15s
             "server_settings": {
                 "application_name": "tenderhub_backend",
-                "jit": "off",  # Disable JIT for faster queries
+                "jit": "off",
+                "statement_timeout": "15000",  # 15s statement timeout at DB level
             },
         },
     )
