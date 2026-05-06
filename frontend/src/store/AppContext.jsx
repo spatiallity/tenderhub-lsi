@@ -142,10 +142,15 @@ export const AppProvider = ({ children }) => {
             .from('tender_watchlist')
             .select('kd_tender, status_internal, assigned_pic, catatan_internal');
 
+          console.log('[loadTendersAndWatchlist] Watchlist data from Supabase:', watchlistData);
+
           if (!error && watchlistData) {
             watchlistData.forEach(w => {
               const tenderId = w.kd_tender;
-              if (w.status_internal) statusMap[tenderId] = w.status_internal;
+              if (w.status_internal) {
+                statusMap[tenderId] = w.status_internal;
+                console.log(`[loadTendersAndWatchlist] Loaded status for tender ${tenderId}: ${w.status_internal}`);
+              }
               if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
               if (w.catatan_internal) {
                 try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
