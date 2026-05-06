@@ -32,7 +32,7 @@ async def search_tenders(
             {"id": 6, "text": "studi kelayakan", "subporto": "FITI", "is_active": True},
         ]
 
-    # Get from INAPROC
+    # Get from INAPROC (will use dummy data if USE_DUMMY_DATA=true)
     tenders = await inaproc_service.get_tenders({"limit": limit})
 
     # Fetch watchlist to overlay internal statuses

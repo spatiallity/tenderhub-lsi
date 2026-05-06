@@ -7,17 +7,20 @@ from app.models.expert import Expert, ExpertProject, ExpertReview
 from app.models.keyword import Keyword
 from sqlalchemy import select, func
 
-from app.api.v1 import tender, rup, expert, keyword, watchlist
+from app.api.v1 import tender, rup, expert, keyword, watchlist, users
 
 async def seed_data():
     async with AsyncSessionLocal() as db:
-        # Seed/top-up experts up to 100 rows when using dummy data
+        # DISABLED: Seeding experts to prevent duplicates
+        # Only seed if database is completely empty
         try:
             from app.services.dummy_data import EXPERTS_RAW
             existing_count = (await db.execute(select(func.count()).select_from(Expert))).scalar_one()
-            if existing_count < 100:
-                needed = 100 - existing_count
-                for e_raw in EXPERTS_RAW[:needed]:
+            
+            # Only seed if database is EMPTY (0 experts)
+            if existing_count == 0:
+                print(f"🔵 Database empty, seeding {min(100, len(EXPERTS_RAW))} experts...")
+                for e_raw in EXPERTS_RAW[:100]:
                     expert_db = Expert(
                         nama=e_raw.get("nama"),
                         no_hp=e_raw.get("noHp"),
@@ -52,6 +55,9 @@ async def seed_data():
                             komentar=r.get("komentar")
                         ))
                 await db.commit()
+                print(f"✅ Seeded {min(100, len(EXPERTS_RAW))} experts")
+            else:
+                print(f"ℹ️ Database already has {existing_count} experts, skipping seed")
         except ImportError:
             pass
         
@@ -103,6 +109,7 @@ app.include_router(rup.router, prefix="/api/v1/rup", tags=["RUP"])
 app.include_router(expert.router, prefix="/api/v1/experts", tags=["Experts"])
 app.include_router(keyword.router, prefix="/api/v1/keywords", tags=["Keywords"])
 app.include_router(watchlist.router, prefix="/api/v1/watchlist", tags=["Watchlist"])
+app.include_router(users.router, prefix="/api/v1", tags=["Users"])
 
 @app.get("/api/health")
 async def health_check():
