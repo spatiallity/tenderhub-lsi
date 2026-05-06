@@ -127,29 +127,34 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const loadTendersAndWatchlist = async () => {
       try {
-        // Tenders and watchlist are shared across all team members
-        const [tendersRes, watchlistRes] = await Promise.all([
+        // Try to fetch both, but handle them independently
+        const [tendersRes, watchlistRes] = await Promise.allSettled([
           api.get('/tender/search', { params: { limit: 200 } }),
           api.get('/watchlist'),
         ]);
 
-        setTendersRaw(tendersRes.data || []);
+        // Handle tenders
+        const tendersData = tendersRes.status === 'fulfilled' ? (tendersRes.value.data || []) : FALLBACK_TENDERS;
+        setTendersRaw(tendersData);
 
         const statusMap = {};
         const picsMap = {};
         const notesMap = {};
 
-        (watchlistRes.data || []).forEach(w => {
-          const tenderId = w.kd_tender;
-          if (w.status_internal) statusMap[tenderId] = w.status_internal;
-          if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
-          if (w.catatan_internal) {
-            try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
-          }
-        });
+        // Handle watchlist (prioritize this data)
+        if (watchlistRes.status === 'fulfilled') {
+          (watchlistRes.value.data || []).forEach(w => {
+            const tenderId = w.kd_tender;
+            if (w.status_internal) statusMap[tenderId] = w.status_internal;
+            if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
+            if (w.catatan_internal) {
+              try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
+            }
+          });
+        }
 
         // Fill API defaults for tenders not yet in watchlist
-        (tendersRes.data || []).forEach(t => {
+        tendersData.forEach(t => {
           if (!statusMap[t.id]) {
             let s = t.internalStatus || 'Dipantau';
             if (t.won === true) s = 'Menang';
@@ -161,6 +166,15 @@ export const AppProvider = ({ children }) => {
         setInternalStatuses(statusMap);
         setAssignedPICs(picsMap);
         setTenderNotes(notesMap);
+
+        // Show appropriate error messages
+        if (tendersRes.status === 'rejected') {
+          console.error('Failed to load tenders:', tendersRes.reason);
+          showToast('API tender error. Menggunakan data fallback.', 'warning');
+        }
+        if (watchlistRes.status === 'rejected') {
+          console.error('Failed to load watchlist:', watchlistRes.reason);
+        }
 
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -486,37 +500,51 @@ export const AppProvider = ({ children }) => {
 
   const refetchTenders = useCallback(async () => {
     try {
-      const [tendersRes, watchlistRes] = await Promise.all([
+      const [tendersRes, watchlistRes] = await Promise.allSettled([
         api.get('/tender/search', { params: { limit: 200 } }),
         api.get('/watchlist'),
       ]);
 
-      setTendersRaw(tendersRes.data || []);
+      // Handle tenders
+      const tendersData = tendersRes.status === 'fulfilled' ? (tendersRes.value.data || []) : [];
+      if (tendersData.length > 0) {
+        setTendersRaw(tendersData);
+      }
 
       const statusMap = {};
       const picsMap = {};
       const notesMap = {};
 
-      (watchlistRes.data || []).forEach(w => {
-        if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
-        if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
-        if (w.catatan_internal) {
-          try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
-        }
-      });
+      // Handle watchlist (prioritize this data)
+      if (watchlistRes.status === 'fulfilled') {
+        (watchlistRes.value.data || []).forEach(w => {
+          if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
+          if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
+          if (w.catatan_internal) {
+            try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
+          }
+        });
+      }
 
-      (tendersRes.data || []).forEach(t => {
-        if (!statusMap[t.id]) {
-          let s = t.internalStatus || 'Dipantau';
-          if (t.won === true) s = 'Menang';
-          else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = s;
-        }
-      });
+      // Fill defaults for tenders not in watchlist
+      if (tendersData.length > 0) {
+        tendersData.forEach(t => {
+          if (!statusMap[t.id]) {
+            let s = t.internalStatus || 'Dipantau';
+            if (t.won === true) s = 'Menang';
+            else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
+            statusMap[t.id] = s;
+          }
+        });
+      }
 
       setInternalStatuses(statusMap);
       setAssignedPICs(picsMap);
       setTenderNotes(notesMap);
+
+      if (tendersRes.status === 'rejected') {
+        console.error('Failed to refetch tenders:', tendersRes.reason);
+      }
     } catch (err) {
       console.error('Failed to refetch tenders:', err);
     }
