@@ -22,7 +22,12 @@ async def search_rup(
     if not keywords:
         keywords = [{"id": 1, "text": "survei topografi", "subporto": "SDA", "is_active": True}] # minimal fallback
 
-    rup_list = await inaproc_service.get_rup_paket({"limit": limit})
+    try:
+        rup_list = await inaproc_service.get_rup_paket({"limit": limit})
+    except Exception as e:
+        print(f"⚠️ INAPROC RUP API error: {e}")
+        # Return empty list if API fails
+        return []
     
     enriched = []
     for r in rup_list:

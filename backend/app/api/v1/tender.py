@@ -32,8 +32,13 @@ async def search_tenders(
             {"id": 6, "text": "studi kelayakan", "subporto": "FITI", "is_active": True},
         ]
 
-    # Get from INAPROC
-    tenders = await inaproc_service.get_tenders({"limit": limit})
+    # Get from INAPROC with error handling
+    try:
+        tenders = await inaproc_service.get_tenders({"limit": limit})
+    except Exception as e:
+        print(f"⚠️ INAPROC API error: {e}")
+        # Return empty list if API fails
+        return []
 
     # Fetch watchlist to overlay internal statuses
     from app.models.watchlist import TenderWatchlist

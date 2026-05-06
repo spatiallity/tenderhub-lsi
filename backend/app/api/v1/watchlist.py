@@ -19,6 +19,12 @@ async def add_to_watchlist(item_in: WatchlistCreate, db: AsyncSession = Depends(
     result = await db.execute(select(TenderWatchlist).where(TenderWatchlist.kd_tender == item_in.kd_tender))
     existing = result.scalars().first()
     if existing:
+        # Update existing entry with new data
+        update_data = item_in.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(existing, key, value)
+        await db.commit()
+        await db.refresh(existing)
         return existing
         
     item = TenderWatchlist(**item_in.model_dump())

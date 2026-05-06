@@ -546,34 +546,20 @@ export const AppProvider = ({ children }) => {
     const tender = tenders.find(t => t.id === tenderId);
     
     try {
-      // Try to PATCH first
-      console.log(`[upsertWatchlistEntry] Trying PATCH /watchlist/${tenderId}`);
-      const response = await api.patch(`/watchlist/${tenderId}`, patch);
-      console.log(`[upsertWatchlistEntry] PATCH successful:`, response.data);
+      // Use POST for upsert (backend handles update if exists)
+      const createData = {
+        kd_tender: parseInt(tenderId),
+        nama_paket: tender?.nama || tender?.nama_paket || null,
+        hps: tender?.hps || null,
+        ...patch,
+      };
+      console.log(`[upsertWatchlistEntry] POST /watchlist with data:`, createData);
+      const response = await api.post('/watchlist', createData);
+      console.log(`[upsertWatchlistEntry] Success:`, response.data);
       return response.data;
     } catch (err) {
-      if (err?.response?.status === 404) {
-        // Entry doesn't exist, create it with POST
-        console.log(`[upsertWatchlistEntry] Entry not found, creating with POST`);
-        try {
-          const createData = {
-            kd_tender: parseInt(tenderId),
-            nama_paket: tender?.nama || tender?.nama_paket || null,
-            hps: tender?.hps || null,
-            ...patch,
-          };
-          console.log(`[upsertWatchlistEntry] POST data:`, createData);
-          const response = await api.post('/watchlist', createData);
-          console.log(`[upsertWatchlistEntry] POST successful:`, response.data);
-          return response.data;
-        } catch (createErr) {
-          console.error(`[upsertWatchlistEntry] POST failed:`, createErr);
-          throw createErr;
-        }
-      } else {
-        console.error(`[upsertWatchlistEntry] PATCH failed:`, err);
-        throw err;
-      }
+      console.error(`[upsertWatchlistEntry] Failed:`, err);
+      throw err;
     }
   }, [tenders]);
 
