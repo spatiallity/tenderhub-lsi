@@ -120,7 +120,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 5294237950,
     metode: 'Prakualifikasi',
     currentStage: 3,
-
+    daysUntilDeadline: 2, // 2 hari lagi - URGENT
     provinsi: 'Jawa Tengah',
     portofolio: 'SDA',
     internalStatus: 'Akan Diikuti',
@@ -154,7 +154,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 2600855468,
     metode: 'Prakualifikasi',
     currentStage: 7,
-
+    daysUntilDeadline: 5, // 5 hari lagi - URGENT
     provinsi: 'DKI Jakarta',
     portofolio: 'FLP',
     internalStatus: 'Sudah Diikuti',
@@ -188,6 +188,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 7422288709,
     metode: 'Prakualifikasi',
     currentStage: 1,
+    daysUntilDeadline: 12, // 12 hari lagi
     provinsi: 'NTB',
     portofolio: 'FITI',
     internalStatus: 'Dipantau',
@@ -221,6 +222,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 3614224566,
     metode: 'Prakualifikasi',
     currentStage: 9,
+    daysUntilDeadline: -2, // Sudah lewat 2 hari - EXPIRED
     provinsi: 'Jawa Barat',
     portofolio: 'SDA',
     internalStatus: 'Sudah Diikuti',
@@ -254,6 +256,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 2097046778,
     metode: 'Pascakualifikasi',
     currentStage: 4,
+    daysUntilDeadline: 18, // 18 hari lagi
     provinsi: 'Jawa Barat',
     portofolio: 'FLP',
     internalStatus: 'Akan Diikuti',
@@ -287,6 +290,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 10489969042,
     metode: 'Prakualifikasi',
     currentStage: 2,
+    daysUntilDeadline: 8, // 8 hari lagi
     provinsi: 'Kalimantan Timur',
     portofolio: 'SDA',
     internalStatus: 'Dipantau',
@@ -320,6 +324,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 4380000000,
     metode: 'Prakualifikasi',
     currentStage: 4,
+    daysUntilDeadline: 15, // 15 hari lagi
     provinsi: 'Jawa Barat',
     portofolio: 'SDA',
     internalStatus: 'Akan Diikuti',
