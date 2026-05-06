@@ -7,7 +7,7 @@ from app.models.expert import Expert, ExpertProject, ExpertReview
 from app.models.keyword import Keyword
 from sqlalchemy import select, func
 
-from app.api.v1 import tender, rup, expert, keyword, watchlist, users, cv_generator
+from app.api.v1 import tender, rup, expert, keyword, watchlist, users, cv_generator_dynamic as cv_generator
 
 async def seed_data():
     async with AsyncSessionLocal() as db:

@@ -103,6 +103,7 @@ Setiap proyek memiliki subsection:
 4. Modal akan muncul menampilkan preview data
 5. Klik **"Generate CV"**
 6. File DOCX akan otomatis ter-download
+7. **✨ SEMUA proyek** expert akan termasuk dalam CV (tidak terbatas 3 proyek)
 
 ### Dari API (Manual Testing)
 
@@ -120,17 +121,25 @@ User clicks "Generate CV"
     ↓
 Frontend calls API: GET /api/v1/cv/{expert_id}/cv
     ↓
-Backend loads expert data from database
+Backend loads expert data from database (ALL projects)
     ↓
 Backend loads TEMPLATE_CV_EXPERT.docx
     ↓
-Backend replaces data in specific table cells (NOT placeholders)
+Backend fills header table with personal info
+    ↓
+Backend fills first project table
+    ↓
+FOR EACH additional project:
+    Backend duplicates project table
+    Backend fills with project data
+    ↓
+Backend fills signature table
     ↓
 Backend returns DOCX file as download
     ↓
 Frontend triggers file download
     ↓
-User gets CV_{ExpertName}_{Date}.docx
+User gets CV_{ExpertName}_{Date}.docx with ALL projects
 ```
 
 ## � How It Works
@@ -166,8 +175,11 @@ replace_text_in_cell(
 ### 1. Template File Must NOT Be Modified
 Template adalah format resmi Sucofindo. **JANGAN DIUBAH** kecuali ada perubahan resmi dari Sucofindo.
 
-### 2. Maximum 3 Projects
-Template memiliki 3 table untuk proyek (Tables 1, 2, 3). Hanya 3 proyek pertama yang akan di-include dalam CV.
+### 2. ~~Maximum 3 Projects~~ UNLIMITED Projects ✨
+**UPDATE**: Versi baru mendukung UNLIMITED projects! Tabel proyek akan diduplikasi secara otomatis untuk setiap proyek yang dimiliki expert.
+
+- Versi lama: Maksimal 3 proyek
+- Versi baru (dynamic): Semua proyek akan ditampilkan
 
 ### 3. Empty Data Handling
 Jika data tidak ada, akan diganti dengan `"Belum diisi"`:
@@ -285,3 +297,92 @@ curl -X GET "https://your-api.com/api/v1/cv/1/cv" --output test_cv.docx
 - [ ] Multiple template support (jika ada format lain)
 - [ ] Batch CV generation untuk multiple experts
 - [ ] CV history/versioning
+
+## ✨ NEW: Dynamic Project Tables (v2.0)
+
+### Fitur Baru
+- **Unlimited Projects**: Tidak ada batasan jumlah proyek
+- **Auto-Duplicate**: Tabel proyek diduplikasi otomatis
+- **Preserve Formatting**: Semua formatting (border, font, spacing) dipertahankan
+- **Same Template**: Menggunakan template yang sama, tidak perlu template baru
+
+### Cara Kerja
+1. Template memiliki 1 tabel proyek (Table 1)
+2. Tabel ini diisi dengan proyek pertama
+3. Untuk proyek ke-2, 3, 4, dst: tabel diduplikasi
+4. Setiap duplikat diisi dengan data proyek masing-masing
+
+### Contoh Output
+
+**Expert dengan 1 proyek:**
+```
+[Header Table]
+[Project 1 Table]
+[Signature Table]
+```
+
+**Expert dengan 5 proyek:**
+```
+[Header Table]
+[Project 1 Table]
+[Project 2 Table] ← Diduplikasi
+[Project 3 Table] ← Diduplikasi
+[Project 4 Table] ← Diduplikasi
+[Project 5 Table] ← Diduplikasi
+[Signature Table]
+```
+
+### Migration dari v1.0 ke v2.0
+
+**v1.0 (Old - Limited to 3 projects):**
+```python
+# backend/app/api/v1/cv_generator.py
+projects = expert.projects[:3]  # ❌ Max 3 projects
+```
+
+**v2.0 (New - Unlimited projects):**
+```python
+# backend/app/api/v1/cv_generator_dynamic.py
+projects = expert.projects  # ✅ ALL projects
+
+# Duplicate table for each project
+for i in range(1, len(projects)):
+    new_table = copy.deepcopy(first_project_table._element)
+    parent.insert(position, new_table)
+    fill_project_table(new_table, projects[i], i+1)
+```
+
+### Technical Details
+
+**Table Duplication:**
+```python
+# Get first project table
+first_project_table = doc.tables[1]
+table_element = first_project_table._element
+
+# Deep copy the table structure
+new_table_element = copy.deepcopy(table_element)
+
+# Insert into document
+parent = table_element.getparent()
+parent.insert(position, new_table_element)
+
+# Create Table object and fill with data
+new_table = Table(new_table_element, doc)
+fill_project_table(new_table, project_data, project_num)
+```
+
+**Placeholder Replacement:**
+```python
+def fill_project_table(table, project, project_num):
+    replacements = {
+        '{Nama Proyek}': project.get('nama_proyek', ''),
+        '{Lokasi Proyek}': project.get('lokasi_proyek', ''),
+        # ... more fields
+    }
+    
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                replace_in_paragraph(paragraph, replacements)
+```
