@@ -17,60 +17,74 @@ async def search_tenders(
     portfolio: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
-    # Fetch keywords for relevance
-    result = await db.execute(select(Keyword))
-    keywords = [{"id": k.id, "text": k.keyword_text, "subporto": k.subporto, "is_active": k.is_active} for k in result.scalars().all()]
-    
-    # Fallback to dummy keywords if none in DB yet
-    if not keywords:
-        keywords = [
-            {"id": 1, "text": "survei topografi", "subporto": "SDA", "is_active": True},
-            {"id": 2, "text": "pengadaan tanah", "subporto": "SDA", "is_active": True},
-            {"id": 3, "text": "survei", "subporto": "FLP", "is_active": True},
-            {"id": 4, "text": "pendataan", "subporto": "FLP", "is_active": True},
-            {"id": 5, "text": "masterplan kawasan", "subporto": "FITI", "is_active": True},
-            {"id": 6, "text": "studi kelayakan", "subporto": "FITI", "is_active": True},
-        ]
-
-    # Get from INAPROC (will use dummy data if USE_DUMMY_DATA=true)
-    tenders = await inaproc_service.get_tenders({"limit": limit})
-
-    # Fetch watchlist to overlay internal statuses
-    from app.models.watchlist import TenderWatchlist
-    wl_result = await db.execute(select(TenderWatchlist))
-    watchlist_map = {str(item.kd_tender): item for item in wl_result.scalars().all()}
-
-    async def enrich_one(t):
-        nama = t.get("nama") or t.get("nama_paket") or ""
-        rel = calculate_relevance(nama, keywords)
-        t_enriched = {**t, **rel}
-
-        kd_tender = str(t_enriched.get("kd_tender") or t_enriched.get("id"))
+    try:
+        # Fetch keywords for relevance
+        result = await db.execute(select(Keyword))
+        keywords = [{"id": k.id, "text": k.keyword_text, "subporto": k.subporto, "is_active": k.is_active} for k in result.scalars().all()]
         
-        # Overlay internal status and notes from DB
-        if kd_tender in watchlist_map:
-            wl_item = watchlist_map[kd_tender]
-            t_enriched["internalStatus"] = wl_item.status_internal
-            t_enriched["catatan_internal"] = wl_item.catatan_internal
-            t_enriched["assigned_expert_ids"] = wl_item.assigned_expert_ids
-            t_enriched["watchlist_id"] = wl_item.id
+        # Fallback to dummy keywords if none in DB yet
+        if not keywords:
+            keywords = [
+                {"id": 1, "text": "survei topografi", "subporto": "SDA", "is_active": True},
+                {"id": 2, "text": "pengadaan tanah", "subporto": "SDA", "is_active": True},
+                {"id": 3, "text": "survei", "subporto": "FLP", "is_active": True},
+                {"id": 4, "text": "pendataan", "subporto": "FLP", "is_active": True},
+                {"id": 5, "text": "masterplan kawasan", "subporto": "FITI", "is_active": True},
+                {"id": 6, "text": "studi kelayakan", "subporto": "FITI", "is_active": True},
+            ]
 
-        if kd_tender and not t_enriched.get("jadwalTahapan"):
+        # Get from INAPROC (will use dummy data if USE_DUMMY_DATA=true)
+        tenders = await inaproc_service.get_tenders({"limit": limit})
+
+        # Fetch watchlist to overlay internal statuses
+        from app.models.watchlist import TenderWatchlist
+        wl_result = await db.execute(select(TenderWatchlist))
+        watchlist_map = {str(item.kd_tender): item for item in wl_result.scalars().all()}
+
+        async def enrich_one(t):
             try:
-                jadwal = await inaproc_service.get_tender_jadwal(int(kd_tender))
-                if jadwal:
-                    t_enriched["jadwalTahapan"] = jadwal
-            except Exception:
-                pass
-        
-        if portfolio and portfolio != "Semua" and t_enriched.get("portofolio") != portfolio and t_enriched.get("recommended_subporto") != portfolio:
-            return None
-            
-        return t_enriched
+                nama = t.get("nama") or t.get("nama_paket") or ""
+                rel = calculate_relevance(nama, keywords)
+                t_enriched = {**t, **rel}
 
-    enriched = [t for t in await asyncio.gather(*(enrich_one(t) for t in tenders)) if t]
+                kd_tender = str(t_enriched.get("kd_tender") or t_enriched.get("id"))
+                
+                # Overlay internal status and notes from DB
+                if kd_tender in watchlist_map:
+                    wl_item = watchlist_map[kd_tender]
+                    t_enriched["internalStatus"] = wl_item.status_internal
+                    t_enriched["catatan_internal"] = wl_item.catatan_internal
+                    t_enriched["assigned_expert_ids"] = wl_item.assigned_expert_ids
+                    t_enriched["watchlist_id"] = wl_item.id
 
-    return enriched
+                if kd_tender and not t_enriched.get("jadwalTahapan"):
+                    try:
+                        jadwal = await inaproc_service.get_tender_jadwal(int(kd_tender))
+                        if jadwal:
+                            t_enriched["jadwalTahapan"] = jadwal
+                    except Exception as e:
+                        # Log but don't fail the entire request
+                        print(f"Warning: Failed to fetch jadwal for tender {kd_tender}: {e}")
+                        pass
+                
+                if portfolio and portfolio != "Semua" and t_enriched.get("portofolio") != portfolio and t_enriched.get("recommended_subporto") != portfolio:
+                    return None
+                    
+                return t_enriched
+            except Exception as e:
+                print(f"Error enriching tender {t.get('kd_tender') or t.get('id')}: {e}")
+                # Return the tender without enrichment rather than failing
+                return t
+
+        enriched = [t for t in await asyncio.gather(*(enrich_one(t) for t in tenders)) if t]
+
+        return enriched
+    
+    except Exception as e:
+        print(f"Error in search_tenders endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 @router.get("/{kd_tender}")
 async def get_tender_detail(kd_tender: int):
