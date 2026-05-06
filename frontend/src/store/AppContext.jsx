@@ -679,17 +679,55 @@ export const AppProvider = ({ children }) => {
 
   // Helper: upsert a watchlist entry via Supabase directly
   const ensureWatchlistEntry = useCallback(async (tenderId, patch = {}) => {
-    const tender = tenders.find(t => t.id === tenderId);
-    const { error } = await supabase
-      .from('tender_watchlist')
-      .upsert({
+    try {
+      const tender = tenders.find(t => t.id === tenderId);
+      
+      // Check if entry exists
+      const { data: existing, error: selectError } = await supabase
+        .from('tender_watchlist')
+        .select('id')
+        .eq('kd_tender', parseInt(tenderId))
+        .maybeSingle();
+      
+      if (selectError) {
+        console.error('[ensureWatchlistEntry] Select error:', selectError);
+        throw new Error(selectError.message);
+      }
+      
+      const payload = {
         kd_tender: parseInt(tenderId),
         status_internal: patch.status_internal ?? (internalStatuses[tenderId] || 'Dipantau'),
         nama_paket: tender?.nama || tender?.nama_paket || null,
         hps: tender?.hps || null,
         ...patch,
-      }, { onConflict: 'kd_tender' });
-    if (error) throw new Error(error.message);
+      };
+      
+      if (existing && existing.id) {
+        // Update existing entry
+        console.log('[ensureWatchlistEntry] Updating existing entry:', existing.id);
+        const { error } = await supabase
+          .from('tender_watchlist')
+          .update(payload)
+          .eq('id', existing.id);
+        if (error) {
+          console.error('[ensureWatchlistEntry] Update error:', error);
+          throw new Error(error.message);
+        }
+      } else {
+        // Insert new entry
+        console.log('[ensureWatchlistEntry] Inserting new entry for tender:', tenderId);
+        const { error } = await supabase
+          .from('tender_watchlist')
+          .insert(payload);
+        if (error) {
+          console.error('[ensureWatchlistEntry] Insert error:', error);
+          throw new Error(error.message);
+        }
+      }
+    } catch (err) {
+      console.error('[ensureWatchlistEntry] Failed:', err);
+      throw err;
+    }
   }, [tenders, internalStatuses]);
 
   const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
