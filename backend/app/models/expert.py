@@ -1,5 +1,5 @@
 from app.core.database import Base
-from sqlalchemy import Column, Integer, String, Float, Boolean, Text, JSON, DateTime, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, Text, JSON, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -21,7 +21,7 @@ class Expert(Base):
     
     # CV Template fields
     tempat_lahir = Column(String(100), nullable=True)
-    tanggal_lahir = Column(Date, nullable=True)  # Changed to Date type
+    tanggal_lahir = Column(String(50), nullable=True)  # Format: "DD Month YYYY" or "YYYY-MM-DD"
     pendidikan_formal = Column(JSON, default=list)  # ["S1 Teknik Planologi ITB", ...]
     pendidikan_non_formal = Column(JSON, default=list)  # ["Training Certificate ...", ...]
     penguasaan_bahasa = Column(JSON, default=list)  # ["Bahasa Indonesia Baik", ...]

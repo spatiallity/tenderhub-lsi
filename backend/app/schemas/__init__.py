@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List, Any
-from datetime import datetime, date
+from datetime import datetime
 
 
 # ─── Expert Schemas ────────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ class ExpertUpdate(BaseModel):
     availability: Optional[str] = None
     # CV Template fields
     tempat_lahir: Optional[str] = None
-    tanggal_lahir: Optional[date] = None  # Changed to date type
+    tanggal_lahir: Optional[str] = None  # Format: "DD Month YYYY" or "YYYY-MM-DD"
     pendidikan_formal: Optional[List[str]] = None
     pendidikan_non_formal: Optional[List[str]] = None
     penguasaan_bahasa: Optional[List[str]] = None
@@ -118,7 +118,7 @@ class ExpertOut(ExpertBase):
     updated_at: datetime
     # CV Template fields
     tempat_lahir: Optional[str] = None
-    tanggal_lahir: Optional[date] = None  # Changed to date type
+    tanggal_lahir: Optional[str] = None  # Format: "DD Month YYYY" or "YYYY-MM-DD"
     pendidikan_formal: Optional[List[str]] = None
     pendidikan_non_formal: Optional[List[str]] = None
     penguasaan_bahasa: Optional[List[str]] = None

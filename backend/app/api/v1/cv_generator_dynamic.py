@@ -20,6 +20,11 @@ import copy
 
 router = APIRouter()
 
+@router.options("/{expert_id}/cv")
+async def cv_options(expert_id: int):
+    """Handle CORS preflight for CV generation"""
+    return {}
+
 def replace_in_paragraph(paragraph, replacements):
     """Replace placeholders in a paragraph"""
     for placeholder, value in replacements.items():
@@ -41,6 +46,16 @@ def fill_project_table(table, project, project_num):
     year_end = waktu_selesai.split()[-1] if waktu_selesai else ''
     year_display = f"{year_start} – {year_end}" if year_start and year_end else (year_start or year_end or '')
     
+    # Format uraian tugas as bullet points
+    uraian_tugas_raw = project.get('uraian_tugas', '')
+    if uraian_tugas_raw and '\n' in uraian_tugas_raw:
+        # Already has line breaks - split and format as bullets
+        tasks = [line.strip() for line in uraian_tugas_raw.split('\n') if line.strip()]
+        uraian_tugas_formatted = '\n'.join(f"• {task}" if not task.startswith('•') else task for task in tasks)
+    else:
+        # Single line - just add bullet
+        uraian_tugas_formatted = f"• {uraian_tugas_raw}" if uraian_tugas_raw else ''
+    
     replacements = {
         # Year header
         f'{{Tahun Awal Proyek {project_num}}}': year_start,
@@ -53,7 +68,7 @@ def fill_project_table(table, project, project_num):
         f'{{Lokasi Proyek {project_num}}}': project.get('lokasi_proyek', ''),
         f'{{Nama Klien {project_num}}}': project.get('pengguna_jasa') or project.get('pemberi_kerja', ''),
         f'{{Nama Perusahaan Tempat Tenaga Ahli Di Hire {project_num}}}': project.get('nama_perusahaan_lain') or project.get('bersama', 'PT SUCOFINDO (Persero)'),
-        f'{{Uraian deskripsi pekerjaan {project_num}}}': project.get('uraian_tugas', ''),
+        f'{{Uraian deskripsi pekerjaan {project_num}}}': uraian_tugas_formatted,
         f'{{Bulan Awal, Tahun {project_num}}}': waktu_mulai,
         f'{{Bulan Akhir, Tahun {project_num}}}': waktu_selesai,
         f'{{Posisi Penugasan {project_num}}}': project.get('posisi_penugasan') or project.get('peran', ''),
@@ -65,7 +80,7 @@ def fill_project_table(table, project, project_num):
         '{Lokasi Proyek}': project.get('lokasi_proyek', ''),
         '{Nama Klien}': project.get('pengguna_jasa') or project.get('pemberi_kerja', ''),
         '{Nama Perusahaan Tempat Tenaga Ahli Di Hire}': project.get('nama_perusahaan_lain') or project.get('bersama', 'PT SUCOFINDO (Persero)'),
-        '{Uraian deskripsi pekerjaan 1}': project.get('uraian_tugas', ''),
+        '{Uraian deskripsi pekerjaan 1}': uraian_tugas_formatted,
         '{Uraian deskripsi pekerjaan 2}': '',
         '{Bulan Awal, Tahun}': waktu_mulai,
         '{Bulan Akhir, Tahun}': waktu_selesai,
@@ -109,48 +124,27 @@ def generate_cv_from_template_dynamic(expert_data, template_path):
     # Get data with safe defaults
     nama = expert_data.get('nama', 'Belum diisi')
     tempat_lahir = expert_data.get('tempat_lahir', 'Belum diisi')
-    
-    # Format tanggal_lahir from date object to Indonesian format
-    tanggal_lahir_raw = expert_data.get('tanggal_lahir')
-    if tanggal_lahir_raw:
-        # If it's a date object, format it
-        if hasattr(tanggal_lahir_raw, 'strftime'):
-            # Format to Indonesian: "15 Maret 1975"
-            months_id = {
-                1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
-                5: 'Mei', 6: 'Juni', 7: 'Juli', 8: 'Agustus',
-                9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
-            }
-            day = tanggal_lahir_raw.day
-            month = months_id[tanggal_lahir_raw.month]
-            year = tanggal_lahir_raw.year
-            tanggal_lahir = f"{day} {month} {year}"
-        else:
-            # If it's already a string, use as is
-            tanggal_lahir = str(tanggal_lahir_raw)
-    else:
-        tanggal_lahir = 'Belum diisi'
-    
+    tanggal_lahir = expert_data.get('tanggal_lahir', 'Belum diisi')
     posisi_diusulkan = expert_data.get('posisi_diusulkan', 'Team Leader')
     
     # Format education
     pendidikan_formal = expert_data.get('pendidikan_formal', [])
     if isinstance(pendidikan_formal, list) and pendidikan_formal:
-        pendidikan_formal_text = "\n".join(str(p) for p in pendidikan_formal)
+        pendidikan_formal_text = "\n".join(f"• {str(p)}" for p in pendidikan_formal)
     else:
         pendidikan_formal_text = ""
     
     pendidikan_non_formal = expert_data.get('pendidikan_non_formal', [])
     if isinstance(pendidikan_non_formal, list) and pendidikan_non_formal:
-        pendidikan_non_formal_text = "\n".join(str(p) for p in pendidikan_non_formal)
+        pendidikan_non_formal_text = "\n".join(f"• {str(p)}" for p in pendidikan_non_formal)
     else:
         pendidikan_non_formal_text = ""
     
     penguasaan_bahasa = expert_data.get('penguasaan_bahasa', [])
     if isinstance(penguasaan_bahasa, list) and penguasaan_bahasa:
-        penguasaan_bahasa_text = "\n".join(str(b) for b in penguasaan_bahasa)
+        penguasaan_bahasa_text = "\n".join(f"• {str(b)}" for b in penguasaan_bahasa)
     else:
-        penguasaan_bahasa_text = "Bahasa Indonesia Baik\nBahasa Inggris Baik"
+        penguasaan_bahasa_text = "• Bahasa Indonesia: Sangat Baik\n• Bahasa Inggris: Baik"
     
     # Prepare replacements for header table
     header_replacements = {
@@ -283,7 +277,7 @@ async def generate_expert_cv_dynamic(
             'nama': expert.nama,
             'posisi_diusulkan': getattr(expert, 'posisi_diusulkan', None) or 'Team Leader',
             'tempat_lahir': getattr(expert, 'tempat_lahir', None) or 'Belum diisi',
-            'tanggal_lahir': getattr(expert, 'tanggal_lahir', None),  # Pass date object directly
+            'tanggal_lahir': getattr(expert, 'tanggal_lahir', None) or 'Belum diisi',
             'pendidikan_formal': getattr(expert, 'pendidikan_formal', None) or [],
             'pendidikan_non_formal': getattr(expert, 'pendidikan_non_formal', None) or [],
             'penguasaan_bahasa': getattr(expert, 'penguasaan_bahasa', None) or ['Bahasa Indonesia Baik', 'Bahasa Inggris Baik'],
@@ -364,10 +358,13 @@ async def generate_expert_cv_dynamic(
     # Return as downloadable file
     filename = f"CV_{expert.nama.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.docx"
     
-    return StreamingResponse(
-        cv_file,
+    from fastapi.responses import Response
+    
+    return Response(
+        content=cv_file.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}"
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache",
         }
     )

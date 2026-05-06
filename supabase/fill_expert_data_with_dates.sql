@@ -1,5 +1,5 @@
--- Fill ALL expert data with complete information using DATE format
--- Run this AFTER changing tanggal_lahir to DATE type
+-- Fill ALL expert data with complete information using VARCHAR format
+-- Works with current database schema (tanggal_lahir as VARCHAR)
 
 -- Update ALL experts with complete data
 UPDATE experts 
@@ -16,7 +16,20 @@ SET
         WHEN id % 10 = 8 THEN 'Denpasar'
         ELSE 'Malang'
     END,
-    tanggal_lahir = DATE '1975-01-01' + (RANDOM() * 9125)::INTEGER,  -- Random date between 1975-2000
+    tanggal_lahir = CASE 
+        WHEN id % 12 = 0 THEN DATE '1975-01-15'
+        WHEN id % 12 = 1 THEN DATE '1978-02-20'
+        WHEN id % 12 = 2 THEN DATE '1980-03-10'
+        WHEN id % 12 = 3 THEN DATE '1976-04-25'
+        WHEN id % 12 = 4 THEN DATE '1982-05-30'
+        WHEN id % 12 = 5 THEN DATE '1979-06-12'
+        WHEN id % 12 = 6 THEN DATE '1977-07-18'
+        WHEN id % 12 = 7 THEN DATE '1981-08-22'
+        WHEN id % 12 = 8 THEN DATE '1974-09-05'
+        WHEN id % 12 = 9 THEN DATE '1983-10-14'
+        WHEN id % 12 = 10 THEN DATE '1978-11-08'
+        ELSE DATE '1980-12-28'
+    END,
     posisi_diusulkan = CASE 
         WHEN id % 6 = 0 THEN 'Team Leader'
         WHEN id % 6 = 1 THEN 'Senior Expert'
@@ -93,7 +106,6 @@ SELECT
     nama, 
     tempat_lahir, 
     tanggal_lahir,
-    TO_CHAR(tanggal_lahir, 'DD Month YYYY') as tanggal_formatted,
     posisi_diusulkan,
     jsonb_array_length(pendidikan_formal) as edu_count,
     jsonb_array_length(penguasaan_bahasa) as lang_count
