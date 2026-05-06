@@ -3,7 +3,7 @@ import { subDays, subMonths, format } from 'date-fns';
 
 // Helper function to generate stage deadlines based on current stage
 // LOGIC: Current stage END DATE determines the deadline badge
-const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null) => {
+const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null, tenderId = 1) => {
   const today = new Date(); // Use actual today
   
   const prakualDurations = [7, 5, 3, 7, 5, 3, 2, 3, 5, 5, 3, 7, 5, 3, 5, 2, 3, 5, 4, 2, 3];
@@ -48,9 +48,12 @@ const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null) 
   ];
   
   // STEP 1: Determine when current stage will END (this is the deadline)
-  // Deterministic based on currentStage to ensure consistency
+  // Add variation based on tender ID to create diverse deadlines
   if (daysUntilDeadline === null) {
-    daysUntilDeadline = ((currentStage * 7 + 3) % 15); // 0 to 14 days, deterministic
+    // Create variation: -5 to +20 days from today
+    // Use tender ID as seed for consistent but varied results
+    const seed = (tenderId * 17 + currentStage * 13) % 26;
+    daysUntilDeadline = seed - 5; // Range: -5 to 20 days
   }
   
   // STEP 2: Calculate current stage END date (the deadline)
@@ -95,11 +98,11 @@ const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null) 
 // Auto-generate stageDeadlines for tenders that don't have it
 const ensureStageDeadlines = (tender) => {
   if (!tender.stageDeadlines && tender.metode && tender.currentStage) {
-    // Use tender.daysUntilDeadline if specified, otherwise random
+    // Use tender.daysUntilDeadline if specified, otherwise use tender ID for variation
     const daysUntil = tender.daysUntilDeadline !== undefined ? tender.daysUntilDeadline : null;
     return {
       ...tender,
-      stageDeadlines: generateStageDeadlines(tender.metode, tender.currentStage, daysUntil)
+      stageDeadlines: generateStageDeadlines(tender.metode, tender.currentStage, daysUntil, tender.id)
     };
   }
   return tender;
