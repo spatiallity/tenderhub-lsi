@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Push to Hugging Face
         env:
@@ -27,16 +25,23 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           
-          # Remove binary files if they exist
-          if [ -f "frontend/public/assets/sucofindo-logo.png" ]; then
-            git rm --cached frontend/public/assets/sucofindo-logo.png || true
-            git commit -m "chore: remove binary assets for HF deployment" || true
-          fi
+          # Create a new orphan branch (no history)
+          git checkout --orphan hf-deploy
+          
+          # Remove binary files before committing
+          rm -f frontend/public/assets/sucofindo-logo.png
+          rm -f .gitattributes
+          
+          # Add all files (except removed binaries)
+          git add -A
+          
+          # Create initial commit
+          git commit -m "Deploy to HuggingFace Space (no binary files)"
           
           # Add HF remote
           git remote add hf https://spatiallity:$HF_TOKEN@huggingface.co/spaces/spatiallity/tenderhub-api || true
           
-          # Push to Hugging Face (force to override any conflicts)
-          git push hf HEAD:main --force
+          # Force push to HuggingFace (orphan branch = clean history)
+          git push hf hf-deploy:main --force
           
           echo "✅ Successfully synced to Hugging Face Spaces"
