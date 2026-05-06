@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from typing import List
 from app.core.database import get_db
 from app.models.expert import Expert, ExpertProject, ExpertReview
-from app.schemas import ExpertOut, ExpertCreate, ExpertUpdate, ExpertProjectCreate, ExpertReviewCreate
+from app.schemas import ExpertOut, ExpertCreate, ExpertUpdate, ExpertProjectCreate, ExpertProjectUpdate, ExpertReviewCreate
 
 router = APIRouter()
 
@@ -65,6 +65,50 @@ async def add_review(expert_id: int, review_in: ExpertReviewCreate, db: AsyncSes
         
     await db.commit()
     return review
+
+@router.delete("/{expert_id}")
+async def delete_expert(expert_id: int, db: AsyncSession = Depends(get_db)):
+    expert = await db.get(Expert, expert_id)
+    if not expert:
+        raise HTTPException(status_code=404, detail="Expert not found")
+    await db.delete(expert)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.patch("/projects/{project_id}")
+async def update_project(project_id: int, project_update: ExpertProjectUpdate, db: AsyncSession = Depends(get_db)):
+    """Update project CV fields"""
+    project = await db.get(ExpertProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    update_data = project_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(project, field, value)
+
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@router.delete("/projects/{project_id}")
+async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
+    """Delete a project and decrement expert's jumlah_proyek"""
+    project = await db.get(ExpertProject, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    expert_id = project.expert_id
+    await db.delete(project)
+
+    expert = await db.get(Expert, expert_id)
+    if expert and expert.jumlah_proyek > 0:
+        expert.jumlah_proyek -= 1
+
+    await db.commit()
+    return {"ok": True}
+
 
 @router.patch("/{expert_id}", response_model=ExpertOut)
 async def update_expert(expert_id: int, expert_update: ExpertUpdate, db: AsyncSession = Depends(get_db)):

@@ -18,4 +18,5 @@ Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 Write-Host "----------------------------------------" -ForegroundColor Gray
 
 # Start uvicorn
+$env:PYTHONIOENCODING = "utf-8"
 py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

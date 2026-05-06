@@ -14,10 +14,38 @@ class ExpertProjectBase(BaseModel):
     bersama: Optional[str] = None
     nama_perusahaan_lain: Optional[str] = None
     status_proyek: str = "Selesai"
+    # CV Template fields
+    lokasi_proyek: Optional[str] = None
+    pengguna_jasa: Optional[str] = None
+    uraian_tugas: Optional[str] = None
+    waktu_mulai: Optional[str] = None
+    waktu_selesai: Optional[str] = None
+    posisi_penugasan: Optional[str] = None
+    status_kepegawaian: Optional[str] = None
+    surat_referensi: Optional[str] = None
 
 
 class ExpertProjectCreate(ExpertProjectBase):
     pass
+
+
+class ExpertProjectUpdate(BaseModel):
+    nama_proyek: Optional[str] = None
+    pemberi_kerja: Optional[str] = None
+    tahun: Optional[int] = None
+    nilai_proyek: Optional[float] = None
+    peran: Optional[str] = None
+    bersama: Optional[str] = None
+    nama_perusahaan_lain: Optional[str] = None
+    status_proyek: Optional[str] = None
+    lokasi_proyek: Optional[str] = None
+    pengguna_jasa: Optional[str] = None
+    uraian_tugas: Optional[str] = None
+    waktu_mulai: Optional[str] = None
+    waktu_selesai: Optional[str] = None
+    posisi_penugasan: Optional[str] = None
+    status_kepegawaian: Optional[str] = None
+    surat_referensi: Optional[str] = None
 
 
 class ExpertProjectOut(ExpertProjectBase):

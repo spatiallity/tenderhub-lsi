@@ -12,7 +12,7 @@ export default function ExpertDetail({ expert }) {
   const {
     reviewDraft, setReviewDraft, addReview,
     historyDraft, setHistoryDraft, addHistory,
-    updateExpertProfile, deleteExpert, deleteExpertHistory
+    updateExpertProfile, deleteExpert, deleteExpertHistory,
   } = useAppContext();
   
   const { profile, canAddReview } = useAuth();

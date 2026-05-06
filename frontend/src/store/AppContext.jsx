@@ -215,7 +215,18 @@ export const AppProvider = ({ children }) => {
             peran: p.peran,
             nilai: p.nilai_proyek,
             bersama: p.bersama,
-            status: p.status_proyek
+            status: p.status_proyek,
+            // CV Template fields preserved for form editing and generation
+            nama_proyek: p.nama_proyek,
+            nama_perusahaan_lain: p.nama_perusahaan_lain,
+            lokasi_proyek: p.lokasi_proyek,
+            pengguna_jasa: p.pengguna_jasa,
+            uraian_tugas: p.uraian_tugas,
+            waktu_mulai: p.waktu_mulai,
+            waktu_selesai: p.waktu_selesai,
+            posisi_penugasan: p.posisi_penugasan,
+            status_kepegawaian: p.status_kepegawaian,
+            surat_referensi: p.surat_referensi,
           })),
           reviews: (e.reviews || []).map(r => ({
             id: r.id,
@@ -504,24 +515,97 @@ export const AppProvider = ({ children }) => {
     showToast('Review berhasil disimpan');
   }, [reviewDraft]);
 
-  const addHistory = useCallback((expertId) => {
+  const addHistory = useCallback(async (expertId) => {
     if (!historyDraft.proyek.trim() || !historyDraft.klien.trim()) return;
+
+    const projectBody = {
+      nama_proyek: historyDraft.proyek,
+      pemberi_kerja: historyDraft.klien,
+      tahun: historyDraft.tahun ? parseInt(historyDraft.tahun) : new Date().getFullYear(),
+      nilai_proyek: Number(historyDraft.nilai || 0) * 1000000,
+      peran: historyDraft.peran || 'Tenaga Ahli',
+      bersama: historyDraft.bersama,
+      status_proyek: 'Selesai',
+    };
+
+    try {
+      const res = await api.post(`/experts/${expertId}/projects`, projectBody);
+      const p = res.data;
+      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+        ...e,
+        history: [...(e.history || []), {
+          id: p.id,
+          proyek: p.nama_proyek,
+          klien: p.pemberi_kerja,
+          tahun: p.tahun,
+          peran: p.peran,
+          nilai: p.nilai_proyek,
+          bersama: p.bersama,
+          status: p.status_proyek,
+          nama_proyek: p.nama_proyek,
+          nama_perusahaan_lain: p.nama_perusahaan_lain,
+          lokasi_proyek: p.lokasi_proyek,
+          pengguna_jasa: p.pengguna_jasa,
+          uraian_tugas: p.uraian_tugas,
+          waktu_mulai: p.waktu_mulai,
+          waktu_selesai: p.waktu_selesai,
+          posisi_penugasan: p.posisi_penugasan,
+          status_kepegawaian: p.status_kepegawaian,
+          surat_referensi: p.surat_referensi,
+        }],
+        proyek: (e.proyek || 0) + 1
+      } : e));
+      showToast('Riwayat berhasil disimpan');
+    } catch (err) {
+      console.error('[addHistory]', err);
+      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+        ...e,
+        history: [...(e.history || []), {
+          id: Date.now(),
+          proyek: historyDraft.proyek,
+          klien: historyDraft.klien,
+          tahun: historyDraft.tahun || new Date().getFullYear(),
+          nilai: Number(historyDraft.nilai || 0) * 1000000,
+          peran: historyDraft.peran || 'Tenaga Ahli',
+          bersama: historyDraft.bersama,
+          status: 'Selesai',
+        }],
+        proyek: (e.proyek || 0) + 1
+      } : e));
+      showToast('Riwayat disimpan lokal (API belum tersambung)', 'warning');
+    }
+    setHistoryDraft({ proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo' });
+  }, [historyDraft, showToast]);
+
+  const deleteExpertHistory = useCallback(async (expertId, projectId) => {
+    try {
+      await api.delete(`/experts/projects/${projectId}`);
+    } catch (err) {
+      console.error('[deleteExpertHistory]', err);
+    }
     setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
       ...e,
-      history: [...(e.history || []), {
-        proyek: historyDraft.proyek,
-        klien: historyDraft.klien,
-        tahun: historyDraft.tahun || new Date().getFullYear(),
-        nilai: Number(historyDraft.nilai || 0) * 1000000,
-        peran: historyDraft.peran || 'Tenaga Ahli',
-        bersama: historyDraft.bersama,
-        status: 'Selesai'
-      }],
-      proyek: (e.proyek || 0) + 1
+      history: (e.history || []).filter(h => h.id !== projectId),
+      proyek: Math.max(0, (e.proyek || 0) - 1),
     } : e));
-    setHistoryDraft({ proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo' });
-    showToast('Riwayat berhasil disimpan');
-  }, [historyDraft]);
+    showToast('Riwayat berhasil dihapus');
+  }, [showToast]);
+
+  const updateExpertProject = useCallback(async (expertId, projectId, projectData) => {
+    try {
+      await api.patch(`/experts/projects/${projectId}`, projectData);
+      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+        ...e,
+        history: (e.history || []).map(h => h.id === projectId ? { ...h, ...projectData } : h),
+      } : e));
+      showToast('Data proyek berhasil diperbarui');
+      return true;
+    } catch (err) {
+      console.error('[updateExpertProject]', err);
+      showToast('Gagal menyimpan data proyek', 'error');
+      return false;
+    }
+  }, [showToast]);
 
   const addUser = useCallback((draft) => {
     if (!draft?.nama?.trim()) return;
@@ -733,7 +817,7 @@ export const AppProvider = ({ children }) => {
     // Expert actions
     addExpert, updateExpertName, updateExpertProfile, deleteExpert,
     reviewDraft, setReviewDraft, addReview,
-    historyDraft, setHistoryDraft, addHistory,
+    historyDraft, setHistoryDraft, addHistory, deleteExpertHistory, updateExpertProject,
   }), [
     sidebarCollapsed, toast, showToast,
     tenders, rupPlans, expertsRaw,
@@ -751,7 +835,7 @@ export const AppProvider = ({ children }) => {
     showWinrateDetail, showStageRef, showPotensiChart, showUrgentPanel, showKeywordManager,
     dashboardChartFilter,
     addExpert, updateExpertName, updateExpertProfile, deleteExpert,
-    reviewDraft, addReview, historyDraft, addHistory,
+    reviewDraft, addReview, historyDraft, addHistory, deleteExpertHistory, updateExpertProject,
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
