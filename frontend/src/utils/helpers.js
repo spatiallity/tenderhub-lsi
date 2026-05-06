@@ -18,21 +18,61 @@ export const dateFrom = (base, delta) => {
   return d;
 };
 
-export const formatDate = (date) =>
-  date instanceof Date
-    ? date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
-    : '-';
+export const formatDate = (date) => {
+  try {
+    if (!date) return '-';
+    
+    if (!(date instanceof Date)) {
+      // Try to parse string date
+      date = new Date(date);
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid date object:`, date);
+      return '-';
+    }
+    
+    return date.toLocaleDateString('id-ID', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric',
+      timeZone: 'Asia/Jakarta'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '-';
+  }
+};
 
 export const formatMonthYear = (dateStr) =>
   dateStr ? new Date(`${dateStr}T00:00:00+07:00`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : '-';
 
 export const daysFromNow = (dateStr) => {
   if (!dateStr) return 999;
-  const target = new Date(`${dateStr}T00:00:00+07:00`);
-  // Always use current date, not a cached constant
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.floor((target - today) / 86400000);
+  
+  try {
+    // Parse date string and ensure it's treated as Jakarta timezone
+    const target = new Date(`${dateStr}T00:00:00+07:00`);
+    
+    // Check if date is valid
+    if (isNaN(target.getTime())) {
+      console.warn(`Invalid date string: ${dateStr}`);
+      return 999;
+    }
+    
+    // Get current date in Jakarta timezone
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const diffMs = target - today;
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    return diffDays;
+  } catch (error) {
+    console.error(`Error calculating days from now for date: ${dateStr}`, error);
+    return 999;
+  }
 };
 
 export const initials = (name) =>
