@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instruksi Penting - Clear Browser Cache</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #e74c3c;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #3498db;
+            margin-top: 30px;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .steps {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        kbd {
+            background: #333;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .button {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #2980b9;
+        }
+        .button.danger {
+            background: #e74c3c;
+        }
+        .button.danger:hover {
+            background: #c0392b;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        ul {
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚠️ PENTING: Clear Browser Cache Dulu!</h1>
+        
+        <div class="warning">
+            <strong>MASALAH:</strong> Browser Anda masih menggunakan kode JavaScript lama yang sudah di-cache. 
+            Meskipun kode sudah diperbaiki, browser tidak akan menggunakan kode baru sampai cache dibersihkan.
+        </div>
+
+        <h2>🔧 Masalah yang Sudah Diperbaiki:</h2>
+        <ul>
+            <li>✅ <strong>Frontend .env</strong> - Sekarang menggunakan variabel yang benar (<code>VITE_API_BASE_URL</code>)</li>
+            <li>✅ <strong>Realtime Conflict</strong> - Disabled di development mode untuk mencegah data revert</li>
+            <li>✅ <strong>Echo Prevention</strong> - Ditingkatkan dari 3 detik ke 10 detik</li>
+            <li>✅ <strong>Logging</strong> - Ditambahkan log lengkap untuk debugging</li>
+        </ul>
+
+        <h2>📋 Langkah-Langkah Clear Cache:</h2>
+
+        <div class="steps">
+            <div class="step">
+                <strong>Opsi 1: Hard Refresh (Tercepat)</strong><br>
+                Tekan: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> (Windows/Linux)<br>
+                Atau: <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> (Mac)
+            </div>
+
+            <div class="step">
+                <strong>Opsi 2: Clear Cache Manual</strong><br>
+                1. Tekan <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Delete</kbd><br>
+                2. Pilih "Cached images and files"<br>
+                3. Pilih time range: "All time"<br>
+                4. Klik "Clear data"<br>
+                5. Refresh halaman dengan <kbd>F5</kbd>
+            </div>
+
+            <div class="step">
+                <strong>Opsi 3: Incognito Mode (Paling Aman)</strong><br>
+                1. Tekan <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd><br>
+                2. Buka <code>http://localhost:5173</code><br>
+                3. Test aplikasi di incognito window
+            </div>
+        </div>
+
+        <h2>✅ Cara Verifikasi Berhasil:</h2>
+        
+        <div class="success">
+            <strong>Buka Browser Console</strong> (<kbd>F12</kbd> → Tab Console), lalu cek log berikut:
+            <pre style="background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 5px; overflow-x: auto; margin-top: 10px;">
+[Auth] Development mode - auto-login as dev user
+[Realtime] Development mode - realtime subscription DISABLED to prevent data conflicts
+[AppContext] Loading keywords from Supabase...
+[API] GET /keywords
+[AppContext] Keywords loaded: X items
+[AppContext] Loading tenders and watchlist...
+[API] GET /tender/search?limit=200
+[AppContext] Tenders loaded: X items
+[API] GET /watchlist
+[AppContext] Watchlist loaded: X items</pre>
+        </div>
+
+        <h2>🧪 Test Perubahan Data:</h2>
+        <ol>
+            <li>Pilih salah satu tender</li>
+            <li>Ubah <strong>Status Internal</strong> (misal: Dipantau → Diikuti)</li>
+            <li>Cek console - harus ada log:
+                <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px; margin-top: 5px;">
+[updateTenderStatus] Called for tender 123, new status: Diikuti
+[Realtime] Marked tender 123 as locally updated
+[API] PATCH /watchlist/123
+[API] Response from /watchlist/123: 200</pre>
+            </li>
+            <li>Refresh halaman (<kbd>F5</kbd>)</li>
+            <li>Status harus tetap "Diikuti" (tidak kembali ke "Dipantau")</li>
+        </ol>
+
+        <h2>❌ Jika Masih Bermasalah:</h2>
+        <ul>
+            <li><strong>Error "timeout of 3000ms"</strong> → Browser masih pakai kode lama, clear cache lagi</li>
+            <li><strong>Error "Anda harus login"</strong> → Dev mode auto-login belum aktif, clear cache</li>
+            <li><strong>Data masih revert</strong> → Cek backend logs, pastikan PATCH request berhasil</li>
+            <li><strong>Realtime masih aktif</strong> → Harus ada log "realtime subscription DISABLED"</li>
+        </ul>
+
+        <div style="text-align: center; margin-top: 40px;">
+            <a href="http://localhost:5173" class="button" target="_blank">
+                🚀 Buka Aplikasi (Localhost:5173)
+            </a>
+            <a href="REALTIME_CONFLICT_FIX.md" class="button">
+                📖 Baca Dokumentasi Lengkap
+            </a>
+        </div>
+
+        <div style="margin-top: 40px; padding: 20px; background: #e8f4f8; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #2c3e50;">💡 Kenapa Ini Terjadi?</h3>
+            <p>Browser modern menggunakan <strong>aggressive caching</strong> untuk mempercepat loading. 
+            Ketika kode JavaScript diupdate, browser tidak otomatis download ulang karena masih punya 
+            versi lama di cache. Hard refresh memaksa browser untuk download semua file terbaru.</p>
+            
+            <p><strong>Development Mode Changes:</strong></p>
+            <ul>
+                <li>Realtime subscription <strong>DISABLED</strong> untuk mencegah race condition</li>
+                <li>Auto-login sebagai dev user (bypass guest mode)</li>
+                <li>Comprehensive logging untuk debugging</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Auto-detect if running in browser and show appropriate message
+        if (window.location.protocol === 'file:') {
+            const warning = document.createElement('div');
+            warning.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #ff9800; color: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 9999;';
+            warning.innerHTML = '<strong>⚠️ Buka file ini di browser!</strong><br>Double-click file HTML ini untuk membuka di browser.';
+            document.body.appendChild(warning);
+        }
+    </script>
+</body>
+</html>

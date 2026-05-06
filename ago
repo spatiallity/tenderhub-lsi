@@ -1,0 +1,172 @@
+[33mcommit 70277f61a285ced3a72b4ec8f29d540e80a600f1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mclaude/sharp-jones-7d653b[m[33m, [m[1;32mclaude/loving-yonath-771273[m[33m)[m
+Merge: ba09ffd9 bba9f95a
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Tue May 5 19:02:43 2026 +0700
+
+    feat: wire auth flow and add real-time watchlist sync
+
+[33mcommit bba9f95a191feeed78b364682e3555ac7f37ab1b[m[33m ([m[1;31morigin/claude/goofy-noether-8b142a[m[33m, [m[1;32mclaude/goofy-noether-8b142a[m[33m)[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Tue May 5 18:52:09 2026 +0700
+
+    feat: wire auth flow and add real-time watchlist sync
+    
+    - Add login route and ProtectedRoute guards in App.jsx so unauthenticated users are redirected to /login; admin-only /users route also protected
+    - Wrap app in AuthProvider so all components can access auth context
+    - Add TenderDetailPanel status/notes editing with save to backend (/watchlist PUT), auto-detecting whether tender is already in watchlist
+    - Add useWatchlistRealtime hook that subscribes to Supabase postgres_changes on tender_watchlist table and triggers refetchTenders on any change
+    - Add refetchTenders to AppContext so all subscribers can trigger a fresh fetch
+    - Backend now returns watchlist_id on enriched tender responses so frontend can identify the correct row to PUT
+    
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+[33mcommit ba09ffd9ef905ff2012dc22a864c9495bd091044[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Tue May 5 17:04:31 2026 +0700
+
+    feat: auth system, user management, and security hardening
+    
+    - Add Supabase Auth login page with split-panel branding UI
+    - Add AuthContext with role-based access (admin/manager/user)
+    - Add ProtectedRoute and UserManagementPage (admin-only)
+    - Restrict internal status editing to manager/admin roles in frontend and backend
+    - Add JWT verification middleware (PyJWT) to all backend write endpoints
+    - require_manager guard on watchlist mutations; get_current_user on expert/keyword mutations
+    - Attach Supabase JWT to all frontend API requests via Axios interceptor
+    - Remove localStorage for internalStatuses, tenderNotes, assignedPICs — API is sole source of truth
+    - Purge stale localStorage keys on app load to prevent cross-user data bleed
+    - Harden CORS: explicit methods/headers instead of wildcard
+    - Add vite manualChunks: main bundle 1304KB to 149KB (-88%), DashboardPage 392KB to 16KB (-96%)
+    - Add supabase/setup.sql for profiles table, RLS policies, and auto-create trigger
+    - Add SUPABASE_JWT_SECRET, SUPABASE_URL, SUPABASE_SERVICE_KEY, SKIP_AUTH to backend config
+    
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+[33mcommit b461cbf46b9a943d55d107a8a66c375041d987f9[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Tue May 5 11:52:20 2026 +0700
+
+    fix(sync): resolve UI state reverting by fixing browser caching in fetchTenders and ensuring correct status dispatch
+
+[33mcommit bebc8130e759c3b8188fc813f14268b3039971cf[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Tue May 5 11:33:08 2026 +0700
+
+    chore: sync remaining updates (package.json and main.py)
+
+[33mcommit e88eab828915e0e72c2d6c60410242b8c397685d[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Tue May 5 10:49:52 2026 +0700
+
+    feat: migrate watchlist data from localStorage to backend DB
+    
+    - backend: add assigned_pic column to tender_watchlist (model + alembic migration)
+    - backend: update Pydantic schemas (WatchlistBase, WatchlistUpdate, TenderOut) with assigned_pic field
+    - backend: add PATCH /api/v1/watchlist/{kd_tender} endpoint for partial updates
+    - frontend: AppContext - remove localStorage for internalStatuses, tenderNotes, assignedPICs
+    - frontend: AppContext - fetchTenders now parallel-fetches /watchlist to hydrate all three states from DB
+    - frontend: AppContext - updateTenderStatus, updateTenderPIC, addTenderNote now async via PATCH with POST fallback
+    - frontend: TenderDetail - explicit Save buttons for status and PIC with loading state and toast feedback
+    - frontend: TenderDetailPanel - async handleSaveWatchlist with loading state and toast
+    - frontend: TenderPage - StatusCell component with explicit Save button (only visible when value changes)
+    - fix: Rules of Hooks violation in TenderDetail (early return moved after all hooks)
+
+[33mcommit 6295159635ee71e3aa6c3317fe50398cee897505[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Tue May 5 00:08:32 2026 +0700
+
+    chore: update TenderHub implementation and fix sync
+
+[33mcommit 1c9afb5a2b03ed056e20ae9cf25f0dc487d3d542[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 15:03:24 2026 +0700
+
+    feat: sort experts by newest, add global vs local keyword logic, add keywords to realtime sync
+
+[33mcommit b064d07e565b3dc758721e320a389b83ca9eb75a[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:50:15 2026 +0700
+
+    fix: restore supabase key and disable dummy data expansion
+
+[33mcommit 2e376ff68b04dd4f63a11b7845537ee991d85e70[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:46:48 2026 +0700
+
+    style: remove document icon from sidebar
+
+[33mcommit 3cd7d423bb7a094571fc46f1518456ae51723f31[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:41:34 2026 +0700
+
+    fix: make application startup resilient to database connection failures
+
+[33mcommit 29becf489f6eae8dccf80e63415f62b956a3bf46[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:29:43 2026 +0700
+
+    fix: update supabase anon key for websocket auth
+
+[33mcommit fb3aaf61e8ee439a6e4ae7acd57f16538f8e3409[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:25:12 2026 +0700
+
+    fix: update supabase url to match active dashboard project
+
+[33mcommit 5ef85437363bd2949b6047b3a87fa70beaf806c1[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:08:27 2026 +0700
+
+    feat: instant local state patching for realtime events
+
+[33mcommit 68e426c6e829d2e0a6f782e7f1359180553fe6bf[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:08:02 2026 +0700
+
+    fix: dynamic deadline logic to prevent tenders from being stuck in past stages
+
+[33mcommit b8ab92d343c56fcebf4d73cb3697fa43bd580330[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 14:04:26 2026 +0700
+
+    chore: add diagnostic logs for realtime subscription
+
+[33mcommit a6af9b6bd65cb0c5c8a63c0984901ba6204772dd[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 13:59:59 2026 +0700
+
+    feat: stabilize realtime sync and resolve expert duplication issues
+
+[33mcommit ec02f561c41e97415754469a07e5123b65abed52[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 13:48:28 2026 +0700
+
+    fix: correct Supabase URL and add cache-buster for tender sync
+
+[33mcommit 67210fdce84551c1229dd465792a15dce0fe4690[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 13:29:38 2026 +0700
+
+    fix: expert sorting desc, global vs local keywords, realtime keyword sync
+
+[33mcommit faf83e607f0dd167bee8a6ade1b4241602225134[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 13:15:33 2026 +0700
+
+    fix: resolve POST/PATCH trailing slash CORS errors on HF Spaces & fix TenderDetailPanel watchlist save state
+
+[33mcommit f4282bf2f829b6e4a56c881e8941f2efb33a98a3[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 13:01:51 2026 +0700
+
+    fix: resolve asyncpg DuplicatePreparedStatementError with Supabase transaction pooler by dynamically generating statement names
+
+[33mcommit 592b49d901d35162a5ad9848373bcc4bd259f10e[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon May 4 12:58:59 2026 +0700
+
+    fix: resolve backend API CORS & Mixed Content errors caused by HTTP redirects on Hugging Face load balancer. Added proxy-headers to uvicorn and fixed expert trailing slash route.
+
+[33mcommit 14a7722b4d5bb266a605a81c708c086848207aad[m
+Author: spatiallity <spatiallity@gmail.com>
+Date:   Mon 

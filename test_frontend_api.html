@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Frontend API</title>
+</head>
+<body>
+    <h1>Test API Connection</h1>
+    <button onclick="testWatchlist()">Test GET /watchlist</button>
+    <button onclick="testUpdateStatus()">Test PATCH /watchlist/169154</button>
+    <pre id="result"></pre>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        
+        async function testWatchlist() {
+            try {
+                const response = await fetch(`${API_BASE}/watchlist`);
+                const data = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+                console.log('Watchlist data:', data);
+            } catch (err) {
+                document.getElementById('result').textContent = 'ERROR: ' + err.message;
+                console.error('Error:', err);
+            }
+        }
+        
+        async function testUpdateStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/watchlist/169154`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        status_internal: 'Akan Diikuti'
+                    })
+                });
+                const data = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+                console.log('Update result:', data);
+            } catch (err) {
+                document.getElementById('result').textContent = 'ERROR: ' + err.message;
+                console.error('Error:', err);
+            }
+        }
+    </script>
+</body>
+</html>
