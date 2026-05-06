@@ -127,34 +127,34 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const loadTendersAndWatchlist = async () => {
       try {
-        // Try to fetch both, but handle them independently
-        const [tendersRes, watchlistRes] = await Promise.allSettled([
-          api.get('/tender/search', { params: { limit: 200 } }),
-          api.get('/watchlist'),
-        ]);
-
-        // Handle tenders
-        const tendersData = tendersRes.status === 'fulfilled' ? (tendersRes.value.data || []) : FALLBACK_TENDERS;
-        setTendersRaw(tendersData);
+        // Use dummy tender data (no backend API needed)
+        console.log('[Direct Supabase] Using local tender data');
+        setTendersRaw(FALLBACK_TENDERS);
 
         const statusMap = {};
         const picsMap = {};
         const notesMap = {};
 
-        // Handle watchlist (prioritize this data)
-        if (watchlistRes.status === 'fulfilled') {
-          (watchlistRes.value.data || []).forEach(w => {
-            const tenderId = w.kd_tender;
-            if (w.status_internal) statusMap[tenderId] = w.status_internal;
-            if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
-            if (w.catatan_internal) {
-              try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
-            }
-          });
+        // Fetch watchlist from Supabase directly
+        try {
+          const watchlistRes = await api.get('/watchlist');
+          
+          if (watchlistRes.data) {
+            watchlistRes.data.forEach(w => {
+              const tenderId = w.kd_tender;
+              if (w.status_internal) statusMap[tenderId] = w.status_internal;
+              if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
+              if (w.catatan_internal) {
+                try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
+              }
+            });
+          }
+        } catch (watchlistErr) {
+          console.error('Failed to load watchlist:', watchlistErr);
         }
 
-        // Fill API defaults for tenders not yet in watchlist
-        tendersData.forEach(t => {
+        // Fill defaults for tenders not in watchlist
+        FALLBACK_TENDERS.forEach(t => {
           if (!statusMap[t.id]) {
             let s = t.internalStatus || 'Dipantau';
             if (t.won === true) s = 'Menang';
@@ -166,15 +166,6 @@ export const AppProvider = ({ children }) => {
         setInternalStatuses(statusMap);
         setAssignedPICs(picsMap);
         setTenderNotes(notesMap);
-
-        // Show appropriate error messages
-        if (tendersRes.status === 'rejected') {
-          console.error('Failed to load tenders:', tendersRes.reason);
-          showToast('API tender error. Menggunakan data fallback.', 'warning');
-        }
-        if (watchlistRes.status === 'rejected') {
-          console.error('Failed to load watchlist:', watchlistRes.reason);
-        }
 
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -500,59 +491,36 @@ export const AppProvider = ({ children }) => {
 
   const refetchTenders = useCallback(async () => {
     try {
-      const [tendersRes, watchlistRes] = await Promise.allSettled([
-        api.get('/tender/search', { params: { limit: 200 } }),
-        api.get('/watchlist'),
-      ]);
-
-      // Handle tenders - only update if successful
-      const tendersData = tendersRes.status === 'fulfilled' ? (tendersRes.value.data || []) : [];
-      if (tendersData.length > 0) {
-        setTendersRaw(tendersData);
-      }
-      // If tender search fails, keep existing tender data
-
+      console.log('[Direct Supabase] Refetching watchlist only');
+      
       const statusMap = {};
       const picsMap = {};
       const notesMap = {};
 
-      // Handle watchlist (prioritize this data) - ALWAYS update from watchlist
-      if (watchlistRes.status === 'fulfilled') {
-        (watchlistRes.value.data || []).forEach(w => {
-          if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
-          if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
-          if (w.catatan_internal) {
-            try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
-          }
-        });
+      // Fetch watchlist from Supabase
+      try {
+        const watchlistRes = await api.get('/watchlist');
         
-        // Update states with watchlist data even if tender search failed
+        if (watchlistRes.data) {
+          watchlistRes.data.forEach(w => {
+            if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
+            if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
+            if (w.catatan_internal) {
+              try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
+            }
+          });
+        }
+        
+        // Update states with watchlist data
         setInternalStatuses(prev => ({ ...prev, ...statusMap }));
         setAssignedPICs(prev => ({ ...prev, ...picsMap }));
         setTenderNotes(prev => ({ ...prev, ...notesMap }));
-      }
-
-      // Fill defaults for tenders not in watchlist (only if we have tender data)
-      if (tendersData.length > 0) {
-        tendersData.forEach(t => {
-          if (!statusMap[t.id]) {
-            let s = t.internalStatus || 'Dipantau';
-            if (t.won === true) s = 'Menang';
-            else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-            statusMap[t.id] = s;
-          }
-        });
         
-        setInternalStatuses(statusMap);
-        setAssignedPICs(picsMap);
-        setTenderNotes(notesMap);
-      }
-
-      if (tendersRes.status === 'rejected') {
-        console.error('Failed to refetch tenders:', tendersRes.reason);
+      } catch (watchlistErr) {
+        console.error('Failed to refetch watchlist:', watchlistErr);
       }
     } catch (err) {
-      console.error('Failed to refetch tenders:', err);
+      console.error('Failed to refetch:', err);
     }
   }, []);
 
