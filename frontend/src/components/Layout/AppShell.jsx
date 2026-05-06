@@ -338,12 +338,19 @@ export default function AppShell() {
                   onClick={async () => {
                     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
                     try {
+                      console.log('[Generate CV] Fetching CV for expert:', selectedExpert.id);
                       const response = await fetch(`${apiBase}/cv/${selectedExpert.id}/cv`, {
                         method: 'GET',
                         headers: { 'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
                       });
-                      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                      console.log('[Generate CV] Response status:', response.status);
+                      if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('[Generate CV] Error response:', errorText);
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                      }
                       const blob = await response.blob();
+                      console.log('[Generate CV] Blob size:', blob.size);
                       const url = window.URL.createObjectURL(blob);
                       const link = document.createElement('a');
                       link.href = url;
@@ -352,7 +359,9 @@ export default function AppShell() {
                       link.click();
                       link.remove();
                       window.URL.revokeObjectURL(url);
+                      console.log('[Generate CV] Download triggered successfully');
                     } catch (err) {
+                      console.error('[Generate CV] Failed:', err);
                       alert(`Gagal generate CV: ${err.message}`);
                     }
                   }}

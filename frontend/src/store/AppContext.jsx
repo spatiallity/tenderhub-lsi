@@ -729,18 +729,28 @@ export const AppProvider = ({ children }) => {
         const updatePayload = { ...basePayload };
         delete updatePayload.kd_tender; // Don't update the primary key
         
-        console.log('[ensureWatchlistEntry] Updating existing entry:', existing.id, 'with payload:', updatePayload);
-        const { data, error } = await supabase
+        console.log('[ensureWatchlistEntry] Updating existing entry ID:', existing.id);
+        console.log('[ensureWatchlistEntry] Update payload:', JSON.stringify(updatePayload, null, 2));
+        
+        const { data, error, status, statusText } = await supabase
           .from('tender_watchlist')
           .update(updatePayload)
           .eq('id', existing.id)
           .select();
         
+        console.log('[ensureWatchlistEntry] Update response:', { data, error, status, statusText });
+        
         if (error) {
           console.error('[ensureWatchlistEntry] Update error:', error);
           throw new Error(error.message);
         }
-        console.log('[ensureWatchlistEntry] Update successful, data:', data);
+        
+        if (!data || data.length === 0) {
+          console.error('[ensureWatchlistEntry] Update returned no data - possible RLS policy issue');
+          throw new Error('Update failed - no data returned');
+        }
+        
+        console.log('[ensureWatchlistEntry] Update successful, updated row:', JSON.stringify(data[0], null, 2));
       } else {
         // Insert new entry
         console.log('[ensureWatchlistEntry] Inserting new entry for tender:', tenderId);
