@@ -505,17 +505,18 @@ export const AppProvider = ({ children }) => {
         api.get('/watchlist'),
       ]);
 
-      // Handle tenders
+      // Handle tenders - only update if successful
       const tendersData = tendersRes.status === 'fulfilled' ? (tendersRes.value.data || []) : [];
       if (tendersData.length > 0) {
         setTendersRaw(tendersData);
       }
+      // If tender search fails, keep existing tender data
 
       const statusMap = {};
       const picsMap = {};
       const notesMap = {};
 
-      // Handle watchlist (prioritize this data)
+      // Handle watchlist (prioritize this data) - ALWAYS update from watchlist
       if (watchlistRes.status === 'fulfilled') {
         (watchlistRes.value.data || []).forEach(w => {
           if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
@@ -524,9 +525,14 @@ export const AppProvider = ({ children }) => {
             try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
           }
         });
+        
+        // Update states with watchlist data even if tender search failed
+        setInternalStatuses(prev => ({ ...prev, ...statusMap }));
+        setAssignedPICs(prev => ({ ...prev, ...picsMap }));
+        setTenderNotes(prev => ({ ...prev, ...notesMap }));
       }
 
-      // Fill defaults for tenders not in watchlist
+      // Fill defaults for tenders not in watchlist (only if we have tender data)
       if (tendersData.length > 0) {
         tendersData.forEach(t => {
           if (!statusMap[t.id]) {
@@ -536,11 +542,11 @@ export const AppProvider = ({ children }) => {
             statusMap[t.id] = s;
           }
         });
+        
+        setInternalStatuses(statusMap);
+        setAssignedPICs(picsMap);
+        setTenderNotes(notesMap);
       }
-
-      setInternalStatuses(statusMap);
-      setAssignedPICs(picsMap);
-      setTenderNotes(notesMap);
 
       if (tendersRes.status === 'rejected') {
         console.error('Failed to refetch tenders:', tendersRes.reason);
