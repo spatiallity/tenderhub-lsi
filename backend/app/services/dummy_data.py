@@ -221,4 +221,5 @@ def _expand_experts_to_100(rows):
 
 
 RUP_RAW = _expand_rup_to_50(RUP_RAW)
-EXPERTS_RAW = _expand_experts_to_100(EXPERTS_RAW)
+# DISABLED: Don't expand experts to prevent duplicates with (17), (18), etc.
+# EXPERTS_RAW = _expand_experts_to_100(EXPERTS_RAW)

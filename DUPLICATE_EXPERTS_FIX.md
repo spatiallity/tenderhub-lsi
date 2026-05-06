@@ -1,311 +1,146 @@
-# 🔧 Fix: Duplicate Experts in Supabase
+# Fix: Duplicate Experts dengan Angka dalam Kurung
 
-## 🐛 Masalah
+## 🔍 Masalah
 
-Data expert duplikat terus bertambah di database Supabase.
+Data expert muncul duplikat dengan angka dalam kurung seperti:
+- Prof. Hendra Santoso, Ph.D. **(17)**
+- Maya Putri, S.Kom., M.T.I. **(18)**
+- Ir. Bambang Sutrisno, M.T. **(19)**
+- Dr. Siti Rahayu, S.E., M.M. **(20)**
+- Agus Purnomo, S.T., M.T. **(21)**
+- Dra. Lestari Wulandari, M.Kes. **(22)**
 
-## 🔍 Root Cause Analysis
+**Kenapa selalu balik setelah push/run?**
+Karena data ini di-seed otomatis dari backend ke database Supabase setiap kali backend start.
 
-Setelah investigasi mendalam, saya menemukan **PENYEBAB UTAMA**:
+## 🔎 Root Cause
 
-### 1. ❌ Function `addExpert` Tidak Return Value
+### 1. Backend Seeding (`backend/app/services/dummy_data.py`)
+```python
+# Fungsi ini meng-expand 16 experts asli menjadi 100 experts
+def _expand_experts_to_100(rows):
+    # ... code ...
+    item["nama"] = f"{base['nama']} ({seq})"  # ❌ Menambahkan (1), (2), (3), dst
+    # ...
 
-**File:** `frontend/src/store/AppContext.jsx`
-
-**Masalah:**
-```javascript
-// ❌ BEFORE - No return statement
-const addExpert = useCallback(async (draft) => {
-  if (!draft.nama?.trim() || !draft.keahlian?.trim()) return; // Returns undefined
-  const body = { ... };
-  try {
-    const res = await api.post('/experts', body);
-    setExpertsRaw(prev => [...prev, res.data]);
-    showToast('Tenaga ahli berhasil ditambahkan');
-    // ❌ No return statement - returns undefined
-  } catch (e) {
-    // ❌ No return statement - returns undefined
-  }
-}, [showToast]);
+EXPERTS_RAW = _expand_experts_to_100(EXPERTS_RAW)  # ❌ Ini yang bikin duplikat!
 ```
 
-**Dampak:**
-- Di `ExpertPage.jsx` ada check: `if (success) { ... }`
-- Tapi `addExpert` tidak return apa-apa (undefined)
-- `if (undefined)` = false, jadi form tidak di-reset
-- User bisa klik "Simpan" berkali-kali
-- Setiap klik = 1 expert baru di database = DUPLIKAT!
-
-**Solusi:**
-```javascript
-// ✅ AFTER - Returns true/false
-const addExpert = useCallback(async (draft) => {
-  if (!draft.nama?.trim() || !draft.keahlian?.trim()) {
-    showToast('Nama dan keahlian wajib diisi', 'warning');
-    return false; // ✅ Return false
-  }
-  
-  const body = { ... };
-  
-  try {
-    const res = await api.post('/experts', body);
-    setExpertsRaw(prev => [...prev, res.data]);
-    showToast('Tenaga ahli berhasil ditambahkan');
-    return true; // ✅ Return success
-  } catch (e) {
-    console.error('[addExpert] Failed to add expert:', e);
-    showToast('Gagal menambahkan expert', 'error');
-    return false; // ✅ Return failure
-  }
-}, [showToast]);
-```
-
-### 2. ✅ Button Protection Already Exists
-
-**File:** `frontend/src/pages/ExpertPage.jsx`
-
-**Good news:** Kode sudah ada proteksi double-click:
-```javascript
-<Btn 
-  className="primary" 
-  disabled={isSaving} // ✅ Button disabled saat saving
-  onClick={async () => {
-    if (isSaving) return; // ✅ Guard clause
-    setIsSaving(true);
-    try {
-      const success = await addExpert(newExpert);
-      if (success) { // ✅ Check success
-        setDraft({ ... }); // Reset form
-        setShowForm(false); // Close form
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  }}
->
-  {isSaving ? 'Menyimpan...' : 'Simpan Tenaga Ahli'}
-</Btn>
-```
-
-**Tapi:** Karena `addExpert` tidak return value, `if (success)` selalu false, form tidak di-reset, user bisa klik lagi!
-
-### 3. ✅ Seed Function Already Safe
-
-**File:** `backend/app/main.py`
-
-**Good news:** Seed function sudah aman:
+### 2. Auto-Seeding di Startup (`backend/app/main.py`)
 ```python
 async def seed_data():
-    existing_count = (await db.execute(select(func.count()).select_from(Expert))).scalar_one()
-    
-    # Only seed if database is EMPTY (0 experts)
+    # Seed experts dari EXPERTS_RAW yang sudah di-expand ke 100
     if existing_count == 0:
-        print(f"🔵 Database empty, seeding {min(100, len(EXPERTS_RAW))} experts...")
-        # ... seed logic
-    else:
-        print(f"ℹ️ Database already has {existing_count} experts, skipping seed")
+        for e_raw in EXPERTS_RAW[:100]:  # ❌ Seed 100 experts termasuk duplikat
+            expert_db = Expert(...)
 ```
 
-**Kesimpulan:** Seed function TIDAK menyebabkan duplikasi.
+### 3. Flow Duplikasi
+```
+Backend Start
+    ↓
+Load EXPERTS_RAW (sudah 100 experts dengan duplikat)
+    ↓
+Check database: 0 experts
+    ↓
+Seed 100 experts ke database (termasuk yang ber-angka)
+    ↓
+Frontend load dari database
+    ↓
+Tampil duplikat dengan angka (17), (18), dst
+```
 
-### 4. ✅ Backend API Already Safe
+## ✅ Solusi
 
-**File:** `backend/app/api/v1/expert.py`
+### Step 1: Disable Expand Function
+**File**: `backend/app/services/dummy_data.py`
 
-**Good news:** Backend API tidak ada logic duplikasi:
 ```python
-@router.post("/", response_model=ExpertOut)
-async def create_expert(expert_in: ExpertCreate, db: AsyncSession = Depends(get_db)):
-    expert = Expert(**expert_in.model_dump())
-    db.add(expert)
-    await db.commit()
-    await db.refresh(expert)
-    return expert
+RUP_RAW = _expand_rup_to_50(RUP_RAW)
+# DISABLED: Don't expand experts to prevent duplicates
+# EXPERTS_RAW = _expand_experts_to_100(EXPERTS_RAW)  # ✅ Di-comment
 ```
 
-**Kesimpulan:** Backend hanya create 1 expert per request. Tidak ada loop atau duplikasi.
+**Hasil**: Backend hanya akan seed 16 experts asli, tanpa duplikat.
 
----
+### Step 2: Cleanup Database
+**File**: `supabase/cleanup_duplicate_experts.sql`
 
-## ✅ Solusi yang Diterapkan
+Jalankan SQL script ini di Supabase SQL Editor:
 
-### 1. Fixed `addExpert` Function
-
-**File:** `frontend/src/store/AppContext.jsx`
-
-**Changes:**
-- ✅ Added return `true` on success
-- ✅ Added return `false` on failure
-- ✅ Added validation message
-- ✅ Added error logging
-
-**Result:**
-- Form akan di-reset setelah berhasil save
-- User tidak bisa klik "Simpan" berkali-kali
-- Tidak ada duplikasi lagi!
-
-### 2. Created Cleanup Script
-
-**File:** `cleanup_duplicate_experts.py`
-
-**Purpose:** Remove existing duplicates from database
-
-**Usage:**
-```bash
-# List all experts
-cd backend
-python ../cleanup_duplicate_experts.py list
-
-# Cleanup duplicates (interactive)
-python ../cleanup_duplicate_experts.py
+```sql
+-- Hapus semua expert dengan angka dalam kurung
+DELETE FROM experts 
+WHERE nama ~ '\s+\(\d+\)$';
 ```
 
-**Features:**
-- Detects duplicates by name (case-insensitive)
-- Shows which experts will be deleted
-- Asks for confirmation before deletion
-- Keeps the first occurrence (lowest ID)
-- Deletes all other duplicates
+**Cara menjalankan**:
+1. Buka Supabase Dashboard
+2. Pilih project TenderHub
+3. Klik "SQL Editor" di sidebar
+4. Copy-paste script dari `supabase/cleanup_duplicate_experts.sql`
+5. Klik "Run"
 
----
-
-## 🧪 Testing
-
-### Test 1: Verify Fix Works
-
-1. **Open aplikasi** di browser (gunakan Incognito!)
-2. **Buka halaman Experts**
-3. **Klik "Tambah Tenaga Ahli"**
-4. **Isi form:**
-   - Nama: "Test Expert"
-   - Instansi: "Test Company"
-   - Keahlian: "Testing"
-   - Portfolio: "SDA"
-5. **Klik "Simpan Tenaga Ahli"**
-6. **Verify:**
-   - ✅ Toast muncul: "Tenaga ahli berhasil ditambahkan"
-   - ✅ Form di-reset (semua field kosong)
-   - ✅ Form ditutup
-   - ✅ Expert baru muncul di list
-7. **Check database:**
-   - ✅ Hanya ada 1 "Test Expert" (tidak duplikat)
-
-### Test 2: Verify Double-Click Protection
-
-1. **Buka form tambah expert**
-2. **Isi form dengan data valid**
-3. **Klik "Simpan" BERKALI-KALI dengan cepat** (double/triple click)
-4. **Verify:**
-   - ✅ Button disabled setelah klik pertama
-   - ✅ Text berubah jadi "Menyimpan..."
-   - ✅ Hanya 1 expert yang tersimpan (tidak duplikat)
-
-### Test 3: Cleanup Existing Duplicates
+### Step 3: Restart Backend (Opsional)
+Jika backend sedang running dan database sudah kosong, restart backend untuk re-seed dengan data yang benar:
 
 ```bash
-# 1. List all experts to see duplicates
+# Stop backend (Ctrl+C)
+# Start backend
 cd backend
-python ../cleanup_duplicate_experts.py list
-
-# Output example:
-# 📋 All Experts (150 total):
-# ================================================================================
-#   1. ID:    1 | Dr. Ahmad Santoso                       | Sucofindo
-#   2. ID:   45 | Dr. Ahmad Santoso                       | Sucofindo  ← DUPLICATE!
-#   3. ID:   89 | Dr. Ahmad Santoso                       | Sucofindo  ← DUPLICATE!
-# ...
-
-# 2. Run cleanup
-python ../cleanup_duplicate_experts.py
-
-# Output example:
-# 🔍 Checking for duplicate experts...
-# 📊 Total experts in database: 150
-# 
-# ❌ Found 3 duplicates for: Dr. Ahmad Santoso
-#    IDs: [1, 45, 89]
-#    ✅ Keeping ID 1
-#    🗑️  Deleting IDs: [45, 89]
-# 
-# 📊 Summary:
-#    - Duplicate names found: 25
-#    - Total experts to delete: 50
-#    - Experts to keep: 100
-# 
-# ⚠️  WARNING: This will DELETE 50 expert records!
-# Type 'YES' to proceed with deletion: YES
-# 
-# 🗑️  Deleting duplicates...
-# ✅ Successfully deleted 50 duplicate experts!
-# 📊 Final expert count: 100
+uvicorn app.main:app --reload
 ```
 
----
+Backend akan detect database kosong dan seed 16 experts asli (tanpa duplikat).
 
-## 📊 Summary
+## 🧪 Verifikasi
 
-### Root Cause:
-❌ Function `addExpert` tidak return value → Form tidak di-reset → User bisa klik berkali-kali → Duplikasi!
+### 1. Check Database
+```sql
+-- Harus return 0
+SELECT COUNT(*) FROM experts WHERE nama ~ '\s+\(\d+\)$';
 
-### Solution:
-✅ Fixed `addExpert` to return `true`/`false` → Form di-reset setelah success → User tidak bisa klik lagi → No more duplicates!
-
-### Additional:
-✅ Created cleanup script untuk hapus duplikat yang sudah ada
-
----
-
-## 🚀 Next Steps
-
-### 1. Cleanup Existing Duplicates
-
-```bash
-cd backend
-python ../cleanup_duplicate_experts.py
+-- Harus return 16 (atau jumlah expert asli)
+SELECT COUNT(*) FROM experts;
 ```
 
-**IMPORTANT:** Backup database dulu sebelum cleanup!
+### 2. Check Frontend
+1. Hard refresh browser (Ctrl+Shift+R)
+2. Buka halaman Expert
+3. Tidak ada lagi expert dengan angka dalam kurung
+4. Total expert: 16 (bukan 100)
 
-### 2. Test New Expert Creation
+## 📋 Files Modified
 
-- Buka aplikasi di Incognito mode
-- Test tambah expert baru
-- Verify tidak ada duplikasi
+1. ✅ `backend/app/services/dummy_data.py` - Disable expand function
+2. ✅ `supabase/cleanup_duplicate_experts.sql` - SQL script untuk cleanup
+3. ✅ `DUPLICATE_EXPERTS_FIX.md` - Dokumentasi ini
 
-### 3. Monitor Database
+## 🚨 Important Notes
 
-- Check Supabase dashboard
-- Verify tidak ada duplikat baru yang muncul
+### Kenapa Tidak Hapus Fungsi `_expand_experts_to_100`?
+Fungsi tetap ada (di-comment) untuk jaga-jaga kalau nanti butuh generate dummy data banyak untuk testing. Tapi **tidak digunakan** di production.
 
----
+### Apa yang Terjadi Setelah Fix?
+- ✅ Database hanya punya 16 experts asli
+- ✅ Tidak ada duplikat dengan angka (17), (18), dst
+- ✅ Data tidak akan "balik" lagi setelah push/run
+- ✅ Frontend dan backend sync dengan data yang sama
 
-## 📁 Files Modified
+### Bagaimana Kalau Mau Tambah Expert Baru?
+Ada 2 cara:
+1. **Via Frontend**: Klik "Tambah Tenaga Ahli" di halaman Expert
+2. **Via Dummy Data**: Tambahkan ke `FALLBACK_EXPERTS` di `frontend/src/data/demoData.js` DAN `EXPERTS_RAW` di `backend/app/services/dummy_data.py`
 
-| File | Status | Changes |
-|------|--------|---------|
-| `frontend/src/store/AppContext.jsx` | ✅ Fixed | Added return true/false to addExpert |
-| `cleanup_duplicate_experts.py` | ✅ Created | Script to cleanup existing duplicates |
-| `DUPLICATE_EXPERTS_FIX.md` | ✅ Created | This documentation |
+## 🔄 Commit Message
+```
+fix: remove duplicate experts with numbers in parentheses
 
----
+- Disable _expand_experts_to_100() in backend/app/services/dummy_data.py
+- Add SQL cleanup script for removing duplicate experts from database
+- Backend now seeds only 16 original experts (not 100 with duplicates)
+- Add comprehensive documentation in DUPLICATE_EXPERTS_FIX.md
 
-## ⚠️ Prevention Tips
-
-### For Developers:
-
-1. **Always return value from async functions** yang di-check hasilnya
-2. **Add validation** sebelum API call
-3. **Add error logging** untuk debugging
-4. **Test double-click scenarios** saat develop form
-
-### For Users:
-
-1. **Jangan spam-click button** "Simpan"
-2. **Tunggu sampai toast muncul** sebelum klik lagi
-3. **Check database** secara berkala untuk duplikat
-
----
-
-**Status:** ✅ FIXED  
-**Last Updated:** 6 Mei 2026, 10:00 WIB  
-**Action Required:** Run cleanup script untuk hapus duplikat yang sudah ada
+Fixes: duplicate experts showing as "Name (17)", "Name (18)", etc.
+Root cause: auto-expansion function creating 100 experts from 16 originals
+```
