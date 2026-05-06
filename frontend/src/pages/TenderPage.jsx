@@ -272,7 +272,7 @@ export default function TenderPage() {
           case 'hps': va = a.hps || 0; vb = b.hps || 0; break;
           case 'stage': va = (a.currentStageName || '').toLowerCase(); vb = (b.currentStageName || '').toLowerCase(); break;
           case 'deadline': va = a.daysLeft ?? 999; vb = b.daysLeft ?? 999; break;
-          case 'metode': va = (a.mtd_pemilihan || a.metode || '').toLowerCase(); vb = (b.mtd_pemilihan || b.metode || '').toLowerCase(); break;
+          case 'kd_tender': va = a.kd_tender || 0; vb = b.kd_tender || 0; break;
           case 'status': va = (internalStatuses[a.id] || 'Dipantau').toLowerCase(); vb = (internalStatuses[b.id] || 'Dipantau').toLowerCase(); break;
           default: return 0;
         }
@@ -482,7 +482,7 @@ export default function TenderPage() {
                   <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap">Sumber Dana</th>
                   {renderSortTh('stage', 'Status Tahap Tender')}
                   {renderSortTh('deadline', 'Deadline')}
-                  {renderSortTh('metode', 'Metode Pemilihan', 'hidden xl:table-cell')}
+                  {renderSortTh('kd_tender', 'Kode Tender', 'hidden xl:table-cell')}
                   {renderSortTh('status', 'Status Internal')}
                   <th className="bg-slate-50 border-b border-slate-200 sticky right-0 z-10"></th>
                 </tr>
@@ -545,8 +545,8 @@ export default function TenderPage() {
                         </div>
                       </td>
                       <td className="px-3 py-3 align-top hidden xl:table-cell">
-                        <Badge color="gray">{t.mtd_pemilihan || t.metode}</Badge>
-                        <div className="text-slate-500 text-[10px] mt-1">{t.kualifikasi_paket}</div>
+                        <div className="font-mono text-[13px] font-bold text-slate-700">{t.kd_tender || '-'}</div>
+                        <div className="text-slate-500 text-[10px] mt-1">{t.metode || t.mtd_pemilihan}</div>
                       </td>
                       <td className="px-3 py-3 align-top">
                         <StatusCell
