@@ -7,7 +7,7 @@ from app.models.expert import Expert, ExpertProject, ExpertReview
 from app.models.keyword import Keyword
 from sqlalchemy import select, func
 
-from app.api.v1 import tender, rup, expert, keyword, watchlist, users
+from app.api.v1 import tender, rup, expert, keyword, watchlist, users, cv_generator
 
 async def seed_data():
     async with AsyncSessionLocal() as db:
@@ -110,6 +110,7 @@ app.include_router(expert.router, prefix="/api/v1/experts", tags=["Experts"])
 app.include_router(keyword.router, prefix="/api/v1/keywords", tags=["Keywords"])
 app.include_router(watchlist.router, prefix="/api/v1/watchlist", tags=["Watchlist"])
 app.include_router(users.router, prefix="/api/v1", tags=["Users"])
+app.include_router(cv_generator.router, prefix="/api/v1/cv", tags=["CV Generator"])
 
 @app.get("/api/health")
 async def health_check():
