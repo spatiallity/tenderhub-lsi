@@ -82,17 +82,10 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col h-full p-12">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
-              style={{ background: 'linear-gradient(135deg, #13B2AA, #0891b2)' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="white" fillOpacity="0.2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 2V8H20" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M16 13H8M16 17H8M10 9H8" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
+  
             <div>
               <div className="text-xl font-black tracking-tight leading-none">
-                <span className="text-blue-300">Tender</span>
+                <span className="text-white">Tender</span>
                 <span style={{ color: '#13B2AA' }}>Hub</span>
               </div>
               <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
@@ -106,7 +99,7 @@ export default function LoginPage() {
             <h1 className="text-4xl font-black text-white leading-tight mb-4">
               Sistem Cerdas<br />
               <span style={{ color: '#13B2AA' }}>Monitoring Tender</span><br />
-              SBU Layanan Publik
+              SBU LSI PT. SUCOFINDO (PERSERO)
             </h1>
             <p className="text-slate-300 text-base leading-relaxed max-w-sm">
               Platform terpadu untuk memantau, menganalisis, dan mengelola peluang pengadaan barang & jasa pemerintah.

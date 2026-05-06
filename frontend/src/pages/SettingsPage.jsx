@@ -8,11 +8,10 @@ import UserManagement from '../components/Settings/UserManagement';
 
 export default function SettingsPage() {
   const {
-    keywords, addKeyword, removeKeyword, deleteGlobalKeyword,
+    keywords, addKeyword, removeKeyword,
     users, addUser, updateUser, deleteUser,
     coverage, setCoverage,
     hpsThreshold, setHpsThreshold,
-    userProfile, setUserProfile,
     showToast
   } = useAppContext();
   
@@ -103,7 +102,7 @@ export default function SettingsPage() {
                   onChange={e => setKwDraft({ ...kwDraft, text: e.target.value })}
                   onKeyPress={e => {
                     if (e.key === 'Enter' && kwDraft.text.trim()) {
-                      addKeyword(kwDraft.portfolio, kwDraft.text, true);
+                      addKeyword(kwDraft.portfolio, kwDraft.text);
                       setKwDraft({ ...kwDraft, text: '' });
                     }
                   }}
@@ -118,7 +117,7 @@ export default function SettingsPage() {
             </select>
             <Btn className="primary" onClick={() => {
               if (kwDraft.text.trim()) {
-                addKeyword(kwDraft.portfolio, kwDraft.text, true);
+                addKeyword(kwDraft.portfolio, kwDraft.text);
                 setKwDraft({ ...kwDraft, text: '' });
               }
             }}>Tambah</Btn>
@@ -155,7 +154,7 @@ export default function SettingsPage() {
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           <button
-                            onClick={() => deleteGlobalKeyword(port, k.id)}
+                            onClick={() => removeKeyword(port, k.id)}
                             className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
                             title="Hapus keyword"
                           >

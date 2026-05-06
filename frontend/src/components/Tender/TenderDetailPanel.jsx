@@ -4,10 +4,12 @@ import TenderTimeline from './TenderTimeline';
 import { formatRupiah, portfolioColor, internalStatusColor } from '../../utils/format';
 import { ExternalLink, Users, Save, AlertCircle } from 'lucide-react';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
 const TenderDetailPanel = ({ tender, onClose }) => {
   const { showToast } = useAppContext();
+  const { user, isGuest } = useAuth();
   const [status, setStatus] = useState(tender?.internalStatus || tender?.status_internal || 'Dipantau');
   const [notes, setNotes] = useState(tender?.catatan_internal || '');
   const [saving, setSaving] = useState(false);
@@ -16,10 +18,15 @@ const TenderDetailPanel = ({ tender, onClose }) => {
   if (!tender) return null;
 
   const handleSaveChanges = async () => {
-    if (!watchlistId) {
-      // Add to watchlist first
-      setSaving(true);
-      try {
+    if (!user || isGuest) {
+      showToast('Anda harus login untuk menyimpan perubahan', 'warning');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (!watchlistId) {
+        // Create new watchlist entry
         const res = await api.post('/watchlist', {
           kd_tender: tender.kd_tender || tender.id,
           nama_paket: tender.nama || tender.nama_paket,
@@ -28,26 +35,29 @@ const TenderDetailPanel = ({ tender, onClose }) => {
           catatan_internal: notes,
         });
         setWatchlistId(res.data.id);
-        showToast("Tender ditambahkan ke Watchlist!");
-      } catch (err) {
-        showToast("Gagal menyimpan tender", "error");
-      } finally {
-        setSaving(false);
-      }
-    } else {
-      // Update existing watchlist item
-      setSaving(true);
-      try {
+        showToast('Tender ditambahkan ke Watchlist!');
+      } else {
+        // Update existing entry
         await api.put(`/watchlist/${watchlistId}`, {
           status_internal: status,
           catatan_internal: notes,
         });
-        showToast("Perubahan disimpan!");
-      } catch (err) {
-        showToast("Gagal menyimpan perubahan", "error");
-      } finally {
-        setSaving(false);
+        showToast('Perubahan disimpan!');
       }
+    } catch (err) {
+      // If 404 (entry not found by ID), try PATCH by kd_tender
+      const tenderId = tender.kd_tender || tender.id;
+      try {
+        await api.patch(`/watchlist/${tenderId}`, {
+          status_internal: status,
+          catatan_internal: notes,
+        });
+        showToast('Perubahan disimpan!');
+      } catch {
+        showToast('Gagal menyimpan perubahan', 'error');
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -79,7 +89,12 @@ const TenderDetailPanel = ({ tender, onClose }) => {
         <CountdownBadge dateStr={tender.deadlineStage} days={tender.daysLeft} expired={tender.deadlinePassed} />
       </div>
 
-      {!watchlistId && (
+      {isGuest ? (
+        <div style={{ display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '8px', marginBottom: '24px' }}>
+          <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ fontSize: '12px', color: '#92400e' }}>Login untuk menyimpan status dan catatan ke database.</p>
+        </div>
+      ) : !watchlistId && (
         <div style={{ display: 'flex', gap: '8px', padding: '12px', backgroundColor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '8px', marginBottom: '24px' }}>
           <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
           <p style={{ fontSize: '12px', color: '#92400e' }}>Tender belum di watchlist. Simpan untuk menambahkannya.</p>
@@ -93,6 +108,7 @@ const TenderDetailPanel = ({ tender, onClose }) => {
             style={{ width: '100%', marginTop: '4px' }}
             value={status}
             onChange={(e) => setStatus(e.target.value)}
+            disabled={isGuest}
           >
             <option>Dipantau</option>
             <option>Akan Diikuti</option>
@@ -102,7 +118,7 @@ const TenderDetailPanel = ({ tender, onClose }) => {
         </div>
         <div>
           <label className="muted" style={{ fontSize: '12px', fontWeight: 800 }}>Assign Tenaga Ahli</label>
-          <button className="btn ghost" style={{ width: '100%', marginTop: '4px', justifyContent: 'space-between' }}>
+          <button className="btn ghost" style={{ width: '100%', marginTop: '4px', justifyContent: 'space-between' }} disabled={isGuest}>
             <span>Pilih Tenaga Ahli</span>
             <Users size={14} />
           </button>
@@ -115,6 +131,7 @@ const TenderDetailPanel = ({ tender, onClose }) => {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Tambahkan catatan untuk tender ini..."
+          disabled={isGuest}
           style={{
             width: '100%',
             minHeight: '80px',
@@ -130,23 +147,25 @@ const TenderDetailPanel = ({ tender, onClose }) => {
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-        <Button
-          className="primary"
-          style={{ flex: 1, opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
-          onClick={handleSaveChanges}
-          disabled={saving}
-        >
-          {saving ? (
-            <>
-              <div style={{ width: '14px', height: '14px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', marginRight: '8px', animation: 'spin 0.6s linear infinite' }} />
-              Menyimpan...
-            </>
-          ) : (
-            <>
-              <Save size={16} /> Simpan Perubahan
-            </>
-          )}
-        </Button>
+        {!isGuest && (
+          <Button
+            className="primary"
+            style={{ flex: 1, opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
+            onClick={handleSaveChanges}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <div style={{ width: '14px', height: '14px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', marginRight: '8px', animation: 'spin 0.6s linear infinite' }} />
+                Menyimpan...
+              </>
+            ) : (
+              <>
+                <Save size={16} /> Simpan Perubahan
+              </>
+            )}
+          </Button>
+        )}
         {tender.lpse && (
           <a href={tender.lpse} target="_blank" rel="noreferrer" className="btn ghost">
             <ExternalLink size={16} /> LPSE
@@ -155,10 +174,10 @@ const TenderDetailPanel = ({ tender, onClose }) => {
       </div>
 
       <div className="section-title" style={{ marginBottom: '16px' }}>Tahapan Tender</div>
-      <TenderTimeline 
-        metode={tender.metode || 'Prakualifikasi'} 
-        currentStage={tender.currentStage || 1} 
-        changes={tender.changes || {}} 
+      <TenderTimeline
+        metode={tender.metode || 'Prakualifikasi'}
+        currentStage={tender.currentStage || 1}
+        changes={tender.changes || {}}
       />
     </SidePanel>
   );

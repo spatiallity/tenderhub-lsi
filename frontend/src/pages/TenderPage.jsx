@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, FileSpreadsheet, MapPin, ChevronRight, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAppContext } from '../store/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Badge, CountdownBadge, PageTitle, Card, Btn } from '../components/UI/index';
 import { portfolioColor, internalStatusColor, PROVINCES, INTERNAL_STATUS_OPTIONS } from '../utils/constants';
 import { formatRupiah, activeKeywordCount, exportTendersExcel } from '../utils/helpers';
@@ -19,7 +20,7 @@ const stageBadgeClass = {
   teal: 'bg-teal-50 text-teal-700 border-teal-200',
 };
 
-function StatusCell({ tender, committedStatus, updateTenderStatus, showToast }) {
+function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, isGuest }) {
   const [localStatus, setLocalStatus] = useState(committedStatus || 'Dipantau');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -30,12 +31,15 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast }) 
 
   const isChanged = localStatus !== (committedStatus || 'Dipantau');
 
+  const stageName = (tender.currentStageName || '').toLowerCase();
   const canBeWon = tender.currentStageName && (
-    tender.currentStageName.toLowerCase().includes('pemenang') ||
-    tender.currentStageName.toLowerCase().includes('sanggah') ||
-    tender.currentStageName.toLowerCase().includes('klarifikasi') ||
-    tender.currentStageName.toLowerCase().includes('penunjukan') ||
-    tender.currentStageName.toLowerCase().includes('kontrak')
+    stageName.includes('pemenang') ||
+    stageName.includes('sanggah') ||
+    stageName.includes('klarifikasi') ||
+    stageName.includes('penunjukan') ||
+    stageName.includes('kontrak') ||
+    // 'Pengumuman Pemenang' — include 'pengumuman' but exclude stage 1 (pengumuman pengadaan)
+    (stageName.includes('pengumuman') && (tender.currentStage || 0) > 1)
   );
 
   const handleSave = async (e) => {
@@ -51,6 +55,26 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast }) 
       setIsSaving(false);
     }
   };
+
+  // Guests cannot edit
+  if (isGuest) {
+    return (
+      <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+        <span className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold text-center ${
+          {
+            'Dipantau':     'bg-slate-50 text-slate-700 border-slate-200',
+            'Akan Diikuti': 'bg-blue-50 text-blue-700 border-blue-200',
+            'Sudah Diikuti':'bg-indigo-50 text-indigo-700 border-indigo-200',
+            'Menang':       'bg-green-50 text-green-700 border-green-200',
+            'Kalah':        'bg-red-50 text-red-700 border-red-200',
+            'Tidak Relevan':'bg-amber-50 text-amber-700 border-amber-200',
+          }[localStatus] || 'bg-slate-50 text-slate-700 border-slate-200'
+        }`}>
+          {localStatus}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
@@ -96,6 +120,7 @@ export default function TenderPage() {
   // Subscribe to realtime watchlist changes
   useWatchlistRealtime();
 
+  const { isGuest } = useAuth();
   const {
     tenders, keywords, loadingTenders,
     addKeyword, removeKeyword,
@@ -529,6 +554,7 @@ export default function TenderPage() {
                           committedStatus={internalStatuses[t.id]}
                           updateTenderStatus={updateTenderStatus}
                           showToast={showToast}
+                          isGuest={isGuest}
                         />
                       </td>
                       <td className={`px-3 py-3 align-top sticky right-0 backdrop-blur-sm ${isNew ? 'bg-amber-50/95' : 'bg-white/95'}`}>

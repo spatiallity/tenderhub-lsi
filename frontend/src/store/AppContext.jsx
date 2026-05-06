@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
-import supabase from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_KEYWORDS, DEFAULT_USERS, PROVINCES } from '../utils/constants';
 import { calcRupMatch, enrichTender, activeKeywordCount } from '../utils/helpers';
@@ -32,7 +31,7 @@ const isInitialAnnouncementTender = (tender) => {
 };
 
 export const AppProvider = ({ children }) => {
-  const { user, isGuest, loading: authLoading } = useAuth();
+  const { user, isGuest } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toast = useToast();
 
@@ -124,44 +123,32 @@ export const AppProvider = ({ children }) => {
     loadKeywords();
   }, []);
 
-  // Load data from API — waits for auth to resolve so watchlist is user-specific
+  // Load data from API on mount
   useEffect(() => {
-    if (authLoading) return;
-
     const loadTendersAndWatchlist = async () => {
       try {
-        console.log('[AppContext] Loading tenders and watchlist...');
-        
-        // Load tenders from API (public data, same for all users)
-        const tendersRes = await api.get('/tender/search', { params: { limit: 200 } });
-        console.log('[AppContext] Tenders loaded:', tendersRes.data?.length, 'items');
-        setTendersRaw(tendersRes.data || []);
+        // Tenders and watchlist are shared across all team members
+        const [tendersRes, watchlistRes] = await Promise.all([
+          api.get('/tender/search', { params: { limit: 200 } }),
+          api.get('/watchlist'),
+        ]);
 
-        // Load watchlist from backend API (not direct Supabase)
-        console.log('[AppContext] Loading watchlist from backend...');
-        const watchlistRes = await api.get('/watchlist');
-        console.log('[AppContext] Watchlist loaded:', watchlistRes.data?.length, 'items');
-        const watchlistData = watchlistRes.data || [];
+        setTendersRaw(tendersRes.data || []);
 
         const statusMap = {};
         const picsMap = {};
         const notesMap = {};
 
-        watchlistData.forEach(w => {
+        (watchlistRes.data || []).forEach(w => {
           const tenderId = w.kd_tender;
-          if (w.status_internal) {
-            statusMap[tenderId] = w.status_internal;
-            console.log(`[AppContext] Loaded status for tender ${tenderId}:`, w.status_internal);
-          }
+          if (w.status_internal) statusMap[tenderId] = w.status_internal;
           if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
           if (w.catatan_internal) {
             try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
           }
         });
 
-        console.log('[AppContext] Status map:', Object.keys(statusMap).length, 'items');
-
-        // Fill API defaults for tenders not yet in the user's watchlist
+        // Fill API defaults for tenders not yet in watchlist
         (tendersRes.data || []).forEach(t => {
           if (!statusMap[t.id]) {
             let s = t.internalStatus || 'Dipantau';
@@ -171,13 +158,12 @@ export const AppProvider = ({ children }) => {
           }
         });
 
-        console.log('[AppContext] Final status map:', Object.keys(statusMap).length, 'items');
         setInternalStatuses(statusMap);
         setAssignedPICs(picsMap);
         setTenderNotes(notesMap);
 
       } catch (err) {
-        console.error('[AppContext] Failed to load data:', err);
+        console.error('Failed to load data:', err);
         setTendersRaw(FALLBACK_TENDERS);
         const statusMap = {};
         FALLBACK_TENDERS.forEach(t => {
@@ -194,7 +180,7 @@ export const AppProvider = ({ children }) => {
     };
 
     loadTendersAndWatchlist();
-  }, [authLoading, user, isGuest]); // Removed showToast from dependencies
+  }, [showToast]);
 
   useEffect(() => {
     api.get('/rup/search', { params: { limit: 100 } })
@@ -500,27 +486,24 @@ export const AppProvider = ({ children }) => {
 
   const refetchTenders = useCallback(async () => {
     try {
-      const tendersRes = await api.get('/tender/search', { params: { limit: 200 } });
+      const [tendersRes, watchlistRes] = await Promise.all([
+        api.get('/tender/search', { params: { limit: 200 } }),
+        api.get('/watchlist'),
+      ]);
+
       setTendersRaw(tendersRes.data || []);
 
       const statusMap = {};
       const picsMap = {};
       const notesMap = {};
 
-      // Reload the user's watchlist so their statuses/notes/PICs are preserved
-      if (user && !isGuest) {
-        const { data: watchlistData } = await supabase
-          .from('tender_watchlist')
-          .select('*')
-          .eq('user_id', user.id);
-        (watchlistData || []).forEach(w => {
-          if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
-          if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
-          if (w.catatan_internal) {
-            try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
-          }
-        });
-      }
+      (watchlistRes.data || []).forEach(w => {
+        if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
+        if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
+        if (w.catatan_internal) {
+          try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
+        }
+      });
 
       (tendersRes.data || []).forEach(t => {
         if (!statusMap[t.id]) {
@@ -537,37 +520,21 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to refetch tenders:', err);
     }
-  }, [user, isGuest]);
+  }, []);
 
-  // Helper: upsert a watchlist row using backend API
-  const upsertWatchlistEntry = useCallback(async (tenderId, patch) => {
-    console.log(`[upsertWatchlistEntry] Upserting tender ${tenderId}:`, patch);
-    
+  // Helper: ensure a watchlist entry exists for kd_tender (create if not found)
+  const ensureWatchlistEntry = useCallback(async (tenderId, forcedStatus) => {
     const tender = tenders.find(t => t.id === tenderId);
-    
-    try {
-      // Use POST for upsert (backend handles update if exists)
-      const createData = {
-        kd_tender: parseInt(tenderId),
-        nama_paket: tender?.nama || tender?.nama_paket || null,
-        hps: tender?.hps || null,
-        ...patch,
-      };
-      console.log(`[upsertWatchlistEntry] POST /watchlist with data:`, createData);
-      const response = await api.post('/watchlist', createData);
-      console.log(`[upsertWatchlistEntry] Success:`, response.data);
-      return response.data;
-    } catch (err) {
-      console.error(`[upsertWatchlistEntry] Failed:`, err);
-      throw err;
-    }
-  }, [tenders]);
+    await api.post('/watchlist', {
+      kd_tender: parseInt(tenderId),
+      status_internal: forcedStatus !== undefined ? forcedStatus : (internalStatuses[tenderId] || 'Dipantau'),
+      nama_paket: tender?.nama || tender?.nama_paket || null,
+      hps: tender?.hps || null,
+    });
+  }, [tenders, internalStatuses]);
 
   const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
-    console.log(`[updateTenderStatus] Called for tender ${tenderId}, new status:`, newStatus);
-    
     if (!user || isGuest) {
-      console.log(`[updateTenderStatus] User not authenticated or is guest`);
       showToast('Anda harus login untuk menyimpan perubahan', 'warning');
       return;
     }
@@ -585,28 +552,29 @@ export const AppProvider = ({ children }) => {
         (stageName.includes('pengumuman') && (tender?.currentStage || 0) > 1);
 
       if (!canBeWon) {
-        console.log(`[updateTenderStatus] Cannot set "Menang" - stage not allowed:`, stageName);
         showToast('Status "Menang" hanya bisa diset setelah tahap Pengumuman Pemenang', 'warning');
         return;
       }
     }
 
-    console.log(`[updateTenderStatus] Dispatching tender-local-update event`);
     window.dispatchEvent(new CustomEvent('tender-local-update', { detail: { tenderId } }));
-    
-    console.log(`[updateTenderStatus] Optimistic update - setting status to:`, newStatus);
     setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
 
     try {
-      console.log(`[updateTenderStatus] Calling upsertWatchlistEntry`);
-      await upsertWatchlistEntry(tenderId, { status_internal: newStatus });
-      console.log(`[updateTenderStatus] Success!`);
+      await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
     } catch (err) {
-      console.error(`[updateTenderStatus] Failed:`, err);
-      showToast('Gagal menyimpan perubahan ke database', 'error');
-      throw new Error('sync_failed');
+      if (err?.response?.status === 404) {
+        try {
+          await ensureWatchlistEntry(tenderId, newStatus);
+          await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
     }
-  }, [user, isGuest, tenders, upsertWatchlistEntry, showToast]);
+  }, [user, isGuest, tenders, ensureWatchlistEntry, showToast]);
 
   const updateTenderPIC = useCallback(async (tenderId, userId) => {
     if (!user || isGuest) {
@@ -618,11 +586,20 @@ export const AppProvider = ({ children }) => {
     setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
 
     try {
-      await upsertWatchlistEntry(tenderId, { assigned_pic: userId || null });
-    } catch {
-      throw new Error('sync_failed');
+      await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        try {
+          await ensureWatchlistEntry(tenderId);
+          await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
     }
-  }, [user, isGuest, upsertWatchlistEntry, showToast]);
+  }, [user, isGuest, ensureWatchlistEntry, showToast]);
 
   const addTenderNote = useCallback(async (tenderId, noteObj) => {
     if (!user || isGuest) {
@@ -634,12 +611,22 @@ export const AppProvider = ({ children }) => {
     const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
     setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
 
+    const payload = { catatan_internal: JSON.stringify(updatedNotes) };
     try {
-      await upsertWatchlistEntry(tenderId, { catatan_internal: JSON.stringify(updatedNotes) });
-    } catch {
-      throw new Error('sync_failed');
+      await api.patch(`/watchlist/${tenderId}`, payload);
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        try {
+          await ensureWatchlistEntry(tenderId);
+          await api.patch(`/watchlist/${tenderId}`, payload);
+        } catch {
+          throw new Error('sync_failed');
+        }
+      } else {
+        throw new Error('sync_failed');
+      }
     }
-  }, [user, isGuest, tenderNotes, upsertWatchlistEntry, showToast]);
+  }, [user, isGuest, tenderNotes, ensureWatchlistEntry, showToast]);
 
   const value = useMemo(() => ({
     // Sidebar
