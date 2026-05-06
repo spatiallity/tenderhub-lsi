@@ -17,19 +17,40 @@ import os
 
 router = APIRouter()
 
-def replace_cell_text(cell, new_text):
-    """Replace entire cell text with new text"""
+def replace_cell_text(cell, new_text, font_name='Arial', font_size=11, alignment='left'):
+    """Replace entire cell text with new text and set formatting"""
     try:
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        
         # Clear all paragraphs
         for paragraph in cell.paragraphs:
             paragraph.clear()
         
         # Set new text in first paragraph
         if cell.paragraphs:
-            cell.paragraphs[0].text = str(new_text)
+            paragraph = cell.paragraphs[0]
         else:
             # If no paragraphs, add one
-            cell.add_paragraph(str(new_text))
+            paragraph = cell.add_paragraph()
+        
+        # Add run with text
+        run = paragraph.add_run(str(new_text))
+        
+        # Set font
+        run.font.name = font_name
+        run.font.size = Pt(font_size)
+        
+        # Set alignment
+        if alignment == 'left':
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        elif alignment == 'center':
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        elif alignment == 'right':
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        elif alignment == 'justify':
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            
     except Exception as e:
         print(f"Error replacing cell text: {e}")
 
@@ -106,32 +127,38 @@ def generate_cv_from_template(expert_data, template_path):
             header_table = doc.tables[0]
             print(f"[CV Generator] Processing header table with {len(header_table.rows)} rows")
             
-            # Row 0: Posisi yang diusulkan - REPLACE ENTIRE CELL
+            # Row 0: Posisi yang diusulkan
             if len(header_table.rows) > 0 and len(header_table.rows[0].cells) > 3:
-                replace_cell_text(header_table.rows[0].cells[3], posisi_diusulkan)
+                replace_cell_text(header_table.rows[0].cells[3], posisi_diusulkan,
+                                font_name='Arial', font_size=11, alignment='left')
                 print(f"[CV Generator] Set posisi: {posisi_diusulkan}")
             
-            # Row 2: Nama Personel - REPLACE ENTIRE CELL
+            # Row 2: Nama Personel
             if len(header_table.rows) > 2 and len(header_table.rows[2].cells) > 3:
-                replace_cell_text(header_table.rows[2].cells[3], nama)
+                replace_cell_text(header_table.rows[2].cells[3], nama,
+                                font_name='Arial', font_size=11, alignment='left')
                 print(f"[CV Generator] Set nama: {nama}")
             
-            # Row 3: Tempat/Tanggal Lahir - REPLACE ENTIRE CELL
+            # Row 3: Tempat/Tanggal Lahir
             if len(header_table.rows) > 3 and len(header_table.rows[3].cells) > 3:
-                replace_cell_text(header_table.rows[3].cells[3], f"{tempat_lahir}, {tanggal_lahir}")
+                replace_cell_text(header_table.rows[3].cells[3], f"{tempat_lahir}, {tanggal_lahir}",
+                                font_name='Arial', font_size=11, alignment='left')
                 print(f"[CV Generator] Set tempat/tanggal lahir: {tempat_lahir}, {tanggal_lahir}")
             
-            # Row 4: Pendidikan Formal - REPLACE ENTIRE CELL
+            # Row 4: Pendidikan Formal
             if len(header_table.rows) > 4 and len(header_table.rows[4].cells) > 3:
-                replace_cell_text(header_table.rows[4].cells[3], pendidikan_formal_text)
+                replace_cell_text(header_table.rows[4].cells[3], pendidikan_formal_text,
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 5: Pendidikan Non Formal - REPLACE ENTIRE CELL
+            # Row 5: Pendidikan Non Formal
             if len(header_table.rows) > 5 and len(header_table.rows[5].cells) > 3:
-                replace_cell_text(header_table.rows[5].cells[3], pendidikan_non_formal_text)
+                replace_cell_text(header_table.rows[5].cells[3], pendidikan_non_formal_text,
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 6: Penguasaan Bahasa - REPLACE ENTIRE CELL
+            # Row 6: Penguasaan Bahasa
             if len(header_table.rows) > 6 and len(header_table.rows[6].cells) > 3:
-                replace_cell_text(header_table.rows[6].cells[3], penguasaan_bahasa_text)
+                replace_cell_text(header_table.rows[6].cells[3], penguasaan_bahasa_text,
+                                font_name='Arial', font_size=11, alignment='left')
         
         # Replace project data in subsequent tables (Tables 1, 2, 3, ...)
         projects = expert_data.get('projects', [])
@@ -146,62 +173,86 @@ def generate_cv_from_template(expert_data, template_path):
             project_table = project_tables[idx]
             print(f"[CV Generator] Processing project {idx+1}: {project.get('nama_proyek', 'N/A')}")
             
-            # Row 1: a. Nama Proyek - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 1 and len(project_table.rows[1].cells) > 3:
-                replace_cell_text(project_table.rows[1].cells[3], project.get('nama_proyek', 'Belum diisi'))
+            # Determine correct cell index based on table structure
+            # Tables 1-2 use cell[4], Table 3+ use cell[11]
+            data_cell_idx = 4 if len(project_table.columns) <= 5 else 11
             
-            # Row 2: b. Lokasi Proyek - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 2 and len(project_table.rows[2].cells) > 3:
-                replace_cell_text(project_table.rows[2].cells[3], project.get('lokasi_proyek', 'Belum diisi'))
+            # Row 1: a. Nama Proyek
+            if len(project_table.rows) > 1 and len(project_table.rows[1].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[1].cells[data_cell_idx], 
+                                project.get('nama_proyek', 'Belum diisi'),
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 3: c. Pengguna Jasa - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 3 and len(project_table.rows[3].cells) > 3:
-                replace_cell_text(project_table.rows[3].cells[3], project.get('pengguna_jasa', 'Belum diisi'))
+            # Row 2: b. Lokasi Proyek
+            if len(project_table.rows) > 2 and len(project_table.rows[2].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[2].cells[data_cell_idx], 
+                                project.get('lokasi_proyek', 'Belum diisi'),
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 4: d. Nama Perusahaan - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 4 and len(project_table.rows[4].cells) > 3:
-                replace_cell_text(project_table.rows[4].cells[3], project.get('nama_perusahaan', 'PT SUCOFINDO (PERSERO)'))
+            # Row 3: c. Pengguna Jasa
+            if len(project_table.rows) > 3 and len(project_table.rows[3].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[3].cells[data_cell_idx], 
+                                project.get('pengguna_jasa', 'Belum diisi'),
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 5: e. Uraian Tugas - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 5 and len(project_table.rows[5].cells) > 3:
-                replace_cell_text(project_table.rows[5].cells[3], project.get('uraian_tugas', 'Belum diisi'))
+            # Row 4: d. Nama Perusahaan
+            if len(project_table.rows) > 4 and len(project_table.rows[4].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[4].cells[data_cell_idx], 
+                                project.get('nama_perusahaan', 'PT SUCOFINDO (PERSERO)'),
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 6: f. Waktu Pelaksanaan - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 6 and len(project_table.rows[6].cells) > 3:
+            # Row 5: e. Uraian Tugas
+            if len(project_table.rows) > 5 and len(project_table.rows[5].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[5].cells[data_cell_idx], 
+                                project.get('uraian_tugas', 'Belum diisi'),
+                                font_name='Arial', font_size=11, alignment='justify')
+            
+            # Row 6: f. Waktu Pelaksanaan
+            if len(project_table.rows) > 6 and len(project_table.rows[6].cells) > data_cell_idx:
                 waktu_mulai = project.get('waktu_mulai', '')
                 waktu_selesai = project.get('waktu_selesai', '')
                 waktu_text = f"{waktu_mulai}-{waktu_selesai}" if waktu_mulai and waktu_selesai else "Belum diisi"
-                replace_cell_text(project_table.rows[6].cells[3], waktu_text)
+                replace_cell_text(project_table.rows[6].cells[data_cell_idx], waktu_text,
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 7: g. Posisi Penugasan - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 7 and len(project_table.rows[7].cells) > 3:
-                replace_cell_text(project_table.rows[7].cells[3], project.get('posisi_penugasan', 'Belum diisi'))
+            # Row 7: g. Posisi Penugasan
+            if len(project_table.rows) > 7 and len(project_table.rows[7].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[7].cells[data_cell_idx], 
+                                project.get('posisi_penugasan', 'Belum diisi'),
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 8: h. Status Kepegawaian - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 8 and len(project_table.rows[8].cells) > 3:
-                replace_cell_text(project_table.rows[8].cells[3], project.get('status_kepegawaian', 'Tidak Tetap'))
+            # Row 8: h. Status Kepegawaian
+            if len(project_table.rows) > 8 and len(project_table.rows[8].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[8].cells[data_cell_idx], 
+                                project.get('status_kepegawaian', 'Tidak Tetap'),
+                                font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 9: i. Surat Referensi - REPLACE ENTIRE CELL
-            if len(project_table.rows) > 9 and len(project_table.rows[9].cells) > 3:
-                replace_cell_text(project_table.rows[9].cells[3], project.get('surat_referensi', '-'))
+            # Row 9: i. Surat Referensi
+            if len(project_table.rows) > 9 and len(project_table.rows[9].cells) > data_cell_idx:
+                replace_cell_text(project_table.rows[9].cells[data_cell_idx], 
+                                project.get('surat_referensi', '-'),
+                                font_name='Arial', font_size=11, alignment='justify')
         
         # Update signature table (last table)
         if len(doc.tables) > 0:
             signature_table = doc.tables[-1]
             print(f"[CV Generator] Processing signature table")
             
-            # Update date - REPLACE ENTIRE CELL
+            # Update date
             if len(signature_table.rows) > 0 and len(signature_table.rows[0].cells) > 0:
                 today = datetime.now().strftime("%d %B %Y")
-                replace_cell_text(signature_table.rows[0].cells[0], f"Jakarta, {today}")
+                replace_cell_text(signature_table.rows[0].cells[0], f"Jakarta, {today}",
+                                font_name='Arial', font_size=11, alignment='left')
             
-            # Update name in signature - REPLACE ENTIRE CELL
+            # Update name in signature
             if len(signature_table.rows) > 3 and len(signature_table.rows[3].cells) > 0:
-                replace_cell_text(signature_table.rows[3].cells[0], nama)
+                replace_cell_text(signature_table.rows[3].cells[0], nama,
+                                font_name='Arial', font_size=11, alignment='left')
             
-            # Update position in signature - REPLACE ENTIRE CELL
+            # Update position in signature
             if len(signature_table.rows) > 4 and len(signature_table.rows[4].cells) > 0:
-                replace_cell_text(signature_table.rows[4].cells[0], posisi_diusulkan)
+                replace_cell_text(signature_table.rows[4].cells[0], posisi_diusulkan,
+                                font_name='Arial', font_size=11, alignment='left')
     
     except Exception as e:
         raise HTTPException(
