@@ -185,7 +185,7 @@ export const AppProvider = ({ children }) => {
     };
 
     loadTendersAndWatchlist();
-  }, [showToast]);
+  }, []); // Run only once on mount
 
   useEffect(() => {
     api.get('/rup/search', { params: { limit: 100 } })
