@@ -113,19 +113,19 @@ export default function ExpertDetail({ expert }) {
                 <span className="text-xs font-extrabold">{(expert.reviews || []).length ? `${expert.rating} overall` : 'Belum direview'}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setShowCVDataModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm"
+                className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm whitespace-nowrap"
               >
-                <Edit3 size={18} />
+                <Edit3 size={16} />
                 Edit Data CV
               </button>
               <button
                 onClick={() => setShowCVGenerator(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm whitespace-nowrap"
               >
-                <FileText size={18} />
+                <FileText size={16} />
                 Generate CV
               </button>
             </div>
