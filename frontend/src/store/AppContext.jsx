@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
+import supabase from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_KEYWORDS, DEFAULT_USERS, PROVINCES } from '../utils/constants';
 import { calcRupMatch, enrichTender, activeKeywordCount } from '../utils/helpers';
@@ -137,10 +138,12 @@ export const AppProvider = ({ children }) => {
 
         // Fetch watchlist from Supabase directly
         try {
-          const watchlistRes = await api.get('/watchlist', { timeout: 8000 });
-          
-          if (watchlistRes.data) {
-            watchlistRes.data.forEach(w => {
+          const { data: watchlistData, error } = await supabase
+            .from('tender_watchlist')
+            .select('kd_tender, status_internal, assigned_pic, catatan_internal');
+
+          if (!error && watchlistData) {
+            watchlistData.forEach(w => {
               const tenderId = w.kd_tender;
               if (w.status_internal) statusMap[tenderId] = w.status_internal;
               if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
@@ -148,6 +151,8 @@ export const AppProvider = ({ children }) => {
                 try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
               }
             });
+          } else if (error) {
+            console.error('Supabase watchlist error:', error.message);
           }
         } catch (watchlistErr) {
           console.error('Failed to load watchlist:', watchlistErr);
@@ -645,10 +650,12 @@ export const AppProvider = ({ children }) => {
 
       // Fetch watchlist from Supabase
       try {
-        const watchlistRes = await api.get('/watchlist', { timeout: 8000 });
-        
-        if (watchlistRes.data) {
-          watchlistRes.data.forEach(w => {
+        const { data: watchlistData, error } = await supabase
+          .from('tender_watchlist')
+          .select('kd_tender, status_internal, assigned_pic, catatan_internal');
+
+        if (!error && watchlistData) {
+          watchlistData.forEach(w => {
             if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
             if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
             if (w.catatan_internal) {
@@ -670,15 +677,19 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
-  // Helper: ensure a watchlist entry exists for kd_tender (create if not found)
-  const ensureWatchlistEntry = useCallback(async (tenderId, forcedStatus) => {
+  // Helper: upsert a watchlist entry via Supabase directly
+  const ensureWatchlistEntry = useCallback(async (tenderId, patch = {}) => {
     const tender = tenders.find(t => t.id === tenderId);
-    await api.post('/watchlist', {
-      kd_tender: parseInt(tenderId),
-      status_internal: forcedStatus !== undefined ? forcedStatus : (internalStatuses[tenderId] || 'Dipantau'),
-      nama_paket: tender?.nama || tender?.nama_paket || null,
-      hps: tender?.hps || null,
-    });
+    const { error } = await supabase
+      .from('tender_watchlist')
+      .upsert({
+        kd_tender: parseInt(tenderId),
+        status_internal: patch.status_internal ?? (internalStatuses[tenderId] || 'Dipantau'),
+        nama_paket: tender?.nama || tender?.nama_paket || null,
+        hps: tender?.hps || null,
+        ...patch,
+      }, { onConflict: 'kd_tender' });
+    if (error) throw new Error(error.message);
   }, [tenders, internalStatuses]);
 
   const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
@@ -709,18 +720,10 @@ export const AppProvider = ({ children }) => {
     setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
 
     try {
-      await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
+      await ensureWatchlistEntry(tenderId, { status_internal: newStatus });
     } catch (err) {
-      if (err?.response?.status === 404) {
-        try {
-          await ensureWatchlistEntry(tenderId, newStatus);
-          await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
+      console.error('[updateTenderStatus] Supabase error:', err.message);
+      throw new Error('sync_failed');
     }
   }, [user, isGuest, tenders, ensureWatchlistEntry, showToast]);
 
@@ -734,20 +737,12 @@ export const AppProvider = ({ children }) => {
     setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
 
     try {
-      await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
+      await ensureWatchlistEntry(tenderId, { assigned_pic: userId || null });
     } catch (err) {
-      if (err?.response?.status === 404) {
-        try {
-          await ensureWatchlistEntry(tenderId);
-          await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
+      console.error('[updateTenderPIC] Supabase error:', err.message);
+      throw new Error('sync_failed');
     }
-  }, [user, isGuest, ensureWatchlistEntry, showToast]);
+  }, [user, isGuest, tenders, internalStatuses, ensureWatchlistEntry, showToast]);
 
   const addTenderNote = useCallback(async (tenderId, noteObj) => {
     if (!user || isGuest) {
@@ -759,22 +754,13 @@ export const AppProvider = ({ children }) => {
     const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
     setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
 
-    const payload = { catatan_internal: JSON.stringify(updatedNotes) };
     try {
-      await api.patch(`/watchlist/${tenderId}`, payload);
+      await ensureWatchlistEntry(tenderId, { catatan_internal: JSON.stringify(updatedNotes) });
     } catch (err) {
-      if (err?.response?.status === 404) {
-        try {
-          await ensureWatchlistEntry(tenderId);
-          await api.patch(`/watchlist/${tenderId}`, payload);
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
+      console.error('[addTenderNote] Supabase error:', err.message);
+      throw new Error('sync_failed');
     }
-  }, [user, isGuest, tenderNotes, ensureWatchlistEntry, showToast]);
+  }, [user, isGuest, tenders, internalStatuses, tenderNotes, ensureWatchlistEntry, showToast]);
 
   const value = useMemo(() => ({
     // Sidebar
