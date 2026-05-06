@@ -236,10 +236,14 @@ export const AppProvider = ({ children }) => {
             tanggal: new Date(r.created_at).toLocaleDateString('id-ID')
           }))
         }));
-        setExpertsRaw(transformedExperts);
+        // Sort by ID descending (newest first)
+        const sortedExperts = transformedExperts.sort((a, b) => (b.id || 0) - (a.id || 0));
+        setExpertsRaw(sortedExperts);
       })
       .catch(() => {
-        setExpertsRaw(FALLBACK_EXPERTS);
+        // Sort fallback data by ID descending (newest first)
+        const sortedFallback = [...FALLBACK_EXPERTS].sort((a, b) => (b.id || 0) - (a.id || 0));
+        setExpertsRaw(sortedFallback);
         showToast('API expert belum tersambung. Dummy tenaga ahli lokal dimuat.', 'error');
       })
       .finally(() => setLoadingExperts(false));
@@ -443,7 +447,8 @@ export const AppProvider = ({ children }) => {
         history: [],
         reviews: []
       };
-      setExpertsRaw(prev => [...prev, transformedExpert]);
+      // Add new expert at the beginning of the array (newest first)
+      setExpertsRaw(prev => [transformedExpert, ...prev]);
       showToast('Tenaga ahli berhasil ditambahkan');
       return true; // ✅ Return success
     } catch (e) {
@@ -461,9 +466,10 @@ export const AppProvider = ({ children }) => {
         history: [], 
         reviews: [] 
       };
-      setExpertsRaw(prev => [...prev, fallbackExpert]);
-      showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'error');
-      return false; // ❌ Return failure
+      // Add new expert at the beginning of the array (newest first)
+      setExpertsRaw(prev => [fallbackExpert, ...prev]);
+      showToast('Tenaga ahli berhasil ditambahkan (disimpan lokal)', 'warning');
+      return true; // ✅ Still return success since data was added locally
     }
   }, [showToast]);
 

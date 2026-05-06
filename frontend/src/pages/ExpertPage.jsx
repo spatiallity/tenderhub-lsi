@@ -51,6 +51,8 @@ export default function ExpertPage() {
       if (portFilter !== 'Semua' && !(e.portofolio || []).includes(portFilter)) return false;
       return true;
     });
+    
+    // Apply sorting
     if (sortKey) {
       const dir = sortDir === 'asc' ? 1 : -1;
       result = [...result].sort((a, b) => {
@@ -68,7 +70,11 @@ export default function ExpertPage() {
         if (va > vb) return 1 * dir;
         return 0;
       });
+    } else {
+      // Default: sort by ID descending (newest first)
+      result = [...result].sort((a, b) => (b.id || 0) - (a.id || 0));
     }
+    
     return result;
   }, [experts, expertSearch, availFilter, portFilter, sortKey, sortDir]);
 
@@ -159,14 +165,18 @@ export default function ExpertPage() {
                   const success = await addExpert(newExpert);
                   
                   if (success) {
+                    // Reset form
                     setDraft({ 
                       nama: '', instansi: '', noHp: '', keahlian: '', portfolio: 'SDA', availability: 'Tersedia',
                       historyProyek: '', historyKlien: '', historyTahun: '', historyPeran: ''
                     });
+                    // Close modal
                     setShowForm(false);
+                    // Show success notification (already handled in addExpert)
                   }
                 } catch (error) {
                   console.error('Error adding expert:', error);
+                  showToast('Gagal menambahkan tenaga ahli', 'error');
                 } finally {
                   setIsSaving(false);
                 }
