@@ -2,7 +2,11 @@
 
 ## 📄 Overview
 
-Fitur Generate CV menggunakan template DOCX (`TEMPLATE_CV_EXPERT.docx`) yang sudah ada di root project. Template ini akan diisi otomatis dengan data expert dari database.
+Fitur Generate CV menggunakan template DOCX resmi Sucofindo (`TEMPLATE_CV_EXPERT.docx`) yang ada di root project. Template ini akan diisi otomatis dengan data expert dari database **mengikuti format template yang sudah ada**.
+
+## 🎯 Prinsip Utama
+
+**PENTING**: Database fields dirancang untuk mengikuti template CV Sucofindo, bukan sebaliknya. Template adalah sumber kebenaran (source of truth).
 
 ## 🔧 Setup
 
@@ -18,61 +22,76 @@ pip install python-docx==1.1.2
 Template harus ada di:
 ```
 TenderHub LSIv2/
-├── TEMPLATE_CV_EXPERT.docx  ← Template file
+├── TEMPLATE_CV_EXPERT.docx  ← Template file (JANGAN DIUBAH)
 ├── backend/
 ├── frontend/
 └── ...
 ```
 
-## 📝 Placeholders dalam Template
+### 3. Database Migration
 
-Template DOCX harus menggunakan placeholder berikut (case-sensitive):
-
-### Data Pribadi
-- `{{NAMA}}` - Nama lengkap expert
-- `{{NO_HP}}` - Nomor telepon
-- `{{INSTANSI}}` - Nama instansi/afiliasi
-- `{{KEAHLIAN}}` - Daftar keahlian (comma-separated)
-- `{{AVAILABILITY}}` - Status ketersediaan (Tersedia/Sedang Bertugas/Tidak Tersedia)
-- `{{RATING}}` - Rating expert (format: 4.8/5.0)
-- `{{JUMLAH_PROYEK}}` - Jumlah proyek yang pernah dikerjakan
-- `{{TANGGAL_GENERATE}}` - Tanggal CV di-generate (format: 06 Mei 2026)
-
-### Riwayat Proyek (dalam tabel)
-
-Untuk setiap proyek (maksimal 10 proyek):
-- `{{PROYEK_1}}` - Nama proyek #1
-- `{{KLIEN_1}}` - Pemberi kerja #1
-- `{{TAHUN_1}}` - Tahun pelaksanaan #1
-- `{{NILAI_1}}` - Nilai kontrak #1 (format: Rp 3.200.000.000)
-- `{{PERAN_1}}` - Peran dalam proyek #1
-- `{{STATUS_1}}` - Status proyek #1 (Selesai/Aktif)
-
-Dan seterusnya untuk `{{PROYEK_2}}`, `{{PROYEK_3}}`, ... sampai `{{PROYEK_10}}`
-
-## 📋 Contoh Struktur Template
-
+Jalankan SQL migration di Supabase:
+```sql
+-- File: supabase/add_cv_template_fields.sql
+-- Menambahkan field-field yang dibutuhkan template
 ```
-CURRICULUM VITAE
 
-Nama: {{NAMA}}
-No. HP: {{NO_HP}}
-Instansi: {{INSTANSI}}
-Keahlian: {{KEAHLIAN}}
-Status: {{AVAILABILITY}}
-Rating: {{RATING}}
-Jumlah Proyek: {{JUMLAH_PROYEK}}
+## 📋 Template Structure (Sucofindo Format)
 
-RIWAYAT PROYEK
+Template memiliki struktur sebagai berikut:
 
-| No | Nama Proyek | Pemberi Kerja | Tahun | Nilai Kontrak | Peran | Status |
-|----|-------------|---------------|-------|---------------|-------|--------|
-| 1  | {{PROYEK_1}} | {{KLIEN_1}} | {{TAHUN_1}} | {{NILAI_1}} | {{PERAN_1}} | {{STATUS_1}} |
-| 2  | {{PROYEK_2}} | {{KLIEN_2}} | {{TAHUN_2}} | {{NILAI_2}} | {{PERAN_2}} | {{STATUS_2}} |
-...
+### Table 0: Header Information
+1. Posisi yang diusulkan
+2. Nama Perusahaan (PT SUCOFINDO PERSERO)
+3. Nama Personel
+4. Tempat/Tanggal Lahir
+5. Pendidikan (Formal)
+6. Pendidikan Non Formal
+7. Penguasaan Bahasa
+8. Pengalaman Kerja
 
-Tanggal Generate: {{TANGGAL_GENERATE}}
-```
+### Tables 1-3: Project History
+Setiap proyek memiliki subsection:
+- a. Nama Proyek
+- b. Lokasi Proyek
+- c. Pengguna Jasa
+- d. Nama Perusahaan
+- e. Uraian Tugas
+- f. Waktu Pelaksanaan
+- g. Posisi Penugasan
+- h. Status Kepegawaian
+- i. Surat Referensi
+
+### Last Table: Signature
+- Tanggal
+- Nama
+- Posisi
+
+## 📊 Database Schema
+
+### Experts Table - New Fields
+
+| Field | Type | Description | Example |
+|-------|------|-------------|---------|
+| `tempat_lahir` | VARCHAR(100) | Tempat lahir | "Bandung" |
+| `tanggal_lahir` | VARCHAR(50) | Tanggal lahir | "7 Juli 1967" |
+| `pendidikan_formal` | JSONB | Array pendidikan formal | `["S1 Teknik Planologi ITB", "S2 Perencanaan Wilayah UGM"]` |
+| `pendidikan_non_formal` | JSONB | Array training/sertifikat | `["Training Certificate Increasing Capacity"]` |
+| `penguasaan_bahasa` | JSONB | Array bahasa | `["Bahasa Indonesia Baik", "Bahasa Inggris Baik"]` |
+| `posisi_diusulkan` | VARCHAR(100) | Posisi dalam tender | "Team Leader" |
+
+### Expert_Projects Table - New Fields
+
+| Field | Type | Description | Example |
+|-------|------|-------------|---------|
+| `lokasi_proyek` | VARCHAR(200) | Lokasi proyek | "Kel. Sepaku, Kec. Sapaku, Kab. Penajam Paser Utara" |
+| `pengguna_jasa` | VARCHAR(200) | Klien/pengguna jasa | "Direktorat Perencanaan Mikro, Otorita IKN" |
+| `uraian_tugas` | TEXT | Deskripsi tugas | "Membantu menyusun metodologi, rencana kerja..." |
+| `waktu_mulai` | VARCHAR(50) | Waktu mulai | "Agustus 2025" |
+| `waktu_selesai` | VARCHAR(50) | Waktu selesai | "Desember 2025" |
+| `posisi_penugasan` | VARCHAR(100) | Posisi dalam proyek | "Ahli Perencanaan Wilayah dan Kota" |
+| `status_kepegawaian` | VARCHAR(50) | Status | "Tidak Tetap" / "Tetap" |
+| `surat_referensi` | VARCHAR(100) | Nomor surat referensi | "10/SK/RENTEK/04/2023" atau "-" |
 
 ## 🎯 Cara Menggunakan
 
@@ -105,7 +124,7 @@ Backend loads expert data from database
     ↓
 Backend loads TEMPLATE_CV_EXPERT.docx
     ↓
-Backend replaces all placeholders with actual data
+Backend replaces data in specific table cells (NOT placeholders)
     ↓
 Backend returns DOCX file as download
     ↓
@@ -114,74 +133,85 @@ Frontend triggers file download
 User gets CV_{ExpertName}_{Date}.docx
 ```
 
-## 📊 Data Mapping
+## � How It Works
 
-| Database Field | Template Placeholder | Format |
-|----------------|---------------------|--------|
-| `nama` | `{{NAMA}}` | String |
-| `no_hp` | `{{NO_HP}}` | String |
-| `instansi` | `{{INSTANSI}}` | String |
-| `keahlian` (array) | `{{KEAHLIAN}}` | Comma-separated |
-| `availability` | `{{AVAILABILITY}}` | String |
-| `rating_avg` | `{{RATING}}` | "4.8/5.0" |
-| `jumlah_proyek` | `{{JUMLAH_PROYEK}}` | Number |
-| `projects[0].nama_proyek` | `{{PROYEK_1}}` | String |
-| `projects[0].pemberi_kerja` | `{{KLIEN_1}}` | String |
-| `projects[0].tahun` | `{{TAHUN_1}}` | Number |
-| `projects[0].nilai_proyek` | `{{NILAI_1}}` | "Rp 3.200.000.000" |
-| `projects[0].peran` | `{{PERAN_1}}` | String |
-| `projects[0].status_proyek` | `{{STATUS_1}}` | String |
+### Replacement Strategy
+
+**TIDAK menggunakan placeholder** seperti `{{NAMA}}`. Sebagai gantinya, kita:
+
+1. **Membaca struktur table** yang sudah ada di template
+2. **Mengganti text** di cell-cell tertentu berdasarkan posisi row
+3. **Mempertahankan formatting** yang sudah ada di template
+
+### Example Code Logic
+
+```python
+# Table 0, Row 2: Nama Personel
+replace_text_in_cell(
+    header_table.rows[2].cells[3], 
+    'Asep Hendy Sopyandi',  # Text yang ada di template
+    expert.nama              # Data dari database
+)
+
+# Table 1, Row 1: Nama Proyek
+replace_text_in_cell(
+    project_table.rows[1].cells[3],
+    'Penyusunan Rencana Pengembangan Kawasan',  # Template text
+    project.nama_proyek                          # Database data
+)
+```
 
 ## ⚠️ Important Notes
 
-### 1. Template File Must Exist
-Jika template tidak ditemukan, API akan return error:
-```json
-{
-  "detail": "CV template not found. Please ensure TEMPLATE_CV_EXPERT.docx exists in project root."
-}
+### 1. Template File Must NOT Be Modified
+Template adalah format resmi Sucofindo. **JANGAN DIUBAH** kecuali ada perubahan resmi dari Sucofindo.
+
+### 2. Maximum 3 Projects
+Template memiliki 3 table untuk proyek (Tables 1, 2, 3). Hanya 3 proyek pertama yang akan di-include dalam CV.
+
+### 3. Empty Data Handling
+Jika data tidak ada, akan diganti dengan `"Belum diisi"`:
+```python
+tempat_lahir = expert.tempat_lahir or 'Belum diisi'
 ```
 
-### 2. Placeholder Case-Sensitive
-Placeholder harus **UPPERCASE** dan dalam double curly braces:
-- ✅ `{{NAMA}}`
-- ❌ `{{nama}}`
-- ❌ `{NAMA}`
-- ❌ `{{Nama}}`
+### 4. Date Format
+Format tanggal mengikuti template:
+- Tanggal lahir: `"7 Juli 1967"`
+- Waktu pelaksanaan: `"Agustus 2025-Desember 2025"`
+- Tanggal generate: `"06 Mei 2026"`
 
-### 3. Maximum 10 Projects
-Hanya 10 proyek pertama yang akan di-include dalam CV. Jika expert punya lebih dari 10 proyek, yang lain akan diabaikan.
-
-### 4. Empty Placeholders
-Jika data tidak ada (misalnya `no_hp` kosong), placeholder akan diganti dengan string kosong `""`.
-
-### 5. Currency Formatting
-Nilai kontrak otomatis diformat ke Rupiah:
-- Input: `3200000000`
-- Output: `Rp 3.200.000.000`
+### 5. Array Fields
+Fields yang berupa array (pendidikan, bahasa) akan di-join dengan newline:
+```python
+pendidikan_text = "\n".join(pendidikan_formal)
+# Output:
+# S1 Teknik Planologi ITB
+# S2 Perencanaan Wilayah UGM
+```
 
 ## 🛠️ Troubleshooting
 
 ### Error: "CV template not found"
-**Solusi**: Pastikan file `TEMPLATE_CV_EXPERT.docx` ada di root project (sejajar dengan folder `backend` dan `frontend`).
+**Solusi**: Pastikan file `TEMPLATE_CV_EXPERT.docx` ada di root project.
 
 ### Error: "Failed to generate CV"
 **Solusi**: 
-1. Cek apakah `python-docx` sudah terinstall: `pip list | grep python-docx`
-2. Cek apakah template file corrupt (coba buka manual di Word)
+1. Cek apakah `python-docx` sudah terinstall
+2. Cek apakah template file corrupt
 3. Cek log backend untuk detail error
 
-### Placeholder tidak ter-replace
+### Data tidak muncul di CV
 **Solusi**:
-1. Pastikan placeholder menggunakan **UPPERCASE**
-2. Pastikan menggunakan **double curly braces** `{{...}}`
-3. Cek apakah ada spasi di dalam placeholder (harus `{{NAMA}}` bukan `{{ NAMA }}`)
+1. Pastikan data sudah ada di database
+2. Jalankan SQL migration untuk menambahkan field baru
+3. Update data expert dengan field-field yang dibutuhkan
 
-### File download tapi corrupt
+### Format CV tidak sesuai
 **Solusi**:
-1. Pastikan `responseType: 'blob'` ada di frontend API call
-2. Cek apakah template file asli tidak corrupt
-3. Restart backend server
+1. **JANGAN** edit template
+2. Cek apakah ada perubahan di template yang tidak disengaja
+3. Re-download template asli dari Sucofindo
 
 ## 📚 API Documentation
 
@@ -211,28 +241,47 @@ Nilai kontrak otomatis diformat ke Rupiah:
   }
   ```
 
-## 🎨 Customizing Template
-
-Untuk mengubah format CV:
-
-1. Buka `TEMPLATE_CV_EXPERT.docx` di Microsoft Word
-2. Edit layout, font, warna, dll sesuai kebutuhan
-3. **Jangan hapus placeholder** `{{...}}`
-4. Save template
-5. Test generate CV untuk memastikan placeholder masih berfungsi
-
 ## 📦 Files Modified
 
-1. ✅ `backend/app/api/v1/cv_generator.py` - New API endpoint
-2. ✅ `backend/app/main.py` - Include cv_generator router
-3. ✅ `backend/requirements.txt` - Add python-docx
-4. ✅ `frontend/src/components/Expert/CVGeneratorModal.jsx` - Simplified UI
-5. ✅ `CV_TEMPLATE_GUIDE.md` - This documentation
+1. ✅ `backend/app/models/expert.py` - Added CV template fields
+2. ✅ `backend/app/api/v1/cv_generator.py` - Complete rewrite to match template
+3. ✅ `backend/alembic/versions/add_cv_template_fields.py` - Alembic migration
+4. ✅ `supabase/add_cv_template_fields.sql` - Supabase migration
+5. ✅ `CV_TEMPLATE_GUIDE.md` - Updated documentation
 
-## 🚀 Next Steps
+## 🚀 Deployment Steps
 
-1. Install python-docx: `pip install python-docx==1.1.2`
-2. Pastikan `TEMPLATE_CV_EXPERT.docx` ada di root project
-3. Restart backend server
-4. Test generate CV dari frontend
-5. Customize template sesuai kebutuhan
+### 1. Update Database (Supabase)
+```sql
+-- Run in Supabase SQL Editor
+-- File: supabase/add_cv_template_fields.sql
+```
+
+### 2. Update Backend
+```bash
+cd backend
+pip install python-docx==1.1.2
+# Deploy to Railway/production
+```
+
+### 3. Test
+```bash
+# Test CV generation
+curl -X GET "https://your-api.com/api/v1/cv/1/cv" --output test_cv.docx
+```
+
+## 📝 Next Steps
+
+1. ✅ Database schema updated
+2. ✅ CV generator rewritten to match template
+3. ⏳ Frontend form untuk input data CV (optional)
+4. ⏳ Bulk update existing expert data
+5. ⏳ User guide untuk mengisi data CV
+
+## 🎨 Future Enhancements
+
+- [ ] Frontend form untuk edit CV data
+- [ ] Preview CV sebelum download
+- [ ] Multiple template support (jika ada format lain)
+- [ ] Batch CV generation untuk multiple experts
+- [ ] CV history/versioning

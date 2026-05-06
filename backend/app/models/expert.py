@@ -18,6 +18,15 @@ class Expert(Base):
     availability = Column(String(50), default="Tersedia")  # Tersedia / Sedang Bertugas / Tidak Tersedia
     rating_avg = Column(Float, default=0.0)
     jumlah_proyek = Column(Integer, default=0)
+    
+    # CV Template fields
+    tempat_lahir = Column(String(100), nullable=True)
+    tanggal_lahir = Column(String(50), nullable=True)
+    pendidikan_formal = Column(JSON, default=list)  # ["S1 Teknik Planologi ITB", ...]
+    pendidikan_non_formal = Column(JSON, default=list)  # ["Training Certificate ...", ...]
+    penguasaan_bahasa = Column(JSON, default=list)  # ["Bahasa Indonesia Baik", ...]
+    posisi_diusulkan = Column(String(100), nullable=True)  # "Team Leader", "Ahli", etc.
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -38,6 +47,17 @@ class ExpertProject(Base):
     bersama = Column(String(50), nullable=True)  # Sucofindo / Lain
     nama_perusahaan_lain = Column(String(200), nullable=True)
     status_proyek = Column(String(50), default="Selesai")
+    
+    # CV Template fields
+    lokasi_proyek = Column(String(200), nullable=True)
+    pengguna_jasa = Column(String(200), nullable=True)
+    uraian_tugas = Column(Text, nullable=True)
+    waktu_mulai = Column(String(50), nullable=True)  # "Agustus 2025"
+    waktu_selesai = Column(String(50), nullable=True)  # "Desember 2025"
+    posisi_penugasan = Column(String(100), nullable=True)  # "Ahli Perencanaan Wilayah"
+    status_kepegawaian = Column(String(50), nullable=True)  # "Tidak Tetap" / "Tetap"
+    surat_referensi = Column(String(100), nullable=True)  # "10/SK/RENTEK/04/2023" or "-"
+    
     created_at = Column(DateTime, default=datetime.utcnow)
 
     expert = relationship("Expert", back_populates="projects")
