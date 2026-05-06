@@ -724,25 +724,31 @@ export const AppProvider = ({ children }) => {
         const updatePayload = { ...basePayload };
         delete updatePayload.kd_tender; // Don't update the primary key
         
-        console.log('[ensureWatchlistEntry] Updating existing entry:', existing.id);
-        const { error } = await supabase
+        console.log('[ensureWatchlistEntry] Updating existing entry:', existing.id, 'with payload:', updatePayload);
+        const { data, error } = await supabase
           .from('tender_watchlist')
           .update(updatePayload)
-          .eq('id', existing.id);
+          .eq('id', existing.id)
+          .select();
+        
         if (error) {
           console.error('[ensureWatchlistEntry] Update error:', error);
           throw new Error(error.message);
         }
+        console.log('[ensureWatchlistEntry] Update successful, data:', data);
       } else {
         // Insert new entry
         console.log('[ensureWatchlistEntry] Inserting new entry for tender:', tenderId);
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('tender_watchlist')
-          .insert(basePayload);
+          .insert(basePayload)
+          .select();
+        
         if (error) {
           console.error('[ensureWatchlistEntry] Insert error:', error);
           throw new Error(error.message);
         }
+        console.log('[ensureWatchlistEntry] Insert successful, data:', data);
       }
     } catch (err) {
       console.error('[ensureWatchlistEntry] Failed:', err);
