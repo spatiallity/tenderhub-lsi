@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem \"D:\\\\OneDrive - UGM 365\\\\Work Stuffs\\\\004 Sucofindo\\\\05 Projects\\\\01 Coding\\\\04 TenderHub LSIv2\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(rtk ls *)",
+      "Bash(rtk find *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk git *)",
+      "Bash(rtk curl *)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); e=data[0] if data else {}; print\\(f'ID: {e.get\\(\\\\\"id\\\\\"\\)}, Nama: {e.get\\(\\\\\"nama\\\\\"\\)}, Projects: {len\\(e.get\\(\\\\\"projects\\\\\",[]\\)\\)}, tempat_lahir: {e.get\\(\\\\\"tempat_lahir\\\\\"\\)}, posisi: {e.get\\(\\\\\"posisi_diusulkan\\\\\"\\)}'\\)\")",
+      "Bash(rtk read *)",
+      "Bash(findstr \"lokasi_proyek\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); p=d.get\\('projects',[]\\); print\\('CV fields in first project:'\\); [print\\(k,':',v\\) for k,v in \\(p[0] if p else {}\\).items\\(\\) if k in ['lokasi_proyek','pengguna_jasa','uraian_tugas','waktu_mulai','posisi_penugasan']]\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(taskkill /F /IM python.exe /T)",
+      "Bash(taskkill /F /IM py.exe /T)",
+      "Bash(taskkill /F /IM uvicorn.exe /T)",
+      "PowerShell(Get-Process *)",
+      "Bash(py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000)",
+      "Bash(PYTHONIOENCODING=utf-8 py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000)",
+      "Bash(xargs grep -l \"ExpertDetail\")"
+    ]
+  }
+}

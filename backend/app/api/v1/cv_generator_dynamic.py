@@ -109,7 +109,28 @@ def generate_cv_from_template_dynamic(expert_data, template_path):
     # Get data with safe defaults
     nama = expert_data.get('nama', 'Belum diisi')
     tempat_lahir = expert_data.get('tempat_lahir', 'Belum diisi')
-    tanggal_lahir = expert_data.get('tanggal_lahir', 'Belum diisi')
+    
+    # Format tanggal_lahir from date object to Indonesian format
+    tanggal_lahir_raw = expert_data.get('tanggal_lahir')
+    if tanggal_lahir_raw:
+        # If it's a date object, format it
+        if hasattr(tanggal_lahir_raw, 'strftime'):
+            # Format to Indonesian: "15 Maret 1975"
+            months_id = {
+                1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
+                5: 'Mei', 6: 'Juni', 7: 'Juli', 8: 'Agustus',
+                9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
+            }
+            day = tanggal_lahir_raw.day
+            month = months_id[tanggal_lahir_raw.month]
+            year = tanggal_lahir_raw.year
+            tanggal_lahir = f"{day} {month} {year}"
+        else:
+            # If it's already a string, use as is
+            tanggal_lahir = str(tanggal_lahir_raw)
+    else:
+        tanggal_lahir = 'Belum diisi'
+    
     posisi_diusulkan = expert_data.get('posisi_diusulkan', 'Team Leader')
     
     # Format education
@@ -262,7 +283,7 @@ async def generate_expert_cv_dynamic(
             'nama': expert.nama,
             'posisi_diusulkan': getattr(expert, 'posisi_diusulkan', None) or 'Team Leader',
             'tempat_lahir': getattr(expert, 'tempat_lahir', None) or 'Belum diisi',
-            'tanggal_lahir': getattr(expert, 'tanggal_lahir', None) or 'Belum diisi',
+            'tanggal_lahir': getattr(expert, 'tanggal_lahir', None),  # Pass date object directly
             'pendidikan_formal': getattr(expert, 'pendidikan_formal', None) or [],
             'pendidikan_non_formal': getattr(expert, 'pendidikan_non_formal', None) or [],
             'penguasaan_bahasa': getattr(expert, 'penguasaan_bahasa', None) or ['Bahasa Indonesia Baik', 'Bahasa Inggris Baik'],
