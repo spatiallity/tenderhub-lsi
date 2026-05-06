@@ -65,3 +65,27 @@ async def add_review(expert_id: int, review_in: ExpertReviewCreate, db: AsyncSes
         
     await db.commit()
     return review
+
+@router.patch("/{expert_id}", response_model=ExpertOut)
+async def update_expert(expert_id: int, expert_update: ExpertUpdate, db: AsyncSession = Depends(get_db)):
+    """
+    Update expert data including CV template fields
+    """
+    result = await db.execute(
+        select(Expert)
+        .options(selectinload(Expert.projects), selectinload(Expert.reviews))
+        .where(Expert.id == expert_id)
+    )
+    expert = result.scalars().first()
+    
+    if not expert:
+        raise HTTPException(status_code=404, detail="Expert not found")
+    
+    # Update fields that are provided
+    update_data = expert_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(expert, field, value)
+    
+    await db.commit()
+    await db.refresh(expert)
+    return expert

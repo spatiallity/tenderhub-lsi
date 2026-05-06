@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Save, Calendar as CalendarIcon, Trash2, FileText } from 'lucide-react';
+import { Plus, Save, Calendar as CalendarIcon, Trash2, FileText, Edit3 } from 'lucide-react';
 import { Badge, Stars, Btn, Card } from '../UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../../utils/constants';
 import { formatRupiah, initials } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 import CVGeneratorModal from './CVGeneratorModal';
+import CVDataModal from './CVDataModal';
 
 export default function ExpertDetail({ expert }) {
   const {
@@ -25,6 +26,7 @@ export default function ExpertDetail({ expert }) {
   const [isSavingHistory, setIsSavingHistory] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showCVGenerator, setShowCVGenerator] = useState(false);
+  const [showCVDataModal, setShowCVDataModal] = useState(false);
 
   useEffect(() => {
     setProfileDraft({
@@ -78,6 +80,18 @@ export default function ExpertDetail({ expert }) {
         />
       )}
 
+      {/* CV Data Edit Modal */}
+      {showCVDataModal && (
+        <CVDataModal
+          expert={expert}
+          onClose={() => setShowCVDataModal(false)}
+          onSave={() => {
+            // Refresh expert data after save
+            window.location.reload();
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex gap-4 items-start">
         <div className="w-[60px] h-[60px] rounded-full text-white font-extrabold flex items-center justify-center shrink-0 text-2xl" style={{ background: avatarColors[expert.id % avatarColors.length] }}>
@@ -99,13 +113,22 @@ export default function ExpertDetail({ expert }) {
                 <span className="text-xs font-extrabold">{(expert.reviews || []).length ? `${expert.rating} overall` : 'Belum direview'}</span>
               </div>
             </div>
-            <button
-              onClick={() => setShowCVGenerator(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-            >
-              <FileText size={18} />
-              Generate CV
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCVDataModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm"
+              >
+                <Edit3 size={18} />
+                Edit Data CV
+              </button>
+              <button
+                onClick={() => setShowCVGenerator(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+              >
+                <FileText size={18} />
+                Generate CV
+              </button>
+            </div>
           </div>
         </div>
       </div>

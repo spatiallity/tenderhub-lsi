@@ -73,6 +73,13 @@ class ExpertUpdate(BaseModel):
     subporto: Optional[List[str]] = None
     main_keahlian: Optional[str] = None
     availability: Optional[str] = None
+    # CV Template fields
+    tempat_lahir: Optional[str] = None
+    tanggal_lahir: Optional[str] = None
+    pendidikan_formal: Optional[List[str]] = None
+    pendidikan_non_formal: Optional[List[str]] = None
+    penguasaan_bahasa: Optional[List[str]] = None
+    posisi_diusulkan: Optional[str] = None
 
 
 class ExpertOut(ExpertBase):
@@ -81,6 +88,13 @@ class ExpertOut(ExpertBase):
     jumlah_proyek: int
     created_at: datetime
     updated_at: datetime
+    # CV Template fields
+    tempat_lahir: Optional[str] = None
+    tanggal_lahir: Optional[str] = None
+    pendidikan_formal: Optional[List[str]] = None
+    pendidikan_non_formal: Optional[List[str]] = None
+    penguasaan_bahasa: Optional[List[str]] = None
+    posisi_diusulkan: Optional[str] = None
     projects: List[ExpertProjectOut] = []
     reviews: List[ExpertReviewOut] = []
 
