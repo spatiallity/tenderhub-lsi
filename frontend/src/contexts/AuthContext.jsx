@@ -33,6 +33,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    // DEV MODE: Auto-login for development (when SKIP_AUTH=true in backend)
+    const isDevelopment = import.meta.env.DEV;
+    if (isDevelopment) {
+      console.log('[Auth] Development mode - auto-login as dev user');
+      const devUser = { id: 'dev-user', email: 'dev@tenderhub.local' };
+      const devProfile = { id: 'dev-user', name: 'Developer', role: 'admin', is_active: true };
+      setUser(devUser);
+      setProfile(devProfile);
+      setLoading(false);
+      return;
+    }
+
     // Check for guest session in sessionStorage
     const guestSession = sessionStorage.getItem('lsi-guest-session');
     if (guestSession) {

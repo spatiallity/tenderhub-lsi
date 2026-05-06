@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
+import supabase from '../services/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_KEYWORDS, DEFAULT_USERS, PROVINCES } from '../utils/constants';
 import { calcRupMatch, enrichTender, activeKeywordCount } from '../utils/helpers';
 import { FALLBACK_RUP } from '../data/rupDummy';
@@ -30,11 +32,13 @@ const isInitialAnnouncementTender = (tender) => {
 };
 
 export const AppProvider = ({ children }) => {
+  const { user, isGuest, loading: authLoading } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toast = useToast();
 
-  // Keywords state
+  // Keywords state - will be loaded from Supabase
   const [keywords, setKeywords] = useState(DEFAULT_KEYWORDS);
+  const [loadingKeywords, setLoadingKeywords] = useState(true);
 
   // Tenders state from API
   const [tendersRaw, setTendersRaw] = useState([]);
@@ -84,22 +88,96 @@ export const AppProvider = ({ children }) => {
     (toastConfig[type] || toastConfig.info)();
   }, [toast]);
 
-  // Load data from API
+  // Load keywords from Supabase
   useEffect(() => {
-    api.get('/tender/search', { params: { limit: 200 } })
-      .then(res => {
-        setTendersRaw(res.data || []);
-        // Initialize internalStatuses — normalize won/followed flags
-        const statusMap = {};
-        (res.data || []).forEach(t => {
-          let s = t.internalStatus || 'Dipantau';
-          if (t.won === true) s = 'Menang';
-          else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-          statusMap[t.id] = s;
+    const loadKeywords = async () => {
+      try {
+        console.log('[AppContext] Loading keywords from Supabase...');
+        const res = await api.get('/keywords');
+        console.log('[AppContext] Keywords loaded:', res.data);
+        const keywordsData = res.data || [];
+        
+        // Transform from flat array to grouped object
+        const grouped = { FLP: [], SDA: [], FITI: [] };
+        keywordsData.forEach(kw => {
+          const portfolio = kw.subporto || 'SDA';
+          if (grouped[portfolio]) {
+            grouped[portfolio].push({
+              id: `${portfolio}-${kw.id}`,
+              dbId: kw.id, // Store database ID for updates/deletes
+              text: kw.keyword_text,
+              active: kw.is_active !== false
+            });
+          }
         });
+        
+        console.log('[AppContext] Keywords grouped:', grouped);
+        setKeywords(grouped);
+      } catch (err) {
+        console.error('[AppContext] Failed to load keywords:', err);
+        // Keep DEFAULT_KEYWORDS as fallback
+      } finally {
+        setLoadingKeywords(false);
+      }
+    };
+    
+    loadKeywords();
+  }, []);
+
+  // Load data from API — waits for auth to resolve so watchlist is user-specific
+  useEffect(() => {
+    if (authLoading) return;
+
+    const loadTendersAndWatchlist = async () => {
+      try {
+        console.log('[AppContext] Loading tenders and watchlist...');
+        
+        // Load tenders from API (public data, same for all users)
+        const tendersRes = await api.get('/tender/search', { params: { limit: 200 } });
+        console.log('[AppContext] Tenders loaded:', tendersRes.data?.length, 'items');
+        setTendersRaw(tendersRes.data || []);
+
+        // Load watchlist from backend API (not direct Supabase)
+        console.log('[AppContext] Loading watchlist from backend...');
+        const watchlistRes = await api.get('/watchlist');
+        console.log('[AppContext] Watchlist loaded:', watchlistRes.data?.length, 'items');
+        const watchlistData = watchlistRes.data || [];
+
+        const statusMap = {};
+        const picsMap = {};
+        const notesMap = {};
+
+        watchlistData.forEach(w => {
+          const tenderId = w.kd_tender;
+          if (w.status_internal) {
+            statusMap[tenderId] = w.status_internal;
+            console.log(`[AppContext] Loaded status for tender ${tenderId}:`, w.status_internal);
+          }
+          if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
+          if (w.catatan_internal) {
+            try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
+          }
+        });
+
+        console.log('[AppContext] Status map:', Object.keys(statusMap).length, 'items');
+
+        // Fill API defaults for tenders not yet in the user's watchlist
+        (tendersRes.data || []).forEach(t => {
+          if (!statusMap[t.id]) {
+            let s = t.internalStatus || 'Dipantau';
+            if (t.won === true) s = 'Menang';
+            else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
+            statusMap[t.id] = s;
+          }
+        });
+
+        console.log('[AppContext] Final status map:', Object.keys(statusMap).length, 'items');
         setInternalStatuses(statusMap);
-      })
-      .catch(() => {
+        setAssignedPICs(picsMap);
+        setTenderNotes(notesMap);
+
+      } catch (err) {
+        console.error('[AppContext] Failed to load data:', err);
         setTendersRaw(FALLBACK_TENDERS);
         const statusMap = {};
         FALLBACK_TENDERS.forEach(t => {
@@ -110,9 +188,13 @@ export const AppProvider = ({ children }) => {
         });
         setInternalStatuses(statusMap);
         showToast('API tender belum tersambung. Dummy tender lokal dimuat.', 'error');
-      })
-      .finally(() => setLoadingTenders(false));
-  }, []);
+      } finally {
+        setLoadingTenders(false);
+      }
+    };
+
+    loadTendersAndWatchlist();
+  }, [authLoading, user, isGuest]); // Removed showToast from dependencies
 
   useEffect(() => {
     api.get('/rup/search', { params: { limit: 100 } })
@@ -122,7 +204,7 @@ export const AppProvider = ({ children }) => {
         showToast('API RUP belum tersambung. Dummy RUP lokal dimuat.', 'error');
       })
       .finally(() => setLoadingRup(false));
-  }, [showToast]);
+  }, []); // Removed showToast - run only once
 
   useEffect(() => {
     api.get('/experts')
@@ -132,7 +214,7 @@ export const AppProvider = ({ children }) => {
         showToast('API expert belum tersambung. Dummy tenaga ahli lokal dimuat.', 'error');
       })
       .finally(() => setLoadingExperts(false));
-  }, [showToast]);
+  }, []); // Removed showToast - run only once
 
   // Phase 1: Heavy enrichment (relevance, stages, deadlines) — only re-runs when raw data or keywords change
   const tendersEnriched = useMemo(() =>
@@ -214,33 +296,101 @@ export const AppProvider = ({ children }) => {
   }, [markRupOpened]);
 
   // Keyword actions
-  const addKeyword = useCallback((portfolio, text) => {
+  const addKeyword = useCallback(async (portfolio, text) => {
     if (!text?.trim()) return;
+    
+    // Optimistic update
+    const tempId = `${portfolio}-${Date.now()}`;
     setKeywords(prev => ({
       ...prev,
-      [portfolio]: [...prev[portfolio], { id: `${portfolio}-${Date.now()}`, text: text.trim(), active: true }]
+      [portfolio]: [...prev[portfolio], { id: tempId, text: text.trim(), active: true }]
     }));
+    
+    // Sync to database
+    try {
+      const res = await api.post('/keywords', {
+        keyword_text: text.trim(),
+        subporto: portfolio,
+        is_active: true
+      });
+      
+      // Update with real database ID
+      setKeywords(prev => ({
+        ...prev,
+        [portfolio]: prev[portfolio].map(k => 
+          k.id === tempId ? { ...k, id: `${portfolio}-${res.data.id}`, dbId: res.data.id } : k
+        )
+      }));
+    } catch (err) {
+      console.error('Failed to save keyword:', err);
+      showToast('Keyword disimpan lokal (belum tersinkron ke database)', 'warning');
+    }
   }, [showToast]);
 
-  const removeKeyword = useCallback((portfolio, id) => {
+  const removeKeyword = useCallback(async (portfolio, id) => {
+    // Optimistic update
     setKeywords(prev => ({ ...prev, [portfolio]: prev[portfolio].filter(k => k.id !== id) }));
-  }, []);
+    
+    // Sync to database
+    const keyword = keywords[portfolio]?.find(k => k.id === id);
+    if (keyword?.dbId) {
+      try {
+        await api.delete(`/keywords/${keyword.dbId}`);
+      } catch (err) {
+        console.error('Failed to delete keyword from database:', err);
+      }
+    }
+  }, [keywords]);
 
-  const clearKeywords = useCallback(() => {
+  const clearKeywords = useCallback(async () => {
+    // Get all keyword IDs to delete
+    const allKeywords = Object.values(keywords).flat();
+    
+    // Optimistic update
     setKeywords(prev => Object.fromEntries(Object.keys(prev).map(portfolio => [portfolio, []])));
     showToast('Semua keyword berhasil dibersihkan');
-  }, [showToast]);
+    
+    // Sync to database
+    try {
+      await Promise.all(
+        allKeywords
+          .filter(k => k.dbId)
+          .map(k => api.delete(`/keywords/${k.dbId}`).catch(err => console.error('Failed to delete keyword:', err)))
+      );
+    } catch (err) {
+      console.error('Failed to clear keywords from database:', err);
+    }
+  }, [keywords, showToast]);
 
-  const updateKeyword = useCallback((portfolio, id, patch) => {
+  const updateKeyword = useCallback(async (portfolio, id, patch) => {
+    // Optimistic update
     setKeywords(prev => ({
       ...prev,
       [portfolio]: prev[portfolio].map(k => k.id === id ? { ...k, ...patch } : k)
     }));
-  }, []);
+    
+    // Sync to database
+    const keyword = keywords[portfolio]?.find(k => k.id === id);
+    if (keyword?.dbId) {
+      try {
+        await api.put(`/keywords/${keyword.dbId}`, {
+          keyword_text: patch.text || keyword.text,
+          subporto: portfolio,
+          is_active: patch.active !== undefined ? patch.active : keyword.active
+        });
+      } catch (err) {
+        console.error('Failed to update keyword in database:', err);
+      }
+    }
+  }, [keywords]);
 
   // Expert actions
   const addExpert = useCallback(async (draft) => {
-    if (!draft.nama?.trim() || !draft.keahlian?.trim()) return;
+    if (!draft.nama?.trim() || !draft.keahlian?.trim()) {
+      showToast('Nama dan keahlian wajib diisi', 'warning');
+      return false;
+    }
+    
     const body = {
       nama: draft.nama.trim(),
       instansi: draft.instansi?.trim() || 'Eksternal SUCOFINDO',
@@ -250,14 +400,18 @@ export const AppProvider = ({ children }) => {
       rating: 4.2,
       proyek: 0,
     };
+    
     try {
       const res = await api.post('/experts', body);
       setExpertsRaw(prev => [...prev, res.data]);
       showToast('Tenaga ahli berhasil ditambahkan');
+      return true; // ✅ Return success
     } catch (e) {
+      console.error('[addExpert] Failed to add expert:', e);
       const fallbackExpert = { ...body, id: Date.now(), noHp: draft.noHp || '', history: [], reviews: [] };
       setExpertsRaw(prev => [...prev, fallbackExpert]);
       showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'error');
+      return false; // ❌ Return failure
     }
   }, [showToast]);
 
@@ -346,97 +500,160 @@ export const AppProvider = ({ children }) => {
 
   const refetchTenders = useCallback(async () => {
     try {
-      const res = await api.get('/tender/search', { params: { limit: 200 } });
-      setTendersRaw(res.data || []);
+      const tendersRes = await api.get('/tender/search', { params: { limit: 200 } });
+      setTendersRaw(tendersRes.data || []);
+
       const statusMap = {};
-      (res.data || []).forEach(t => {
-        let s = t.internalStatus || 'Dipantau';
-        if (t.won === true) s = 'Menang';
-        else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
-        statusMap[t.id] = s;
+      const picsMap = {};
+      const notesMap = {};
+
+      // Reload the user's watchlist so their statuses/notes/PICs are preserved
+      if (user && !isGuest) {
+        const { data: watchlistData } = await supabase
+          .from('tender_watchlist')
+          .select('*')
+          .eq('user_id', user.id);
+        (watchlistData || []).forEach(w => {
+          if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
+          if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
+          if (w.catatan_internal) {
+            try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
+          }
+        });
+      }
+
+      (tendersRes.data || []).forEach(t => {
+        if (!statusMap[t.id]) {
+          let s = t.internalStatus || 'Dipantau';
+          if (t.won === true) s = 'Menang';
+          else if (s === 'Sudah Diikuti' && t.lost === true) s = 'Kalah';
+          statusMap[t.id] = s;
+        }
       });
+
       setInternalStatuses(statusMap);
+      setAssignedPICs(picsMap);
+      setTenderNotes(notesMap);
     } catch (err) {
       console.error('Failed to refetch tenders:', err);
     }
-  }, []);
+  }, [user, isGuest]);
 
-  // Helper: ensure a watchlist entry exists for kd_tender before patching
-  const ensureWatchlistEntry = useCallback(async (tenderId, forcedStatus) => {
+  // Helper: upsert a watchlist row using backend API
+  const upsertWatchlistEntry = useCallback(async (tenderId, patch) => {
+    console.log(`[upsertWatchlistEntry] Upserting tender ${tenderId}:`, patch);
+    
     const tender = tenders.find(t => t.id === tenderId);
-    await api.post('/watchlist', {
-      kd_tender: parseInt(tenderId),
-      status_internal: forcedStatus !== undefined ? forcedStatus : (internalStatuses[tenderId] || 'Dipantau'),
-      nama_paket: tender?.nama || tender?.nama_paket || null,
-      hps: tender?.hps || null,
-    });
-  }, [tenders, internalStatuses]);
+    
+    try {
+      // Try to PATCH first
+      console.log(`[upsertWatchlistEntry] Trying PATCH /watchlist/${tenderId}`);
+      const response = await api.patch(`/watchlist/${tenderId}`, patch);
+      console.log(`[upsertWatchlistEntry] PATCH successful:`, response.data);
+      return response.data;
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        // Entry doesn't exist, create it with POST
+        console.log(`[upsertWatchlistEntry] Entry not found, creating with POST`);
+        try {
+          const createData = {
+            kd_tender: parseInt(tenderId),
+            nama_paket: tender?.nama || tender?.nama_paket || null,
+            hps: tender?.hps || null,
+            ...patch,
+          };
+          console.log(`[upsertWatchlistEntry] POST data:`, createData);
+          const response = await api.post('/watchlist', createData);
+          console.log(`[upsertWatchlistEntry] POST successful:`, response.data);
+          return response.data;
+        } catch (createErr) {
+          console.error(`[upsertWatchlistEntry] POST failed:`, createErr);
+          throw createErr;
+        }
+      } else {
+        console.error(`[upsertWatchlistEntry] PATCH failed:`, err);
+        throw err;
+      }
+    }
+  }, [tenders]);
 
   const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
-    // OPTIMISTIC: Update UI immediately
+    console.log(`[updateTenderStatus] Called for tender ${tenderId}, new status:`, newStatus);
+    
+    if (!user || isGuest) {
+      console.log(`[updateTenderStatus] User not authenticated or is guest`);
+      showToast('Anda harus login untuk menyimpan perubahan', 'warning');
+      return;
+    }
+
+    // Enforce: "Menang" only allowed after winner announcement stage
+    if (newStatus === 'Menang') {
+      const tender = tenders.find(t => t.id === tenderId);
+      const stageName = (tender?.currentStageName || '').toLowerCase();
+      const canBeWon =
+        stageName.includes('pemenang') ||
+        stageName.includes('sanggah') ||
+        stageName.includes('klarifikasi') ||
+        stageName.includes('penunjukan') ||
+        stageName.includes('kontrak') ||
+        (stageName.includes('pengumuman') && (tender?.currentStage || 0) > 1);
+
+      if (!canBeWon) {
+        console.log(`[updateTenderStatus] Cannot set "Menang" - stage not allowed:`, stageName);
+        showToast('Status "Menang" hanya bisa diset setelah tahap Pengumuman Pemenang', 'warning');
+        return;
+      }
+    }
+
+    console.log(`[updateTenderStatus] Dispatching tender-local-update event`);
+    window.dispatchEvent(new CustomEvent('tender-local-update', { detail: { tenderId } }));
+    
+    console.log(`[updateTenderStatus] Optimistic update - setting status to:`, newStatus);
     setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
 
-    // SYNC: PATCH to backend
     try {
-      await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
+      console.log(`[updateTenderStatus] Calling upsertWatchlistEntry`);
+      await upsertWatchlistEntry(tenderId, { status_internal: newStatus });
+      console.log(`[updateTenderStatus] Success!`);
     } catch (err) {
-      if (err?.response?.status === 404) {
-        // Entry doesn't exist yet — create it first, then patch
-        try {
-          await ensureWatchlistEntry(tenderId, newStatus);
-          await api.patch(`/watchlist/${tenderId}`, { status_internal: newStatus });
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
+      console.error(`[updateTenderStatus] Failed:`, err);
+      showToast('Gagal menyimpan perubahan ke database', 'error');
+      throw new Error('sync_failed');
     }
-  }, [ensureWatchlistEntry]);
+  }, [user, isGuest, tenders, upsertWatchlistEntry, showToast]);
 
   const updateTenderPIC = useCallback(async (tenderId, userId) => {
-    // OPTIMISTIC: Update UI immediately
+    if (!user || isGuest) {
+      showToast('Anda harus login untuk menyimpan perubahan', 'warning');
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent('tender-local-update', { detail: { tenderId } }));
     setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
 
-    // SYNC: PATCH to backend
     try {
-      await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
-    } catch (err) {
-      if (err?.response?.status === 404) {
-        try {
-          await ensureWatchlistEntry(tenderId);
-          await api.patch(`/watchlist/${tenderId}`, { assigned_pic: userId || null });
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
+      await upsertWatchlistEntry(tenderId, { assigned_pic: userId || null });
+    } catch {
+      throw new Error('sync_failed');
     }
-  }, [ensureWatchlistEntry]);
+  }, [user, isGuest, upsertWatchlistEntry, showToast]);
 
   const addTenderNote = useCallback(async (tenderId, noteObj) => {
-    // OPTIMISTIC: Update UI immediately
+    if (!user || isGuest) {
+      showToast('Anda harus login untuk menambahkan catatan', 'warning');
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent('tender-local-update', { detail: { tenderId } }));
     const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
     setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
 
-    // SYNC: PATCH to backend
-    const payload = { catatan_internal: JSON.stringify(updatedNotes) };
     try {
-      await api.patch(`/watchlist/${tenderId}`, payload);
-    } catch (err) {
-      if (err?.response?.status === 404) {
-        try {
-          await ensureWatchlistEntry(tenderId);
-          await api.patch(`/watchlist/${tenderId}`, payload);
-        } catch {
-          throw new Error('sync_failed');
-        }
-      } else {
-        throw new Error('sync_failed');
-      }
+      await upsertWatchlistEntry(tenderId, { catatan_internal: JSON.stringify(updatedNotes) });
+    } catch {
+      throw new Error('sync_failed');
     }
-  }, [tenderNotes, ensureWatchlistEntry]);
+  }, [user, isGuest, tenderNotes, upsertWatchlistEntry, showToast]);
 
   const value = useMemo(() => ({
     // Sidebar

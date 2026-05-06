@@ -1,660 +1,445 @@
-import {
-  Document,
-  Packer,
-  Paragraph,
-  Table,
-  TableRow,
-  TableCell,
-  TextRun,
-  WidthType,
-  AlignmentType,
-  BorderStyle,
-  ShadingType,
-  VerticalAlign,
-  ImageRun,
-  HeadingLevel,
-} from 'docx';
+import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType, BorderStyle, AlignmentType, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 
-// Constants for document formatting
-const FONT_NAME = 'Times New Roman';
-const FONT_SIZE = 22; // 11pt in half-points
-const TABLE_WIDTH = 8787; // DXA units for A4 with margins
-const COL_LABEL = 2551; // ~4.5cm
-const COL_COLON = 283; // ~0.5cm
-const COL_VALUE = TABLE_WIDTH - COL_LABEL - COL_COLON;
-
-// Border styling
-const thinBorder = {
-  style: BorderStyle.SINGLE,
-  size: 1,
-  color: 'CCCCCC',
+// Format currency to Indonesian Rupiah
+const formatRupiah = (amount) => {
+  if (!amount) return '-';
+  return `Rp ${amount.toLocaleString('id-ID')}`;
 };
 
-const allBorders = {
-  top: thinBorder,
-  bottom: thinBorder,
-  left: thinBorder,
-  right: thinBorder,
-};
-
-// Cell margins
-const cellMargins = {
-  top: 80,
-  bottom: 80,
-  left: 120,
-  right: 120,
-};
-
-/**
- * Create a section title paragraph
- */
-function createSectionTitle(text) {
-  return new Paragraph({
-    text,
-    bold: true,
-    underline: {},
-    allCaps: true,
-    font: FONT_NAME,
-    size: FONT_SIZE,
-    spacing: { before: 240, after: 120 },
-  });
-}
-
-/**
- * Create a 3-column row (Label | : | Value)
- */
-function createDataRow(label, value) {
-  return new TableRow({
-    children: [
-      new TableCell({
-        children: [new Paragraph({ text: label, font: FONT_NAME, size: FONT_SIZE })],
-        width: { size: COL_LABEL, type: WidthType.DXA },
-        borders: allBorders,
-        margins: cellMargins,
-        verticalAlign: VerticalAlign.CENTER,
-      }),
-      new TableCell({
-        children: [new Paragraph({ text: ':', font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-        width: { size: COL_COLON, type: WidthType.DXA },
-        borders: allBorders,
-        margins: cellMargins,
-        verticalAlign: VerticalAlign.CENTER,
-      }),
-      new TableCell({
-        children: [new Paragraph({ text: value || '-', font: FONT_NAME, size: FONT_SIZE })],
-        width: { size: COL_VALUE, type: WidthType.DXA },
-        borders: allBorders,
-        margins: cellMargins,
-        verticalAlign: VerticalAlign.CENTER,
-      }),
-    ],
-  });
-}
-
-/**
- * Create a separator row with gray shading
- */
-function createSeparatorRow() {
-  return new TableRow({
-    children: [
-      new TableCell({
-        children: [new Paragraph({ text: '' })],
-        columnSpan: 3,
-        shading: { fill: 'D9D9D9', type: ShadingType.CLEAR },
-        borders: allBorders,
-        margins: { top: 40, bottom: 40, left: 120, right: 120 },
-      }),
-    ],
-  });
-}
-
-/**
- * Format date to Indonesian format
- */
-function formatDate(dateStr) {
+// Format date to Indonesian format
+const formatDate = (dateStr) => {
   if (!dateStr) return '-';
   const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const date = new Date(dateStr);
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-}
+};
 
-/**
- * Format currency to Indonesian Rupiah
- */
-function formatCurrency(amount) {
-  if (!amount) return '-';
-  return `Rp ${parseInt(amount).toLocaleString('id-ID')}`;
-}
-
-/**
- * Generate CV Document
- */
-export async function generateCV(data) {
-  const sections = [];
-
-  // Title
-  sections.push(
-    new Paragraph({
-      text: 'CURRICULUM VITAE',
-      bold: true,
-      font: FONT_NAME,
-      size: 24, // 12pt
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 240 },
-    })
-  );
-
-  // SECTION 1: DATA PRIBADI
-  sections.push(createSectionTitle('DATA PRIBADI'));
+// Calculate work duration
+const calculateDuration = (startDate, endDate) => {
+  if (!startDate || !endDate) return '-';
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  const years = Math.floor(months / 12);
+  const remainingMonths = months % 12;
   
-  const dataPribadiRows = [
-    createDataRow('Nama Lengkap', data.namaLengkap),
-    createDataRow('Tempat, Tanggal Lahir', `${data.tempatLahir}, ${formatDate(data.tanggalLahir)}`),
-    createDataRow('Agama', data.agama),
-    createDataRow('Jenis Kelamin', data.jenisKelamin),
-    createDataRow('Status Perkawinan', data.statusPerkawinan),
-    createDataRow('Alamat Rumah Sesuai KTP', data.alamatKTP),
-    createDataRow('Alamat Domisili', data.alamatDomisili),
-    createDataRow('NIK KTP', data.nikKTP),
-    createDataRow('No. NPWP', data.noNPWP),
-    createDataRow('Kewarganegaraan', data.kewarganegaraan || 'Indonesia'),
-    createDataRow('No. Telepon/HP', data.noTelepon),
-    createDataRow('Alamat Email', data.email),
-  ];
-
-  sections.push(
-    new Table({
-      width: { size: TABLE_WIDTH, type: WidthType.DXA },
-      rows: dataPribadiRows,
-    })
-  );
-
-  // SECTION 2: LATAR BELAKANG PENDIDIKAN
-  if (data.pendidikan && data.pendidikan.length > 0) {
-    sections.push(createSectionTitle('LATAR BELAKANG PENDIDIKAN'));
-    
-    const pendidikanRows = [];
-    data.pendidikan.forEach((pend, index) => {
-      if (index > 0) pendidikanRows.push(createSeparatorRow());
-      
-      pendidikanRows.push(
-        createDataRow('Jenjang Pendidikan', pend.jenjang),
-        createDataRow('Tanggal Kelulusan', pend.tanggalLulus),
-        createDataRow('Fakultas/Jurusan', pend.fakultasJurusan),
-        createDataRow('Nama Perguruan Tinggi', pend.namaPerguruanTinggi),
-        createDataRow('IPK', pend.ipk || '-')
-      );
-    });
-
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: pendidikanRows,
-      })
-    );
+  if (years > 0 && remainingMonths > 0) {
+    return `${years} tahun ${remainingMonths} bulan`;
+  } else if (years > 0) {
+    return `${years} tahun`;
+  } else {
+    return `${remainingMonths} bulan`;
   }
+};
 
-  // SECTION 3: RINGKASAN PENGALAMAN KERJA
-  if (data.pengalamanKerja && data.pengalamanKerja.length > 0) {
-    sections.push(createSectionTitle('RINGKASAN PENGALAMAN KERJA'));
-    
-    const headerRow = new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ text: 'No', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 567, type: WidthType.DXA }, // 1cm
-          borders: allBorders,
-          margins: cellMargins,
-          verticalAlign: VerticalAlign.CENTER,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Nama Instansi/Lembaga/Program', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 3118, type: WidthType.DXA }, // 5.5cm
-          borders: allBorders,
-          margins: cellMargins,
-          verticalAlign: VerticalAlign.CENTER,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Posisi', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 2268, type: WidthType.DXA }, // 4cm
-          borders: allBorders,
-          margins: cellMargins,
-          verticalAlign: VerticalAlign.CENTER,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Tingkat Wilayah', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 1417, type: WidthType.DXA }, // 2.5cm
-          borders: allBorders,
-          margins: cellMargins,
-          verticalAlign: VerticalAlign.CENTER,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Waktu', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 1134, type: WidthType.DXA }, // 2cm
-          borders: allBorders,
-          margins: cellMargins,
-          verticalAlign: VerticalAlign.CENTER,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Lama Bekerja', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 1417, type: WidthType.DXA }, // 2.5cm
-          borders: allBorders,
-          margins: cellMargins,
-          verticalAlign: VerticalAlign.CENTER,
-        }),
-      ],
-    });
-
-    const dataRows = data.pengalamanKerja.map((exp, index) => {
-      const waktu = `${exp.lamaBekerjaTahun || 0} Tahun ${exp.lamaBekerjaBulan || 0} Bulan`;
-      const periode = `${formatDate(exp.tanggalMulai)} - ${exp.tanggalSelesai === 'Sekarang' ? 'Sekarang' : formatDate(exp.tanggalSelesai)}`;
-      
-      return new TableRow({
+// Create table cell with specific styling
+const createCell = (text, options = {}) => {
+  return new TableCell({
+    children: [
+      new Paragraph({
         children: [
-          new TableCell({
-            children: [new Paragraph({ text: String(index + 1), font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-            verticalAlign: VerticalAlign.CENTER,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: exp.namaInstansi, font: FONT_NAME, size: FONT_SIZE })],
-            borders: allBorders,
-            margins: cellMargins,
-            verticalAlign: VerticalAlign.CENTER,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: exp.posisi, font: FONT_NAME, size: FONT_SIZE })],
-            borders: allBorders,
-            margins: cellMargins,
-            verticalAlign: VerticalAlign.CENTER,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: exp.tingkatWilayah, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-            verticalAlign: VerticalAlign.CENTER,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: waktu, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-            verticalAlign: VerticalAlign.CENTER,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: periode, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-            verticalAlign: VerticalAlign.CENTER,
+          new TextRun({
+            text: text || '-',
+            font: 'Times New Roman',
+            size: 22, // 11pt
+            bold: options.bold || false,
           }),
         ],
-      });
-    });
+        alignment: options.alignment || AlignmentType.LEFT,
+      }),
+    ],
+    width: options.width || { size: 100, type: WidthType.AUTO },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+      left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+      right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+    },
+    shading: options.shading || undefined,
+  });
+};
 
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: [headerRow, ...dataRows],
-      })
-    );
-  }
+export const generateCV = async (cvData) => {
+  const { dataPribadi, pendidikan, pengalaman, bahasa, expertName } = cvData;
 
-  // SECTION 4: URAIAN PENGALAMAN KERJA (Detail)
-  if (data.pengalamanKerja && data.pengalamanKerja.length > 0) {
-    sections.push(createSectionTitle('URAIAN PENGALAMAN KERJA'));
-    
-    const uraianRows = [];
-    data.pengalamanKerja.forEach((exp, index) => {
-      if (index > 0) uraianRows.push(createSeparatorRow());
-      
-      uraianRows.push(
-        createDataRow('Nama Proyek / Program', exp.namaProyek || exp.namaInstansi),
-        createDataRow('Nama Instansi/Lembaga', exp.namaInstansi),
-        createDataRow('Lokasi', exp.tingkatWilayah),
-        createDataRow('Posisi/Jabatan', exp.posisi),
-        createDataRow('Periode', `${formatDate(exp.tanggalMulai)} - ${exp.tanggalSelesai === 'Sekarang' ? 'Sekarang' : formatDate(exp.tanggalSelesai)}`),
-        createDataRow('Nilai Kontrak', formatCurrency(exp.nilaiKontrak)),
-        createDataRow('Uraian Tugas', exp.uraianTugas || '-')
-      );
-    });
-
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: uraianRows,
-      })
-    );
-  }
-
-  // SECTION 5: SERTIFIKASI & KEAHLIAN
-  if (data.sertifikasi && data.sertifikasi.length > 0) {
-    sections.push(createSectionTitle('SERTIFIKASI & KEAHLIAN'));
-    
-    const sertifikasiRows = [];
-    data.sertifikasi.forEach((sert, index) => {
-      if (index > 0) sertifikasiRows.push(createSeparatorRow());
-      
-      sertifikasiRows.push(
-        createDataRow('Bidang Keahlian Utama', sert.bidang),
-        createDataRow('Nama Sertifikat/SKA/SKT', sert.namaSertifikat),
-        createDataRow('Nomor Sertifikat', sert.nomorSertifikat),
-        createDataRow('Lembaga Penerbit', sert.lembagaPenerbit),
-        createDataRow('Tahun Terbit', sert.tahunTerbit),
-        createDataRow('Masa Berlaku', sert.masaBerlaku)
-      );
-    });
-
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: sertifikasiRows,
-      })
-    );
-  }
-
-  // SECTION 6: PELATIHAN & PENDIDIKAN NON-FORMAL
-  if (data.pelatihan && data.pelatihan.length > 0) {
-    sections.push(createSectionTitle('PELATIHAN & PENDIDIKAN NON-FORMAL'));
-    
-    const pelatihanHeaderRow = new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ text: 'No', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 567, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Nama Pelatihan', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 4000, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Penyelenggara', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 2500, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Tahun', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 900, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Durasi', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 820, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-      ],
-    });
-
-    const pelatihanDataRows = data.pelatihan.map((pel, index) => {
-      return new TableRow({
-        children: [
-          new TableCell({
-            children: [new Paragraph({ text: String(index + 1), font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: pel.namaPelatihan, font: FONT_NAME, size: FONT_SIZE })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: pel.penyelenggara, font: FONT_NAME, size: FONT_SIZE })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: pel.tahun, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: pel.durasi, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-        ],
-      });
-    });
-
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: [pelatihanHeaderRow, ...pelatihanDataRows],
-      })
-    );
-  }
-
-  // SECTION 7: ORGANISASI PROFESI
-  if (data.organisasi && data.organisasi.length > 0) {
-    sections.push(createSectionTitle('ORGANISASI PROFESI'));
-    
-    const orgHeaderRow = new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ text: 'No', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 567, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Nama Organisasi', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 4000, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Jabatan', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 3000, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Tahun', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 1220, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-      ],
-    });
-
-    const orgDataRows = data.organisasi.map((org, index) => {
-      return new TableRow({
-        children: [
-          new TableCell({
-            children: [new Paragraph({ text: String(index + 1), font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: org.namaOrganisasi, font: FONT_NAME, size: FONT_SIZE })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: org.jabatan, font: FONT_NAME, size: FONT_SIZE })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: org.tahunMasuk, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-        ],
-      });
-    });
-
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: [orgHeaderRow, ...orgDataRows],
-      })
-    );
-  }
-
-  // SECTION 8: KEMAMPUAN BAHASA
-  if (data.bahasa && data.bahasa.length > 0) {
-    sections.push(createSectionTitle('KEMAMPUAN BAHASA'));
-    
-    const bahasaHeaderRow = new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ text: 'No', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 567, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Bahasa', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 2500, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Lisan', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 2860, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: 'Tulisan', bold: true, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-          width: { size: 2860, type: WidthType.DXA },
-          borders: allBorders,
-          margins: cellMargins,
-        }),
-      ],
-    });
-
-    const bahasaDataRows = data.bahasa.map((bhs, index) => {
-      return new TableRow({
-        children: [
-          new TableCell({
-            children: [new Paragraph({ text: String(index + 1), font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: bhs.bahasa, font: FONT_NAME, size: FONT_SIZE })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: bhs.kemampuanLisan, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: bhs.kemampuanTulisan, font: FONT_NAME, size: FONT_SIZE, alignment: AlignmentType.CENTER })],
-            borders: allBorders,
-            margins: cellMargins,
-          }),
-        ],
-      });
-    });
-
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: [bahasaHeaderRow, ...bahasaDataRows],
-      })
-    );
-  }
-
-  // SECTION 9: REFERENSI
-  if (data.referensi && data.referensi.length > 0) {
-    sections.push(createSectionTitle('REFERENSI'));
-    
-    const referensiRows = [];
-    data.referensi.forEach((ref, index) => {
-      if (index > 0) referensiRows.push(createSeparatorRow());
-      
-      referensiRows.push(
-        createDataRow('Nama', ref.nama),
-        createDataRow('Jabatan', ref.jabatan),
-        createDataRow('Instansi', ref.instansi),
-        createDataRow('No. Telepon', ref.noTelepon)
-      );
-    });
-
-    sections.push(
-      new Table({
-        width: { size: TABLE_WIDTH, type: WidthType.DXA },
-        rows: referensiRows,
-      })
-    );
-  }
-
-  // PENUTUP: PERNYATAAN & TANDA TANGAN
-  sections.push(
-    new Paragraph({
-      text: 'Yang bertanda tangan di bawah ini, saya menyatakan bahwa semua keterangan yang tercantum dalam daftar riwayat hidup ini adalah benar dan dapat dipertanggungjawabkan.',
-      font: FONT_NAME,
-      size: FONT_SIZE,
-      spacing: { before: 480, after: 240 },
-      alignment: AlignmentType.JUSTIFIED,
-    })
-  );
-
-  const kotaTanggal = `${data.kotaPenandatangan || 'Jakarta'}, ${formatDate(data.tanggalPenandatangan || new Date())}`;
-  
-  sections.push(
-    new Paragraph({
-      text: kotaTanggal,
-      font: FONT_NAME,
-      size: FONT_SIZE,
-      alignment: AlignmentType.RIGHT,
-      spacing: { after: 120 },
-    }),
-    new Paragraph({
-      text: 'Yang Membuat Pernyataan,',
-      font: FONT_NAME,
-      size: FONT_SIZE,
-      alignment: AlignmentType.RIGHT,
-      spacing: { after: 960 }, // Space for signature
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: data.namaLengkap,
-          font: FONT_NAME,
-          size: FONT_SIZE,
-          bold: true,
-          underline: {},
-        }),
-      ],
-      alignment: AlignmentType.RIGHT,
-    })
-  );
-
-  // Create document
   const doc = new Document({
-    sections: [
-      {
-        properties: {
-          page: {
-            margin: {
-              top: 1418, // 2.5cm
-              bottom: 1418,
-              left: 1701, // 3cm
-              right: 1418,
-            },
+    sections: [{
+      properties: {
+        page: {
+          margin: {
+            top: 1417, // 2.5cm
+            right: 1417, // 2.5cm
+            bottom: 1417, // 2.5cm
+            left: 1701, // 3cm
           },
         },
-        children: sections,
       },
-    ],
+      children: [
+        // Title
+        new Paragraph({
+          text: 'CURRICULUM VITAE',
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 },
+        }),
+
+        // Data Pribadi Section
+        new Paragraph({
+          text: 'DATA PRIBADI',
+          bold: true,
+          font: 'Times New Roman',
+          size: 22,
+          spacing: { before: 200, after: 200 },
+        }),
+
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              children: [
+                createCell('Nama', { width: { size: 30, type: WidthType.PERCENTAGE } }),
+                createCell(':', { width: { size: 5, type: WidthType.PERCENTAGE } }),
+                createCell(dataPribadi.nama),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Tempat/Tanggal Lahir'),
+                createCell(':'),
+                createCell(`${dataPribadi.tempatLahir}, ${formatDate(dataPribadi.tanggalLahir)}`),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Agama'),
+                createCell(':'),
+                createCell(dataPribadi.agama),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Jenis Kelamin'),
+                createCell(':'),
+                createCell(dataPribadi.jenisKelamin),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Status Perkawinan'),
+                createCell(':'),
+                createCell(dataPribadi.statusPerkawinan),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Alamat KTP'),
+                createCell(':'),
+                createCell(dataPribadi.alamatKTP),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Alamat Domisili'),
+                createCell(':'),
+                createCell(dataPribadi.alamatDomisili),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('NIK'),
+                createCell(':'),
+                createCell(dataPribadi.nik),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('NPWP'),
+                createCell(':'),
+                createCell(dataPribadi.npwp),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Kewarganegaraan'),
+                createCell(':'),
+                createCell(dataPribadi.kewarganegaraan),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('No. Telepon'),
+                createCell(':'),
+                createCell(dataPribadi.noTelepon),
+              ],
+            }),
+            new TableRow({
+              children: [
+                createCell('Email'),
+                createCell(':'),
+                createCell(dataPribadi.email),
+              ],
+            }),
+          ],
+        }),
+
+        // Pendidikan Section
+        new Paragraph({
+          text: 'LATAR BELAKANG PENDIDIKAN',
+          bold: true,
+          font: 'Times New Roman',
+          size: 22,
+          spacing: { before: 400, after: 200 },
+        }),
+
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: pendidikan.flatMap((edu, index) => {
+            const rows = [
+              new TableRow({
+                children: [
+                  createCell('Jenjang', { width: { size: 30, type: WidthType.PERCENTAGE } }),
+                  createCell(':', { width: { size: 5, type: WidthType.PERCENTAGE } }),
+                  createCell(edu.jenjang),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Tanggal Lulus'),
+                  createCell(':'),
+                  createCell(formatDate(edu.tanggalLulus)),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Fakultas/Jurusan'),
+                  createCell(':'),
+                  createCell(edu.fakultasJurusan),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Nama Perguruan Tinggi'),
+                  createCell(':'),
+                  createCell(edu.namaPerguruanTinggi),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('IPK'),
+                  createCell(':'),
+                  createCell(edu.ipk || '-'),
+                ],
+              }),
+            ];
+
+            // Add separator between education entries
+            if (index < pendidikan.length - 1) {
+              rows.push(
+                new TableRow({
+                  children: [
+                    createCell('', { 
+                      shading: { fill: 'D9D9D9' },
+                      width: { size: 30, type: WidthType.PERCENTAGE }
+                    }),
+                    createCell('', { 
+                      shading: { fill: 'D9D9D9' },
+                      width: { size: 5, type: WidthType.PERCENTAGE }
+                    }),
+                    createCell('', { shading: { fill: 'D9D9D9' } }),
+                  ],
+                })
+              );
+            }
+
+            return rows;
+          }),
+        }),
+
+        // Pengalaman Kerja Section
+        new Paragraph({
+          text: 'RINGKASAN PENGALAMAN KERJA',
+          bold: true,
+          font: 'Times New Roman',
+          size: 22,
+          spacing: { before: 400, after: 200 },
+        }),
+
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            // Header
+            new TableRow({
+              children: [
+                createCell('No', { bold: true, width: { size: 5, type: WidthType.PERCENTAGE } }),
+                createCell('Nama Instansi', { bold: true, width: { size: 25, type: WidthType.PERCENTAGE } }),
+                createCell('Nama Proyek', { bold: true, width: { size: 30, type: WidthType.PERCENTAGE } }),
+                createCell('Posisi', { bold: true, width: { size: 15, type: WidthType.PERCENTAGE } }),
+                createCell('Periode', { bold: true, width: { size: 15, type: WidthType.PERCENTAGE } }),
+                createCell('Lama Bekerja', { bold: true, width: { size: 10, type: WidthType.PERCENTAGE } }),
+              ],
+            }),
+            // Data rows
+            ...pengalaman.map((exp, index) => 
+              new TableRow({
+                children: [
+                  createCell((index + 1).toString()),
+                  createCell(exp.namaInstansi),
+                  createCell(exp.namaProyek),
+                  createCell(exp.posisi),
+                  createCell(`${formatDate(exp.periodeAwal)} - ${formatDate(exp.periodeAkhir)}`),
+                  createCell(calculateDuration(exp.periodeAwal, exp.periodeAkhir)),
+                ],
+              })
+            ),
+          ],
+        }),
+
+        // Uraian Pengalaman Kerja
+        new Paragraph({
+          text: 'URAIAN PENGALAMAN KERJA',
+          bold: true,
+          font: 'Times New Roman',
+          size: 22,
+          spacing: { before: 400, after: 200 },
+        }),
+
+        ...pengalaman.flatMap((exp, index) => [
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  createCell('Nama Instansi', { width: { size: 30, type: WidthType.PERCENTAGE } }),
+                  createCell(':', { width: { size: 5, type: WidthType.PERCENTAGE } }),
+                  createCell(exp.namaInstansi),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Nama Proyek'),
+                  createCell(':'),
+                  createCell(exp.namaProyek),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Posisi'),
+                  createCell(':'),
+                  createCell(exp.posisi),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Tingkat Wilayah'),
+                  createCell(':'),
+                  createCell(exp.tingkatWilayah || '-'),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Periode Kerja'),
+                  createCell(':'),
+                  createCell(`${formatDate(exp.periodeAwal)} - ${formatDate(exp.periodeAkhir)}`),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Lama Bekerja'),
+                  createCell(':'),
+                  createCell(calculateDuration(exp.periodeAwal, exp.periodeAkhir)),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Nilai Kontrak'),
+                  createCell(':'),
+                  createCell(formatRupiah(exp.nilaiKontrak)),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  createCell('Uraian Tugas'),
+                  createCell(':'),
+                  createCell(exp.uraianTugas || '-'),
+                ],
+              }),
+            ],
+          }),
+          new Paragraph({ text: '', spacing: { after: 200 } }),
+        ]),
+
+        // Kemampuan Bahasa
+        new Paragraph({
+          text: 'KEMAMPUAN BAHASA',
+          bold: true,
+          font: 'Times New Roman',
+          size: 22,
+          spacing: { before: 400, after: 200 },
+        }),
+
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            // Header
+            new TableRow({
+              children: [
+                createCell('No', { bold: true, width: { size: 10, type: WidthType.PERCENTAGE } }),
+                createCell('Nama Bahasa', { bold: true, width: { size: 30, type: WidthType.PERCENTAGE } }),
+                createCell('Kemampuan Lisan', { bold: true, width: { size: 30, type: WidthType.PERCENTAGE } }),
+                createCell('Kemampuan Tulisan', { bold: true, width: { size: 30, type: WidthType.PERCENTAGE } }),
+              ],
+            }),
+            // Data rows
+            ...bahasa.map((lang, index) => 
+              new TableRow({
+                children: [
+                  createCell((index + 1).toString()),
+                  createCell(lang.namaBahasa),
+                  createCell(lang.kemampuanLisan),
+                  createCell(lang.kemampuanTulisan),
+                ],
+              })
+            ),
+          ],
+        }),
+
+        // Pernyataan
+        new Paragraph({
+          text: '',
+          spacing: { before: 400 },
+        }),
+        new Paragraph({
+          text: 'Demikian curriculum vitae ini saya buat dengan sebenarnya.',
+          font: 'Times New Roman',
+          size: 22,
+        }),
+        new Paragraph({
+          text: '',
+          spacing: { after: 400 },
+        }),
+        new Paragraph({
+          text: `${dataPribadi.tempatLahir}, ${formatDate(new Date())}`,
+          font: 'Times New Roman',
+          size: 22,
+          alignment: AlignmentType.RIGHT,
+        }),
+        new Paragraph({
+          text: '',
+          spacing: { after: 800 },
+        }),
+        new Paragraph({
+          text: dataPribadi.nama,
+          font: 'Times New Roman',
+          size: 22,
+          alignment: AlignmentType.RIGHT,
+        }),
+      ],
+    }],
   });
 
   // Generate and download
   const blob = await Packer.toBlob(doc);
-  const fileName = `CV_${data.namaLengkap.replace(/\s+/g, '_')}_${new Date().getFullYear()}.docx`;
+  const fileName = `CV_${expertName.replace(/\s+/g, '_')}_${new Date().getFullYear()}.docx`;
   saveAs(blob, fileName);
-}
+};

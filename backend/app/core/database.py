@@ -22,13 +22,19 @@ else:
         settings.DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
+        pool_size=10,  # Reduced to prevent exhaustion
+        max_overflow=20,  # Reduced overflow
+        pool_timeout=30,  # Faster timeout
+        pool_recycle=1800,  # Recycle connections after 30 minutes (more aggressive)
         connect_args={
             "ssl": ssl_ctx,
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0,
             "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4().hex}__",
+            "server_settings": {
+                "application_name": "tenderhub_backend",
+                "jit": "off",  # Disable JIT for faster queries
+            },
         },
     )
 
@@ -45,8 +51,12 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         try:
             yield session
+            await session.commit()  # Commit any pending transactions
+        except Exception:
+            await session.rollback()  # Rollback on error
+            raise
         finally:
-            await session.close()
+            await session.close()  # Always close the session
 
 
 async def create_tables():

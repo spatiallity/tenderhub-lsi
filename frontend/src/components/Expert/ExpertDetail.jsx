@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Save, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
+import { Plus, Save, Calendar as CalendarIcon, Trash2, FileText } from 'lucide-react';
 import { Badge, Stars, Btn, Card } from '../UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../../utils/constants';
 import { formatRupiah, initials } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
+import CVGeneratorModal from './CVGeneratorModal';
 
 export default function ExpertDetail({ expert }) {
   const {
@@ -23,6 +24,7 @@ export default function ExpertDetail({ expert }) {
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [isSavingHistory, setIsSavingHistory] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showCVGenerator, setShowCVGenerator] = useState(false);
 
   useEffect(() => {
     setProfileDraft({
@@ -68,23 +70,42 @@ export default function ExpertDetail({ expert }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* CV Generator Modal */}
+      {showCVGenerator && (
+        <CVGeneratorModal
+          expert={expert}
+          onClose={() => setShowCVGenerator(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex gap-4 items-start">
         <div className="w-[60px] h-[60px] rounded-full text-white font-extrabold flex items-center justify-center shrink-0 text-2xl" style={{ background: avatarColors[expert.id % avatarColors.length] }}>
           {initials(expert.nama)}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-extrabold tracking-tight leading-snug mb-1">{expert.nama}</h2>
-          <div className="text-slate-500 text-[13px] mb-2">
-            No. HP: {expert.noHp || 'Tidak tersedia'} | {expert.instansi}
-          </div>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            <Badge color={availabilityColor[expert.availability]}>{expert.availability}</Badge>
-            {(expert.portofolio || []).map(p => <Badge key={p} color={portfolioColor[p]}>{p}</Badge>)}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Stars rating={(expert.reviews || []).length ? (expert.rating || 0) : 0} />
-            <span className="text-xs font-extrabold">{(expert.reviews || []).length ? `${expert.rating} overall` : 'Belum direview'}</span>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-extrabold tracking-tight leading-snug mb-1">{expert.nama}</h2>
+              <div className="text-slate-500 text-[13px] mb-2">
+                No. HP: {expert.noHp || 'Tidak tersedia'} | {expert.instansi}
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <Badge color={availabilityColor[expert.availability]}>{expert.availability}</Badge>
+                {(expert.portofolio || []).map(p => <Badge key={p} color={portfolioColor[p]}>{p}</Badge>)}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Stars rating={(expert.reviews || []).length ? (expert.rating || 0) : 0} />
+                <span className="text-xs font-extrabold">{(expert.reviews || []).length ? `${expert.rating} overall` : 'Belum direview'}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowCVGenerator(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+            >
+              <FileText size={18} />
+              Generate CV
+            </button>
           </div>
         </div>
       </div>
