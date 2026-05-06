@@ -1,21 +1,111 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Save, Calendar as CalendarIcon, Trash2, FileText, Edit3 } from 'lucide-react';
+import { Plus, Save, Calendar as CalendarIcon, Trash2, FileText, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Badge, Stars, Btn, Card } from '../UI/index';
 import { portfolioColor, availabilityColor, avatarColors } from '../../utils/constants';
 import { formatRupiah, initials } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
-import CVGeneratorModal from './CVGeneratorModal';
-import CVDataModal from './CVDataModal';
+import api from '../../services/api';
 
-export default function ExpertDetail({ expert }) {
+// Sub-component: editable CV fields for a single project
+function ProjectCVFields({ project, isGuest }) {
+  const [draft, setDraft] = useState({
+    lokasi_proyek: project.lokasi_proyek || '',
+    pengguna_jasa: project.pengguna_jasa || '',
+    uraian_tugas: project.uraian_tugas || '',
+    waktu_mulai: project.waktu_mulai || '',
+    waktu_selesai: project.waktu_selesai || '',
+    posisi_penugasan: project.posisi_penugasan || '',
+    status_kepegawaian: project.status_kepegawaian || 'Tidak Tetap',
+    surat_referensi: project.surat_referensi || '-',
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/experts/projects/${project.id}`, draft);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { alert('Gagal menyimpan'); } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+      <div className="text-xs font-extrabold text-slate-700 mb-2 truncate">{project.proyek || project.nama_proyek}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Lokasi Proyek</label>
+          <input className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Misal: Jakarta Selatan, DKI Jakarta"
+            value={draft.lokasi_proyek} onChange={e => setDraft(p => ({ ...p, lokasi_proyek: e.target.value }))} disabled={isGuest} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Pengguna Jasa</label>
+          <input className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Misal: Direktorat Perencanaan, Otorita IKN"
+            value={draft.pengguna_jasa} onChange={e => setDraft(p => ({ ...p, pengguna_jasa: e.target.value }))} disabled={isGuest} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Waktu Mulai</label>
+          <input className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Misal: Agustus 2025"
+            value={draft.waktu_mulai} onChange={e => setDraft(p => ({ ...p, waktu_mulai: e.target.value }))} disabled={isGuest} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Waktu Selesai</label>
+          <input className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Misal: Desember 2025"
+            value={draft.waktu_selesai} onChange={e => setDraft(p => ({ ...p, waktu_selesai: e.target.value }))} disabled={isGuest} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Posisi Penugasan</label>
+          <input className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Misal: Ahli Perencanaan Wilayah"
+            value={draft.posisi_penugasan} onChange={e => setDraft(p => ({ ...p, posisi_penugasan: e.target.value }))} disabled={isGuest} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Status Kepegawaian</label>
+          <select className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            value={draft.status_kepegawaian} onChange={e => setDraft(p => ({ ...p, status_kepegawaian: e.target.value }))} disabled={isGuest}>
+            <option>Tidak Tetap</option>
+            <option>Tetap</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Surat Referensi</label>
+          <input className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Misal: 10/SK/RENTEK/04/2023 atau -"
+            value={draft.surat_referensi} onChange={e => setDraft(p => ({ ...p, surat_referensi: e.target.value }))} disabled={isGuest} />
+        </div>
+        <div className="flex flex-col gap-1 md:col-span-2">
+          <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Uraian Tugas</label>
+          <textarea className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100 resize-y min-h-[60px]"
+            placeholder="Deskripsi tugas dalam proyek ini..."
+            value={draft.uraian_tugas} onChange={e => setDraft(p => ({ ...p, uraian_tugas: e.target.value }))} disabled={isGuest} />
+        </div>
+      </div>
+      {!isGuest && (
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-colors ${saved ? 'bg-green-100 text-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+        >
+          <Save size={12} /> {saving ? 'Menyimpan...' : saved ? 'Tersimpan ✓' : 'Simpan'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function ExpertDetail({ expert, onClose }) {
+  const { canAddReview, canAddHistory, isGuest } = useAuth();
   const {
     reviewDraft, setReviewDraft, addReview,
     historyDraft, setHistoryDraft, addHistory,
-    updateExpertProfile, deleteExpert, deleteExpertHistory,
+    updateExpertProfile, deleteExpert, deleteExpertHistory
   } = useAppContext();
-  
-  const { profile, canAddReview } = useAuth();
 
   if (!expert) return null;
 
@@ -25,8 +115,33 @@ export default function ExpertDetail({ expert }) {
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [isSavingHistory, setIsSavingHistory] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [showCVGenerator, setShowCVGenerator] = useState(false);
-  const [showCVDataModal, setShowCVDataModal] = useState(false);
+
+  // CV state
+  const [showCV, setShowCV] = useState(false);
+  const [cvDraft, setCvDraft] = useState({
+    posisi_diusulkan: '',
+    tempat_lahir: '',
+    tanggal_lahir: '',
+    pendidikan_formal: [],
+    pendidikan_non_formal: [],
+    penguasaan_bahasa: [],
+  });
+  const [isSavingCV, setIsSavingCV] = useState(false);
+  // array field input drafts
+  const [pendFormalInput, setPendFormalInput] = useState('');
+  const [pendNonFormalInput, setPendNonFormalInput] = useState('');
+  const [bahasaInput, setBahasaInput] = useState('');
+
+  useEffect(() => {
+    setCvDraft({
+      posisi_diusulkan: expert?.posisi_diusulkan || '',
+      tempat_lahir: expert?.tempat_lahir || '',
+      tanggal_lahir: expert?.tanggal_lahir || '',
+      pendidikan_formal: expert?.pendidikan_formal || [],
+      pendidikan_non_formal: expert?.pendidikan_non_formal || [],
+      penguasaan_bahasa: expert?.penguasaan_bahasa || [],
+    });
+  }, [expert?.id]);
 
   useEffect(() => {
     setProfileDraft({
@@ -72,66 +187,23 @@ export default function ExpertDetail({ expert }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* CV Generator Modal */}
-      {showCVGenerator && (
-        <CVGeneratorModal
-          expert={expert}
-          onClose={() => setShowCVGenerator(false)}
-        />
-      )}
 
-      {/* CV Data Edit Modal */}
-      {showCVDataModal && (
-        <CVDataModal
-          expert={expert}
-          onClose={() => setShowCVDataModal(false)}
-          onSave={() => {
-            // Refresh expert data after save
-            window.location.reload();
-          }}
-        />
-      )}
-
-      {/* Header */}
-      <div className="flex gap-4 items-start">
-        <div className="w-[60px] h-[60px] rounded-full text-white font-extrabold flex items-center justify-center shrink-0 text-2xl" style={{ background: avatarColors[expert.id % avatarColors.length] }}>
-          {initials(expert.nama)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-extrabold tracking-tight leading-snug mb-1">{expert.nama}</h2>
-              <div className="text-slate-500 text-[13px] mb-2">
-                No. HP: {expert.noHp || 'Tidak tersedia'} | {expert.instansi}
-              </div>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                <Badge color={availabilityColor[expert.availability]}>{expert.availability}</Badge>
-                {(expert.portofolio || []).map(p => <Badge key={p} color={portfolioColor[p]}>{p}</Badge>)}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Stars rating={(expert.reviews || []).length ? (expert.rating || 0) : 0} />
-                <span className="text-xs font-extrabold">{(expert.reviews || []).length ? `${expert.rating} overall` : 'Belum direview'}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setShowCVDataModal(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm whitespace-nowrap"
-              >
-                <Edit3 size={16} />
-                Edit Data CV
-              </button>
-              <button
-                onClick={() => setShowCVGenerator(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm whitespace-nowrap"
-              >
-                <FileText size={16} />
-                Generate CV
-              </button>
-            </div>
+      {/* Expert Info Summary */}
+      <Card className="bg-slate-50 border border-slate-200">
+        <div className="flex items-center gap-4 mb-3">
+          <div className="flex flex-wrap gap-2">
+            <Badge color={availabilityColor[expert.availability]}>{expert.availability}</Badge>
+            {(expert.portofolio || []).map(p => <Badge key={p} color={portfolioColor[p]}>{p}</Badge>)}
           </div>
         </div>
-      </div>
+        <div className="text-sm text-slate-600 mb-2">
+          <strong>No. HP:</strong> {expert.noHp || 'Tidak tersedia'}
+        </div>
+        <div className="flex items-center gap-2">
+          <Stars rating={(expert.reviews || []).length ? (expert.rating || 0) : 0} />
+          <span className="text-sm font-semibold">{(expert.reviews || []).length ? `${expert.rating} overall` : 'Belum direview'}</span>
+        </div>
+      </Card>
 
       {/* Edit Profil Ringkas */}
       <Card className="bg-slate-50 border border-slate-200">
@@ -289,51 +361,227 @@ export default function ExpertDetail({ expert }) {
           ))}
         </div>
 
+        {canAddReview ? (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
           <div className="font-extrabold text-[13px] mb-2">Tambah Review</div>
-          
-          {!canAddReview ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-xs text-amber-700">
-                Anda harus login sebagai user terdaftar untuk menambahkan review.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <input 
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-100 focus:ring-2 focus:ring-blue-100 outline-none" 
-                placeholder="Nama reviewer" 
-                value={profile?.name || 'User'}
-                disabled
-                title="Reviewer otomatis terisi dengan nama Anda"
-              />
-              <Stars rating={reviewDraft.rating} size={22} onRate={(rating) => setReviewDraft(p => ({ ...p, rating }))} />
-              <textarea 
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none min-h-[76px] resize-y" 
-                placeholder="Komentar review..." 
-                value={reviewDraft.komentar} 
-                onChange={e => setReviewDraft(p => ({ ...p, komentar: e.target.value }))} 
-              />
-              <Btn 
-                className="primary small self-start" 
-                onClick={async () => {
-                  if (isSavingReview) return;
-                  setIsSavingReview(true);
-                  try {
-                    // Set reviewer name before saving
-                    setReviewDraft(p => ({ ...p, reviewer: profile?.name || 'User' }));
-                    await addReview(expert.id);
-                  } finally {
-                    setIsSavingReview(false);
-                  }
-                }}
-                disabled={isSavingReview}
-              >
-                <Save size={14} />{isSavingReview ? 'Menyimpan...' : 'Simpan Review'}
-              </Btn>
-            </div>
-          )}
+          <div className="flex flex-col gap-2">
+            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama reviewer" value={reviewDraft.reviewer} onChange={e => setReviewDraft(p => ({ ...p, reviewer: e.target.value }))} />
+            <Stars rating={reviewDraft.rating} size={22} onRate={(rating) => setReviewDraft(p => ({ ...p, rating }))} />
+            <textarea className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none min-h-[76px] resize-y" placeholder="Komentar review..." value={reviewDraft.komentar} onChange={e => setReviewDraft(p => ({ ...p, komentar: e.target.value }))} />
+            <Btn
+              className="primary small self-start"
+              onClick={async () => {
+                if (isSavingReview) return;
+                setIsSavingReview(true);
+                try { await addReview(expert.id); } finally { setIsSavingReview(false); }
+              }}
+              disabled={isSavingReview}
+            >
+              <Save size={14} />{isSavingReview ? 'Menyimpan...' : 'Simpan Review'}
+            </Btn>
+          </div>
         </div>
+        ) : (
+          <div className="text-xs text-slate-400 italic">Login untuk menambahkan review.</div>
+        )}
+      </div>
+
+      {/* CV Section */}
+      <div className="border border-slate-200 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setShowCV(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+        >
+          <span className="font-extrabold text-sm flex items-center gap-2">
+            <FileText size={16} className="text-blue-600" /> Data CV (Template Sucofindo)
+          </span>
+          {showCV ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {showCV && (
+          <div className="p-4 flex flex-col gap-5">
+
+            {/* ── Data Pribadi ── */}
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-extrabold uppercase tracking-widest text-slate-500">Data Pribadi</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-slate-500 font-semibold">Posisi yang Diusulkan</label>
+                  <input
+                    className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Misal: Team Leader, Ahli Geodesi"
+                    value={cvDraft.posisi_diusulkan}
+                    onChange={e => setCvDraft(p => ({ ...p, posisi_diusulkan: e.target.value }))}
+                    disabled={isGuest}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-slate-500 font-semibold">Tempat Lahir</label>
+                  <input
+                    className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Misal: Bandung"
+                    value={cvDraft.tempat_lahir}
+                    onChange={e => setCvDraft(p => ({ ...p, tempat_lahir: e.target.value }))}
+                    disabled={isGuest}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] text-slate-500 font-semibold">Tanggal Lahir</label>
+                  <input
+                    className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Misal: 7 Juli 1967"
+                    value={cvDraft.tanggal_lahir}
+                    onChange={e => setCvDraft(p => ({ ...p, tanggal_lahir: e.target.value }))}
+                    disabled={isGuest}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Pendidikan Formal ── */}
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-extrabold uppercase tracking-widest text-slate-500">Pendidikan Formal</div>
+              <div className="flex flex-col gap-1">
+                {cvDraft.pendidikan_formal.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs py-1 border-b border-slate-100">
+                    <span className="flex-1">{item}</span>
+                    {!isGuest && (
+                      <button onClick={() => setCvDraft(p => ({ ...p, pendidikan_formal: p.pendidikan_formal.filter((_, j) => j !== i) }))}
+                        className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {!isGuest && (
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Misal: S1 Teknik Planologi ITB (1990)"
+                    value={pendFormalInput}
+                    onChange={e => setPendFormalInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && pendFormalInput.trim()) {
+                        setCvDraft(p => ({ ...p, pendidikan_formal: [...p.pendidikan_formal, pendFormalInput.trim()] }));
+                        setPendFormalInput('');
+                      }
+                    }}
+                  />
+                  <Btn className="primary small" onClick={() => {
+                    if (!pendFormalInput.trim()) return;
+                    setCvDraft(p => ({ ...p, pendidikan_formal: [...p.pendidikan_formal, pendFormalInput.trim()] }));
+                    setPendFormalInput('');
+                  }}><Plus size={13} /></Btn>
+                </div>
+              )}
+            </div>
+
+            {/* ── Pendidikan Non Formal ── */}
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-extrabold uppercase tracking-widest text-slate-500">Pendidikan Non Formal / Pelatihan</div>
+              <div className="flex flex-col gap-1">
+                {cvDraft.pendidikan_non_formal.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs py-1 border-b border-slate-100">
+                    <span className="flex-1">{item}</span>
+                    {!isGuest && (
+                      <button onClick={() => setCvDraft(p => ({ ...p, pendidikan_non_formal: p.pendidikan_non_formal.filter((_, j) => j !== i) }))}
+                        className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {!isGuest && (
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Misal: Training Certificate GIS (2019)"
+                    value={pendNonFormalInput}
+                    onChange={e => setPendNonFormalInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && pendNonFormalInput.trim()) {
+                        setCvDraft(p => ({ ...p, pendidikan_non_formal: [...p.pendidikan_non_formal, pendNonFormalInput.trim()] }));
+                        setPendNonFormalInput('');
+                      }
+                    }}
+                  />
+                  <Btn className="primary small" onClick={() => {
+                    if (!pendNonFormalInput.trim()) return;
+                    setCvDraft(p => ({ ...p, pendidikan_non_formal: [...p.pendidikan_non_formal, pendNonFormalInput.trim()] }));
+                    setPendNonFormalInput('');
+                  }}><Plus size={13} /></Btn>
+                </div>
+              )}
+            </div>
+
+            {/* ── Penguasaan Bahasa ── */}
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-extrabold uppercase tracking-widest text-slate-500">Penguasaan Bahasa</div>
+              <div className="flex flex-wrap gap-1.5">
+                {cvDraft.penguasaan_bahasa.map((item, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-full">
+                    {item}
+                    {!isGuest && (
+                      <button onClick={() => setCvDraft(p => ({ ...p, penguasaan_bahasa: p.penguasaan_bahasa.filter((_, j) => j !== i) }))}
+                        className="text-slate-400 hover:text-red-500 ml-0.5"><X size={10} /></button>
+                    )}
+                  </span>
+                ))}
+              </div>
+              {!isGuest && (
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Misal: Bahasa Indonesia Baik"
+                    value={bahasaInput}
+                    onChange={e => setBahasaInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && bahasaInput.trim()) {
+                        setCvDraft(p => ({ ...p, penguasaan_bahasa: [...p.penguasaan_bahasa, bahasaInput.trim()] }));
+                        setBahasaInput('');
+                      }
+                    }}
+                  />
+                  <Btn className="primary small" onClick={() => {
+                    if (!bahasaInput.trim()) return;
+                    setCvDraft(p => ({ ...p, penguasaan_bahasa: [...p.penguasaan_bahasa, bahasaInput.trim()] }));
+                    setBahasaInput('');
+                  }}><Plus size={13} /></Btn>
+                </div>
+              )}
+            </div>
+
+            {/* ── Simpan Data Pribadi CV ── */}
+            {!isGuest && (
+              <Btn className="primary small self-start" disabled={isSavingCV} onClick={async () => {
+                setIsSavingCV(true);
+                try {
+                  await api.patch(`/experts/${expert.id}`, {
+                    posisi_diusulkan: cvDraft.posisi_diusulkan,
+                    tempat_lahir: cvDraft.tempat_lahir,
+                    tanggal_lahir: cvDraft.tanggal_lahir,
+                    pendidikan_formal: cvDraft.pendidikan_formal,
+                    pendidikan_non_formal: cvDraft.pendidikan_non_formal,
+                    penguasaan_bahasa: cvDraft.penguasaan_bahasa,
+                  });
+                  alert('Data CV disimpan');
+                } catch { alert('Gagal menyimpan'); } finally { setIsSavingCV(false); }
+              }}><Save size={13} /> {isSavingCV ? 'Menyimpan...' : 'Simpan Data CV'}</Btn>
+            )}
+
+            {/* ── Data Proyek (CV fields) ── */}
+            <div>
+              <div className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-3">Data Proyek untuk CV</div>
+              <div className="flex flex-col gap-4">
+                {(expert.history || []).map((h) => (
+                  <ProjectCVFields key={h.id} project={h} isGuest={isGuest} />
+                ))}
+                {(expert.history || []).length === 0 && (
+                  <div className="text-xs text-slate-400 italic">Belum ada riwayat proyek.</div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* Delete Expert */}

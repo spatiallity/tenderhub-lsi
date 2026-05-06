@@ -318,9 +318,68 @@ export default function AppShell() {
         {selectedRup && <RupDetail rup={selectedRup} />}
       </SidePanel>
       
-      <SidePanel open={!!selectedExpert} onClose={() => setSelectedExpertId(null)} title="Profil Tenaga Ahli">
-        {selectedExpert && <ExpertDetail expert={selectedExpert} />}
-      </SidePanel>
+      {/* Expert Detail Modal - Centered */}
+      {selectedExpert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center text-sm" style={{ background: '#3b82f6' }}>
+                  {selectedExpert.nama?.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">{selectedExpert.nama}</h2>
+                  <p className="text-sm text-slate-500">{selectedExpert.instansi}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+                    try {
+                      const response = await fetch(`${apiBase}/cv/${selectedExpert.id}/cv`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+                      });
+                      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', `CV_${selectedExpert.nama.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.docx`);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                      alert(`Gagal generate CV: ${err.message}`);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Generate CV
+                </button>
+                <button
+                  onClick={() => setSelectedExpertId(null)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <ExpertDetail expert={selectedExpert} onClose={() => setSelectedExpertId(null)} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <SidePanel open={showPotensiChart} onClose={() => setShowPotensiChart(false)} title="Distribusi Nilai Kontrak Tender">
         <PotensiChartPanel tenders={chartTenders} openTender={(id) => {
