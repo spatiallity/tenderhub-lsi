@@ -97,7 +97,8 @@ const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null, 
 
 // Auto-generate stageDeadlines for tenders that don't have it
 const ensureStageDeadlines = (tender) => {
-  if (!tender.stageDeadlines && tender.metode && tender.currentStage) {
+  // ALWAYS regenerate stageDeadlines to ensure fresh data with variation
+  if (tender.metode && tender.currentStage) {
     // Use tender.daysUntilDeadline if specified, otherwise use tender ID for variation
     const daysUntil = tender.daysUntilDeadline !== undefined ? tender.daysUntilDeadline : null;
     return {
