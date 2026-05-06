@@ -694,20 +694,33 @@ export const AppProvider = ({ children }) => {
         throw new Error(selectError.message);
       }
       
-      const payload = {
+      // Build payload with only valid fields from the database schema
+      const basePayload = {
         kd_tender: parseInt(tenderId),
         status_internal: patch.status_internal ?? (internalStatuses[tenderId] || 'Dipantau'),
         nama_paket: tender?.nama || tender?.nama_paket || null,
         hps: tender?.hps || null,
-        ...patch,
       };
       
+      // Add optional fields from patch if they exist
+      if (patch.assigned_pic !== undefined) basePayload.assigned_pic = patch.assigned_pic;
+      if (patch.catatan_internal !== undefined) basePayload.catatan_internal = patch.catatan_internal;
+      if (patch.nama_klpd !== undefined) basePayload.nama_klpd = patch.nama_klpd;
+      if (patch.assigned_expert_ids !== undefined) basePayload.assigned_expert_ids = patch.assigned_expert_ids;
+      if (patch.subporto_rekomendasi !== undefined) basePayload.subporto_rekomendasi = patch.subporto_rekomendasi;
+      if (patch.relevance_score !== undefined) basePayload.relevance_score = patch.relevance_score;
+      
+      console.log('[ensureWatchlistEntry] Payload:', basePayload);
+      
       if (existing && existing.id) {
-        // Update existing entry
+        // Update existing entry - remove kd_tender from update payload
+        const updatePayload = { ...basePayload };
+        delete updatePayload.kd_tender; // Don't update the primary key
+        
         console.log('[ensureWatchlistEntry] Updating existing entry:', existing.id);
         const { error } = await supabase
           .from('tender_watchlist')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', existing.id);
         if (error) {
           console.error('[ensureWatchlistEntry] Update error:', error);
@@ -718,7 +731,7 @@ export const AppProvider = ({ children }) => {
         console.log('[ensureWatchlistEntry] Inserting new entry for tender:', tenderId);
         const { error } = await supabase
           .from('tender_watchlist')
-          .insert(payload);
+          .insert(basePayload);
         if (error) {
           console.error('[ensureWatchlistEntry] Insert error:', error);
           throw new Error(error.message);
