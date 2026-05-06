@@ -3,7 +3,7 @@ import { subDays, subMonths, format } from 'date-fns';
 
 // Helper function to generate stage deadlines based on current stage
 // LOGIC: Current stage END DATE determines the deadline badge
-const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null, tenderId = 1) => {
+const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null) => {
   const today = new Date(); // Use actual today
   
   const prakualDurations = [7, 5, 3, 7, 5, 3, 2, 3, 5, 5, 3, 7, 5, 3, 5, 2, 3, 5, 4, 2, 3];
@@ -48,12 +48,9 @@ const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null, 
   ];
   
   // STEP 1: Determine when current stage will END (this is the deadline)
-  // Add variation based on tender ID to create diverse deadlines
+  // Deterministic based on currentStage to ensure consistency
   if (daysUntilDeadline === null) {
-    // Create variation: -5 to +20 days from today
-    // Use tender ID as seed for consistent but varied results
-    const seed = (tenderId * 17 + currentStage * 13) % 26;
-    daysUntilDeadline = seed - 5; // Range: -5 to 20 days
+    daysUntilDeadline = ((currentStage * 7 + 3) % 15); // 0 to 14 days, deterministic
   }
   
   // STEP 2: Calculate current stage END date (the deadline)
@@ -97,13 +94,12 @@ const generateStageDeadlines = (metode, currentStage, daysUntilDeadline = null, 
 
 // Auto-generate stageDeadlines for tenders that don't have it
 const ensureStageDeadlines = (tender) => {
-  // ALWAYS regenerate stageDeadlines to ensure fresh data with variation
-  if (tender.metode && tender.currentStage) {
-    // Use tender.daysUntilDeadline if specified, otherwise use tender ID for variation
+  if (!tender.stageDeadlines && tender.metode && tender.currentStage) {
+    // Use tender.daysUntilDeadline if specified, otherwise random
     const daysUntil = tender.daysUntilDeadline !== undefined ? tender.daysUntilDeadline : null;
     return {
       ...tender,
-      stageDeadlines: generateStageDeadlines(tender.metode, tender.currentStage, daysUntil, tender.id)
+      stageDeadlines: generateStageDeadlines(tender.metode, tender.currentStage, daysUntil)
     };
   }
   return tender;
@@ -120,7 +116,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 5294237950,
     metode: 'Prakualifikasi',
     currentStage: 3,
-    daysUntilDeadline: 2, // 2 hari lagi - URGENT
+
     provinsi: 'Jawa Tengah',
     portofolio: 'SDA',
     internalStatus: 'Akan Diikuti',
@@ -154,7 +150,7 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 2600855468,
     metode: 'Prakualifikasi',
     currentStage: 7,
-    daysUntilDeadline: 5, // 5 hari lagi - URGENT
+
     provinsi: 'DKI Jakarta',
     portofolio: 'FLP',
     internalStatus: 'Sudah Diikuti',
@@ -188,7 +184,6 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 7422288709,
     metode: 'Prakualifikasi',
     currentStage: 1,
-    daysUntilDeadline: 12, // 12 hari lagi
     provinsi: 'NTB',
     portofolio: 'FITI',
     internalStatus: 'Dipantau',
@@ -222,7 +217,6 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 3614224566,
     metode: 'Prakualifikasi',
     currentStage: 9,
-    daysUntilDeadline: -2, // Sudah lewat 2 hari - EXPIRED
     provinsi: 'Jawa Barat',
     portofolio: 'SDA',
     internalStatus: 'Sudah Diikuti',
@@ -256,7 +250,6 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 2097046778,
     metode: 'Pascakualifikasi',
     currentStage: 4,
-    daysUntilDeadline: 18, // 18 hari lagi
     provinsi: 'Jawa Barat',
     portofolio: 'FLP',
     internalStatus: 'Akan Diikuti',
@@ -290,7 +283,6 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 10489969042,
     metode: 'Prakualifikasi',
     currentStage: 2,
-    daysUntilDeadline: 8, // 8 hari lagi
     provinsi: 'Kalimantan Timur',
     portofolio: 'SDA',
     internalStatus: 'Dipantau',
@@ -324,7 +316,6 @@ const FALLBACK_TENDERS_RAW = [
     pagu: 4380000000,
     metode: 'Prakualifikasi',
     currentStage: 4,
-    daysUntilDeadline: 15, // 15 hari lagi
     provinsi: 'Jawa Barat',
     portofolio: 'SDA',
     internalStatus: 'Akan Diikuti',
