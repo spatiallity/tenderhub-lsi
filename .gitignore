@@ -18,3 +18,13 @@ backend/lsi_tender.db
 # OS files
 .DS_Store
 Thumbs.db
+
+# Binary assets (to prevent Hugging Face sync errors)
+frontend/public/assets/**/*.png
+frontend/public/assets/**/*.jpg
+frontend/public/assets/**/*.jpeg
+frontend/public/assets/**/*.gif
+frontend/public/assets/**/*.svg
+frontend/public/assets/**/*.ico
+frontend/public/assets/**/*.pdf
+frontend/public/assets/**/*.zip

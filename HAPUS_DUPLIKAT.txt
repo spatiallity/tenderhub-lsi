@@ -39,7 +39,22 @@ Artinya:
 
 LANGKAH 3: HAPUS DUPLICATE
 
-PILIHAN A: Hapus SEMUA duplicate sekaligus
+PILIHAN A: Hapus SEMUA yang ada tanda kurung ( )
+-----------------------------------------------
+
+DELETE FROM experts
+WHERE nama LIKE '%(%)%';
+
+Klik "Run"
+
+Artinya: Hapus semua expert yang namanya ada tanda kurung
+Contoh yang akan dihapus:
+- "Prof. Hendra Santoso (17)"
+- "Dr. Ahmad (18)"
+- "Ir. Budi Setiawan (19)"
+
+
+PILIHAN B: Hapus SEMUA duplicate sekaligus
 -----------------------------------------
 
 DELETE FROM experts
@@ -54,7 +69,7 @@ Klik "Run"
 Artinya: Hapus semua duplicate, keep yang ID terkecil
 
 
-PILIHAN B: Hapus duplicate berdasarkan nama tertentu
+PILIHAN C: Hapus duplicate berdasarkan nama tertentu
 ---------------------------------------------------
 
 Contoh 1: Hapus duplicate "Dr. Ahmad Santoso"
@@ -123,14 +138,32 @@ total_experts
 TIPS:
 
 1. SELALU run LANGKAH 2 dulu untuk lihat duplicate
-2. Pilih PILIHAN A untuk hapus semua sekaligus (tercepat)
-3. Pilih PILIHAN B untuk hapus per nama (lebih kontrol)
-4. Query akan keep expert dengan ID TERKECIL
-5. Setelah hapus, refresh frontend (F5)
+2. Pilih PILIHAN A untuk hapus semua yang ada tanda kurung ( ) - TERCEPAT!
+3. Pilih PILIHAN B untuk hapus semua duplicate sekaligus
+4. Pilih PILIHAN C untuk hapus per nama (lebih kontrol)
+5. Query akan keep expert dengan ID TERKECIL
+6. Setelah hapus, refresh frontend (F5)
 
 ═══════════════════════════════════════════════════════════════════
 
 CONTOH LENGKAP:
+
+CONTOH 1: Hapus semua yang ada tanda kurung
+------------------------------------------
+
+1. Run LANGKAH 2 → Lihat ada berapa expert dengan tanda kurung
+2. Run query ini:
+
+   DELETE FROM experts
+   WHERE nama LIKE '%(%)%';
+
+3. Run LANGKAH 4 → Verify
+4. Refresh frontend (F5)
+5. Done! ✅
+
+
+CONTOH 2: Hapus duplicate "Dr. Ahmad Santoso"
+--------------------------------------------
 
 1. Run LANGKAH 2 → Lihat ada "Dr. Ahmad Santoso" 3x
 2. Run query ini:

@@ -19,7 +19,15 @@ ORDER BY jumlah DESC, nama;
 -- STEP 2: Delete duplicates by name pattern
 -- ========================================================================
 
--- Contoh: Delete semua "Dr. Ahmad" kecuali yang pertama
+-- HAPUS SEMUA YANG ADA ( ) NYA
+-- Query ini akan delete semua expert yang namanya ada tanda kurung
+-- Contoh: "Prof. Hendra Santoso (17)" akan dihapus
+
+DELETE FROM experts
+WHERE nama LIKE '%(%)%';
+
+
+-- Contoh lain: Delete semua "Dr. Ahmad" kecuali yang pertama
 -- Ganti 'Dr. Ahmad%' dengan nama yang mau di-cleanup
 
 DELETE FROM experts
