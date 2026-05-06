@@ -24,4 +24,4 @@ jobs:
             exit 1
           fi
           git remote add hf https://spatiallity:$HF_TOKEN@huggingface.co/spaces/spatiallity/tenderhub-api
-          git push hf main --force
+          GIT_LFS_SKIP_SMUDGE=1 git push hf main --force

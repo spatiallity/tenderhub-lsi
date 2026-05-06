@@ -1,3 +1,4 @@
+frontend/public/assets/sucofindo-logo.png filter=lfs diff=lfs merge=lfs -text
 *.docx filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
 *.xlsx filter=lfs diff=lfs merge=lfs -text
