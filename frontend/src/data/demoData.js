@@ -863,7 +863,7 @@ export const FALLBACK_EXPERTS = [
   {
     id: 16,
     nama: 'Arvian Riatmaja, S.T., M.Cs.',
-    noHp: '0812-3456-7890',
+    noHp: '0857-1234-9876',
     instansi: 'Universitas Gadjah Mada',
     keahlian: ['Full Stack Development', 'AI System Architect', 'Geospatial Data'],
     availability: 'Tersedia',

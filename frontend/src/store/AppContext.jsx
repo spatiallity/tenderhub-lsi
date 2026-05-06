@@ -199,7 +199,34 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     api.get('/experts')
-      .then(res => setExpertsRaw(res.data || []))
+      .then(res => {
+        // Transform API response from snake_case to camelCase
+        const transformedExperts = (res.data || []).map(e => ({
+          ...e,
+          noHp: e.no_hp || '',
+          portofolio: e.subporto || [],
+          rating: e.rating_avg || 0,
+          proyek: e.jumlah_proyek || 0,
+          history: (e.projects || []).map(p => ({
+            id: p.id,
+            proyek: p.nama_proyek,
+            klien: p.pemberi_kerja,
+            tahun: p.tahun,
+            peran: p.peran,
+            nilai: p.nilai_proyek,
+            bersama: p.bersama,
+            status: p.status_proyek
+          })),
+          reviews: (e.reviews || []).map(r => ({
+            id: r.id,
+            reviewer: r.reviewer_nama,
+            rating: r.rating,
+            komentar: r.komentar,
+            tanggal: new Date(r.created_at).toLocaleDateString('id-ID')
+          }))
+        }));
+        setExpertsRaw(transformedExperts);
+      })
       .catch(() => {
         setExpertsRaw(FALLBACK_EXPERTS);
         showToast('API expert belum tersambung. Dummy tenaga ahli lokal dimuat.', 'error');
@@ -384,22 +411,45 @@ export const AppProvider = ({ children }) => {
     
     const body = {
       nama: draft.nama.trim(),
+      no_hp: draft.noHp?.trim() || null,
       instansi: draft.instansi?.trim() || 'Eksternal SUCOFINDO',
       keahlian: [draft.keahlian.trim()],
       availability: draft.availability || 'Tersedia',
-      portofolio: [draft.portfolio || 'SDA'],
-      rating: 4.2,
-      proyek: 0,
+      subporto: [draft.portfolio || 'SDA'],
+      rating_avg: 4.2,
+      jumlah_proyek: 0,
     };
     
     try {
       const res = await api.post('/experts', body);
-      setExpertsRaw(prev => [...prev, res.data]);
+      // Transform response to match frontend format
+      const transformedExpert = {
+        ...res.data,
+        noHp: res.data.no_hp || '',
+        portofolio: res.data.subporto || [],
+        rating: res.data.rating_avg || 0,
+        proyek: res.data.jumlah_proyek || 0,
+        history: [],
+        reviews: []
+      };
+      setExpertsRaw(prev => [...prev, transformedExpert]);
       showToast('Tenaga ahli berhasil ditambahkan');
       return true; // ✅ Return success
     } catch (e) {
       console.error('[addExpert] Failed to add expert:', e);
-      const fallbackExpert = { ...body, id: Date.now(), noHp: draft.noHp || '', history: [], reviews: [] };
+      const fallbackExpert = { 
+        id: Date.now(), 
+        nama: draft.nama.trim(),
+        noHp: draft.noHp?.trim() || '', 
+        instansi: draft.instansi?.trim() || 'Eksternal SUCOFINDO',
+        keahlian: [draft.keahlian.trim()],
+        availability: draft.availability || 'Tersedia',
+        portofolio: [draft.portfolio || 'SDA'],
+        rating: 4.2,
+        proyek: 0,
+        history: [], 
+        reviews: [] 
+      };
       setExpertsRaw(prev => [...prev, fallbackExpert]);
       showToast('API expert belum tersambung. Data expert disimpan sementara di browser.', 'error');
       return false; // ❌ Return failure
@@ -413,7 +463,7 @@ export const AppProvider = ({ children }) => {
   const updateExpertProfile = useCallback(async (expertId, patch) => {
     const safePatch = {
       nama: patch?.nama?.trim(),
-      noHp: patch?.noHp?.trim(),
+      no_hp: patch?.noHp?.trim(),
       instansi: patch?.instansi?.trim(),
     };
     try {
@@ -421,7 +471,13 @@ export const AppProvider = ({ children }) => {
     } catch {
       // Keep local fallback update when API is unavailable.
     }
-    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { ...e, ...safePatch } : e));
+    // Update local state with camelCase version
+    setExpertsRaw(prev => prev.map(e => e.id === expertId ? { 
+      ...e, 
+      nama: safePatch.nama || e.nama,
+      noHp: safePatch.no_hp || e.noHp,
+      instansi: safePatch.instansi || e.instansi
+    } : e));
     showToast('Profil tenaga ahli berhasil diperbarui');
   }, [showToast]);
 
