@@ -23,5 +23,10 @@ jobs:
             echo "Error: HF_TOKEN is not set in GitHub Secrets"
             exit 1
           fi
+          
+          # Remove binary files before pushing to HF
+          git rm --cached frontend/public/assets/sucofindo-logo.png || true
+          git commit -m "temp: remove binary assets for HF" || true
+          
           git remote add hf https://spatiallity:$HF_TOKEN@huggingface.co/spaces/spatiallity/tenderhub-api
-          GIT_LFS_SKIP_SMUDGE=1 git push hf main --force
+          git push hf HEAD:main --force
