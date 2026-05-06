@@ -193,14 +193,21 @@ export const AppProvider = ({ children }) => {
   }, []); // Run only once on mount
 
   useEffect(() => {
-    api.get('/rup/search', { params: { limit: 100 } })
-      .then(res => setRupRaw(res.data || []))
-      .catch(() => {
+    const loadRup = async () => {
+      try {
+        const res = await api.get('/rup/search', { params: { limit: 100 } });
+        setRupRaw(res.data || []);
+      } catch (err) {
+        console.error('[AppContext] Failed to load RUP:', err);
         setRupRaw(FALLBACK_RUP);
         showToast('API RUP belum tersambung. Dummy RUP lokal dimuat.', 'error');
-      })
-      .finally(() => setLoadingRup(false));
-  }, []); // Removed showToast - run only once
+      } finally {
+        setLoadingRup(false);
+      }
+    };
+    
+    loadRup();
+  }, []); // Run only once on mount
 
   useEffect(() => {
     api.get('/experts')
