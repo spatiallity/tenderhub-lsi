@@ -774,16 +774,25 @@ export const AppProvider = ({ children }) => {
       }
     }
 
+    // Save old status for rollback
+    const oldStatus = internalStatuses[tenderId];
+    
+    // Optimistic update
+    console.log('[updateTenderStatus] Updating status:', tenderId, newStatus);
     window.dispatchEvent(new CustomEvent('tender-local-update', { detail: { tenderId } }));
     setInternalStatuses(prev => ({ ...prev, [tenderId]: newStatus }));
 
     try {
       await ensureWatchlistEntry(tenderId, { status_internal: newStatus });
+      console.log('[updateTenderStatus] Status saved successfully');
+      showToast('Status berhasil diperbarui');
     } catch (err) {
-      console.error('[updateTenderStatus] Supabase error:', err.message);
-      throw new Error('sync_failed');
+      console.error('[updateTenderStatus] Failed to save:', err);
+      // Rollback to old status
+      setInternalStatuses(prev => ({ ...prev, [tenderId]: oldStatus }));
+      showToast('Gagal menyimpan status ke database', 'error');
     }
-  }, [user, isGuest, tenders, ensureWatchlistEntry, showToast]);
+  }, [user, isGuest, tenders, internalStatuses, ensureWatchlistEntry, showToast]);
 
   const updateTenderPIC = useCallback(async (tenderId, userId) => {
     if (!user || isGuest) {
@@ -791,16 +800,25 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
+    // Save old PIC for rollback
+    const oldPIC = assignedPICs[tenderId];
+    
+    // Optimistic update
+    console.log('[updateTenderPIC] Updating PIC:', tenderId, userId);
     window.dispatchEvent(new CustomEvent('tender-local-update', { detail: { tenderId } }));
     setAssignedPICs(prev => ({ ...prev, [tenderId]: userId }));
 
     try {
       await ensureWatchlistEntry(tenderId, { assigned_pic: userId || null });
+      console.log('[updateTenderPIC] PIC saved successfully');
+      showToast('PIC berhasil diperbarui');
     } catch (err) {
-      console.error('[updateTenderPIC] Supabase error:', err.message);
-      throw new Error('sync_failed');
+      console.error('[updateTenderPIC] Failed to save:', err);
+      // Rollback to old PIC
+      setAssignedPICs(prev => ({ ...prev, [tenderId]: oldPIC }));
+      showToast('Gagal menyimpan PIC ke database', 'error');
     }
-  }, [user, isGuest, tenders, internalStatuses, ensureWatchlistEntry, showToast]);
+  }, [user, isGuest, assignedPICs, ensureWatchlistEntry, showToast]);
 
   const addTenderNote = useCallback(async (tenderId, noteObj) => {
     if (!user || isGuest) {
@@ -808,17 +826,26 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
+    // Save old notes for rollback
+    const oldNotes = tenderNotes[tenderId] || [];
+    const updatedNotes = [...oldNotes, noteObj];
+    
+    // Optimistic update
+    console.log('[addTenderNote] Adding note:', tenderId);
     window.dispatchEvent(new CustomEvent('tender-local-update', { detail: { tenderId } }));
-    const updatedNotes = [...(tenderNotes[tenderId] || []), noteObj];
     setTenderNotes(prev => ({ ...prev, [tenderId]: updatedNotes }));
 
     try {
       await ensureWatchlistEntry(tenderId, { catatan_internal: JSON.stringify(updatedNotes) });
+      console.log('[addTenderNote] Note saved successfully');
+      showToast('Catatan berhasil ditambahkan');
     } catch (err) {
-      console.error('[addTenderNote] Supabase error:', err.message);
-      throw new Error('sync_failed');
+      console.error('[addTenderNote] Failed to save:', err);
+      // Rollback to old notes
+      setTenderNotes(prev => ({ ...prev, [tenderId]: oldNotes }));
+      showToast('Gagal menyimpan catatan ke database', 'error');
     }
-  }, [user, isGuest, tenders, internalStatuses, tenderNotes, ensureWatchlistEntry, showToast]);
+  }, [user, isGuest, tenderNotes, ensureWatchlistEntry, showToast]);
 
   const value = useMemo(() => ({
     // Sidebar
