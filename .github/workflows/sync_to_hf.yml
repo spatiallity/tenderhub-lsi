@@ -24,9 +24,16 @@ jobs:
             exit 1
           fi
           
-          # Remove binary files before pushing to HF
-          git rm --cached frontend/public/assets/sucofindo-logo.png || true
-          git commit -m "temp: remove binary assets for HF" || true
+          # Configure git identity
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           
+          # Create a clean branch without binary files
+          git checkout -b hf-deploy
+          
+          # Remove binary files from current commit and history
+          git filter-branch -f --index-filter 'git rm --cached --ignore-unmatch frontend/public/assets/sucofindo-logo.png' HEAD
+          
+          # Push to Hugging Face
           git remote add hf https://spatiallity:$HF_TOKEN@huggingface.co/spaces/spatiallity/tenderhub-api
-          git push hf HEAD:main --force
+          git push hf hf-deploy:main --force
