@@ -1,5 +1,5 @@
 # Restart Backend Script
-Write-Host "🔄 Restarting Backend Server..." -ForegroundColor Cyan
+Write-Host "Restarting Backend Server..." -ForegroundColor Cyan
 
 # Kill existing uvicorn processes
 Write-Host "Stopping existing backend processes..." -ForegroundColor Yellow

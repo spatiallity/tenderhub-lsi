@@ -1,15 +1,15 @@
 # Test CV Generator API
-Write-Host "🧪 Testing CV Generator API..." -ForegroundColor Cyan
+Write-Host "Testing CV Generator API..." -ForegroundColor Cyan
 Write-Host ""
 
 # Test 1: Check if backend is running
 Write-Host "Test 1: Checking backend health..." -ForegroundColor Yellow
 try {
     $health = Invoke-RestMethod -Uri "http://localhost:8000/api/health" -Method Get
-    Write-Host "✓ Backend is running!" -ForegroundColor Green
+    Write-Host "[OK] Backend is running!" -ForegroundColor Green
     Write-Host "  Status: $($health.status)" -ForegroundColor Gray
 } catch {
-    Write-Host "✗ Backend is NOT running!" -ForegroundColor Red
+    Write-Host "[ERROR] Backend is NOT running!" -ForegroundColor Red
     Write-Host "  Please run: .\restart_backend.ps1" -ForegroundColor Yellow
     exit 1
 }
@@ -20,12 +20,12 @@ Write-Host ""
 Write-Host "Test 2: Checking experts..." -ForegroundColor Yellow
 try {
     $experts = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/experts" -Method Get
-    Write-Host "✓ Found $($experts.Count) experts" -ForegroundColor Green
+    Write-Host "[OK] Found $($experts.Count) experts" -ForegroundColor Green
     if ($experts.Count -gt 0) {
         Write-Host "  First expert: $($experts[0].nama) (ID: $($experts[0].id))" -ForegroundColor Gray
     }
 } catch {
-    Write-Host "✗ Failed to get experts!" -ForegroundColor Red
+    Write-Host "[ERROR] Failed to get experts!" -ForegroundColor Red
     Write-Host "  Error: $_" -ForegroundColor Red
     exit 1
 }
@@ -43,17 +43,17 @@ if ($experts.Count -gt 0) {
         
         if (Test-Path $outputFile) {
             $fileSize = (Get-Item $outputFile).Length
-            Write-Host "✓ CV generated successfully!" -ForegroundColor Green
+            Write-Host "[OK] CV generated successfully!" -ForegroundColor Green
             Write-Host "  File: $outputFile" -ForegroundColor Gray
             Write-Host "  Size: $fileSize bytes" -ForegroundColor Gray
             Write-Host ""
             Write-Host "Opening CV file..." -ForegroundColor Cyan
             Start-Process $outputFile
         } else {
-            Write-Host "✗ CV file not created!" -ForegroundColor Red
+            Write-Host "[ERROR] CV file not created!" -ForegroundColor Red
         }
     } catch {
-        Write-Host "✗ Failed to generate CV!" -ForegroundColor Red
+        Write-Host "[ERROR] Failed to generate CV!" -ForegroundColor Red
         Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Red
         
         # Try to get more details
@@ -66,4 +66,4 @@ if ($experts.Count -gt 0) {
 }
 
 Write-Host ""
-Write-Host "✅ Testing complete!" -ForegroundColor Green
+Write-Host "[DONE] Testing complete!" -ForegroundColor Green
