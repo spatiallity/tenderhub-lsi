@@ -81,7 +81,7 @@ def generate_cv_from_template(expert_data, template_path):
     
     Template structure:
     - Table 0: Header info (Posisi, Nama, Tempat/Tanggal Lahir, Pendidikan, dll)
-    - Tables 1-N: Individual project entries with subsections a-i
+    - Tables 1-N: Individual project entries grouped by year
     - Last Table: Signature section
     """
     
@@ -105,14 +105,14 @@ def generate_cv_from_template(expert_data, template_path):
     if isinstance(pendidikan_formal, list) and pendidikan_formal:
         pendidikan_formal_text = "\n".join(str(p) for p in pendidikan_formal)
     else:
-        pendidikan_formal_text = "Belum diisi"
+        pendidikan_formal_text = ""  # Empty if no data
     
     # Format non-formal education with type checking
     pendidikan_non_formal = expert_data.get('pendidikan_non_formal', [])
     if isinstance(pendidikan_non_formal, list) and pendidikan_non_formal:
         pendidikan_non_formal_text = "\n".join(str(p) for p in pendidikan_non_formal)
     else:
-        pendidikan_non_formal_text = "Belum diisi"
+        pendidikan_non_formal_text = ""  # Empty if no data
     
     # Format language skills with type checking
     penguasaan_bahasa = expert_data.get('penguasaan_bahasa', [])
@@ -120,6 +120,19 @@ def generate_cv_from_template(expert_data, template_path):
         penguasaan_bahasa_text = "\n".join(str(b) for b in penguasaan_bahasa)
     else:
         penguasaan_bahasa_text = "Bahasa Indonesia Baik\nBahasa Inggris Baik"
+    
+    # Group projects by year
+    projects = expert_data.get('projects', [])
+    projects_by_year = {}
+    for project in projects:
+        year = project.get('tahun') or project.get('waktu_mulai', '').split()[0] if project.get('waktu_mulai') else 'Unknown'
+        if year not in projects_by_year:
+            projects_by_year[year] = []
+        projects_by_year[year].append(project)
+    
+    # Sort years descending
+    sorted_years = sorted(projects_by_year.keys(), reverse=True)
+    print(f"[CV Generator] Projects grouped by year: {sorted_years}")
     
     try:
         # Replace in Table 0 (Header info)
@@ -160,78 +173,99 @@ def generate_cv_from_template(expert_data, template_path):
                 replace_cell_text(header_table.rows[6].cells[3], penguasaan_bahasa_text,
                                 font_name='Arial', font_size=11, alignment='left')
         
-        # Replace project data in subsequent tables (Tables 1, 2, 3, ...)
-        projects = expert_data.get('projects', [])
+        # Replace project data - grouped by year
         project_tables = doc.tables[1:-1] if len(doc.tables) > 2 else []
         
-        print(f"[CV Generator] Processing {len(projects)} projects into {len(project_tables)} project tables")
+        print(f"[CV Generator] Processing {len(sorted_years)} years into {len(project_tables)} project tables")
         
-        for idx, project in enumerate(projects):
-            if idx >= len(project_tables):
+        table_idx = 0
+        for year in sorted_years:
+            if table_idx >= len(project_tables):
                 break
             
-            project_table = project_tables[idx]
-            print(f"[CV Generator] Processing project {idx+1}: {project.get('nama_proyek', 'N/A')}")
+            year_projects = projects_by_year[year]
+            project_table = project_tables[table_idx]
             
             # Determine correct cell index based on table structure
-            # Tables 1-2 use cell[4], Table 3+ use cell[11]
             data_cell_idx = 4 if len(project_table.columns) <= 5 else 11
             
-            # Row 1: a. Nama Proyek
-            if len(project_table.rows) > 1 and len(project_table.rows[1].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[1].cells[data_cell_idx], 
-                                project.get('nama_proyek', 'Belum diisi'),
-                                font_name='Arial', font_size=11, alignment='justify')
+            # Update year header (Row 0)
+            if len(project_table.rows) > 0:
+                year_text = f"TAHUN {year}" if year != 'Unknown' else "TAHUN"
+                # Clear all cells in row 0
+                for cell in project_table.rows[0].cells:
+                    replace_cell_text(cell, year_text, font_name='Arial', font_size=11, alignment='center')
             
-            # Row 2: b. Lokasi Proyek
-            if len(project_table.rows) > 2 and len(project_table.rows[2].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[2].cells[data_cell_idx], 
-                                project.get('lokasi_proyek', 'Belum diisi'),
-                                font_name='Arial', font_size=11, alignment='justify')
+            # Process first project in this year
+            if len(year_projects) > 0:
+                project = year_projects[0]
+                print(f"[CV Generator] Year {year}: {project.get('nama_proyek', 'N/A')}")
+                
+                # Row 1: a. Nama Proyek
+                if len(project_table.rows) > 1 and len(project_table.rows[1].cells) > data_cell_idx:
+                    nama_proyek = project.get('nama_proyek', '')
+                    replace_cell_text(project_table.rows[1].cells[data_cell_idx], 
+                                    nama_proyek,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 2: b. Lokasi Proyek
+                if len(project_table.rows) > 2 and len(project_table.rows[2].cells) > data_cell_idx:
+                    lokasi = project.get('lokasi_proyek', '')
+                    replace_cell_text(project_table.rows[2].cells[data_cell_idx], 
+                                    lokasi,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 3: c. Pengguna Jasa
+                if len(project_table.rows) > 3 and len(project_table.rows[3].cells) > data_cell_idx:
+                    pengguna_jasa = project.get('pengguna_jasa', '')
+                    replace_cell_text(project_table.rows[3].cells[data_cell_idx], 
+                                    pengguna_jasa,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 4: d. Nama Perusahaan
+                if len(project_table.rows) > 4 and len(project_table.rows[4].cells) > data_cell_idx:
+                    perusahaan = project.get('nama_perusahaan', '')
+                    replace_cell_text(project_table.rows[4].cells[data_cell_idx], 
+                                    perusahaan,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 5: e. Uraian Tugas
+                if len(project_table.rows) > 5 and len(project_table.rows[5].cells) > data_cell_idx:
+                    uraian = project.get('uraian_tugas', '')
+                    replace_cell_text(project_table.rows[5].cells[data_cell_idx], 
+                                    uraian,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 6: f. Waktu Pelaksanaan
+                if len(project_table.rows) > 6 and len(project_table.rows[6].cells) > data_cell_idx:
+                    waktu_mulai = project.get('waktu_mulai', '')
+                    waktu_selesai = project.get('waktu_selesai', '')
+                    waktu_text = f"{waktu_mulai}-{waktu_selesai}" if waktu_mulai and waktu_selesai else ""
+                    replace_cell_text(project_table.rows[6].cells[data_cell_idx], waktu_text,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 7: g. Posisi Penugasan
+                if len(project_table.rows) > 7 and len(project_table.rows[7].cells) > data_cell_idx:
+                    posisi = project.get('posisi_penugasan', '')
+                    replace_cell_text(project_table.rows[7].cells[data_cell_idx], 
+                                    posisi,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 8: h. Status Kepegawaian
+                if len(project_table.rows) > 8 and len(project_table.rows[8].cells) > data_cell_idx:
+                    status = project.get('status_kepegawaian', '')
+                    replace_cell_text(project_table.rows[8].cells[data_cell_idx], 
+                                    status,
+                                    font_name='Arial', font_size=11, alignment='justify')
+                
+                # Row 9: i. Surat Referensi
+                if len(project_table.rows) > 9 and len(project_table.rows[9].cells) > data_cell_idx:
+                    surat_ref = project.get('surat_referensi', '')
+                    replace_cell_text(project_table.rows[9].cells[data_cell_idx], 
+                                    surat_ref,
+                                    font_name='Arial', font_size=11, alignment='justify')
             
-            # Row 3: c. Pengguna Jasa
-            if len(project_table.rows) > 3 and len(project_table.rows[3].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[3].cells[data_cell_idx], 
-                                project.get('pengguna_jasa', 'Belum diisi'),
-                                font_name='Arial', font_size=11, alignment='justify')
-            
-            # Row 4: d. Nama Perusahaan
-            if len(project_table.rows) > 4 and len(project_table.rows[4].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[4].cells[data_cell_idx], 
-                                project.get('nama_perusahaan', 'PT SUCOFINDO (PERSERO)'),
-                                font_name='Arial', font_size=11, alignment='justify')
-            
-            # Row 5: e. Uraian Tugas
-            if len(project_table.rows) > 5 and len(project_table.rows[5].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[5].cells[data_cell_idx], 
-                                project.get('uraian_tugas', 'Belum diisi'),
-                                font_name='Arial', font_size=11, alignment='justify')
-            
-            # Row 6: f. Waktu Pelaksanaan
-            if len(project_table.rows) > 6 and len(project_table.rows[6].cells) > data_cell_idx:
-                waktu_mulai = project.get('waktu_mulai', '')
-                waktu_selesai = project.get('waktu_selesai', '')
-                waktu_text = f"{waktu_mulai}-{waktu_selesai}" if waktu_mulai and waktu_selesai else "Belum diisi"
-                replace_cell_text(project_table.rows[6].cells[data_cell_idx], waktu_text,
-                                font_name='Arial', font_size=11, alignment='justify')
-            
-            # Row 7: g. Posisi Penugasan
-            if len(project_table.rows) > 7 and len(project_table.rows[7].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[7].cells[data_cell_idx], 
-                                project.get('posisi_penugasan', 'Belum diisi'),
-                                font_name='Arial', font_size=11, alignment='justify')
-            
-            # Row 8: h. Status Kepegawaian
-            if len(project_table.rows) > 8 and len(project_table.rows[8].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[8].cells[data_cell_idx], 
-                                project.get('status_kepegawaian', 'Tidak Tetap'),
-                                font_name='Arial', font_size=11, alignment='justify')
-            
-            # Row 9: i. Surat Referensi
-            if len(project_table.rows) > 9 and len(project_table.rows[9].cells) > data_cell_idx:
-                replace_cell_text(project_table.rows[9].cells[data_cell_idx], 
-                                project.get('surat_referensi', '-'),
-                                font_name='Arial', font_size=11, alignment='justify')
+            table_idx += 1
         
         # Update signature table (last table)
         if len(doc.tables) > 0:

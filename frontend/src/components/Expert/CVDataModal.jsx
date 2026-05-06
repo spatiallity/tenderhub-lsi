@@ -329,11 +329,12 @@ const CVDataModal = ({ expert, onClose, onSave }) => {
 
           {/* Note */}
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <h4 className="font-semibold text-amber-900 mb-2">📝 Catatan</h4>
+            <h4 className="font-semibold text-amber-900 mb-2">📝 Catatan Penting</h4>
             <ul className="text-sm text-amber-700 space-y-1 ml-4 list-disc">
-              <li>Data proyek akan diambil dari Riwayat Pekerjaan yang sudah ada</li>
-              <li>Untuk edit data proyek, gunakan form "Tambah Riwayat Pekerjaan" di bawah</li>
-              <li>Maksimal 3 proyek pertama yang akan muncul di CV</li>
+              <li>Data proyek akan diambil dari <strong>Riwayat Pekerjaan</strong> yang sudah ada di bawah</li>
+              <li>Untuk edit data proyek (lokasi, pengguna jasa, uraian tugas, dll), gunakan form <strong>"Tambah Riwayat Pekerjaan"</strong></li>
+              <li>Proyek akan dikelompokkan berdasarkan <strong>tahun</strong> di CV</li>
+              <li>Pastikan data proyek sudah lengkap: lokasi, pengguna jasa, uraian tugas, waktu, posisi, status kepegawaian, surat referensi</li>
             </ul>
           </div>
         </div>
