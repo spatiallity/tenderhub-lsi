@@ -228,61 +228,106 @@ async def generate_expert_cv(
     Returns a downloadable DOCX file
     """
     
-    # Get expert with all related data
-    result = await db.execute(
-        select(Expert)
-        .options(selectinload(Expert.projects), selectinload(Expert.reviews))
-        .where(Expert.id == expert_id)
-    )
-    expert = result.scalars().first()
+    try:
+        # Get expert with all related data
+        result = await db.execute(
+            select(Expert)
+            .options(selectinload(Expert.projects), selectinload(Expert.reviews))
+            .where(Expert.id == expert_id)
+        )
+        expert = result.scalars().first()
+        
+        if not expert:
+            raise HTTPException(status_code=404, detail="Expert not found")
+        
+        print(f"[CV Generator] Generating CV for expert: {expert.nama} (ID: {expert_id})")
+        
+        # Prepare expert data following template structure
+        expert_data = {
+            'nama': expert.nama,
+            'posisi_diusulkan': getattr(expert, 'posisi_diusulkan', None) or 'Team Leader',
+            'tempat_lahir': getattr(expert, 'tempat_lahir', None) or 'Belum diisi',
+            'tanggal_lahir': getattr(expert, 'tanggal_lahir', None) or 'Belum diisi',
+            'pendidikan_formal': getattr(expert, 'pendidikan_formal', None) or [],
+            'pendidikan_non_formal': getattr(expert, 'pendidikan_non_formal', None) or [],
+            'penguasaan_bahasa': getattr(expert, 'penguasaan_bahasa', None) or ['Bahasa Indonesia Baik', 'Bahasa Inggris Baik'],
+            'projects': [
+                {
+                    'nama_proyek': p.nama_proyek,
+                    'lokasi_proyek': getattr(p, 'lokasi_proyek', None) or 'Belum diisi',
+                    'pengguna_jasa': getattr(p, 'pengguna_jasa', None) or p.pemberi_kerja or 'Belum diisi',
+                    'nama_perusahaan': p.nama_perusahaan_lain or 'PT SUCOFINDO (PERSERO)',
+                    'uraian_tugas': getattr(p, 'uraian_tugas', None) or 'Belum diisi',
+                    'waktu_mulai': getattr(p, 'waktu_mulai', None) or (str(p.tahun) if p.tahun else ''),
+                    'waktu_selesai': getattr(p, 'waktu_selesai', None) or (str(p.tahun) if p.tahun else ''),
+                    'posisi_penugasan': getattr(p, 'posisi_penugasan', None) or p.peran or 'Belum diisi',
+                    'status_kepegawaian': getattr(p, 'status_kepegawaian', None) or 'Tidak Tetap',
+                    'surat_referensi': getattr(p, 'surat_referensi', None) or '-',
+                }
+                for p in expert.projects[:3]  # Max 3 projects (template has 3 project tables)
+            ]
+        }
+        
+        print(f"[CV Generator] Expert data prepared. Projects: {len(expert_data['projects'])}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[CV Generator] Error preparing expert data: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error preparing expert data: {str(e)}"
+        )
     
-    if not expert:
-        raise HTTPException(status_code=404, detail="Expert not found")
-    
-    # Prepare expert data following template structure
-    expert_data = {
-        'nama': expert.nama,
-        'posisi_diusulkan': getattr(expert, 'posisi_diusulkan', None) or 'Team Leader',
-        'tempat_lahir': getattr(expert, 'tempat_lahir', None) or 'Belum diisi',
-        'tanggal_lahir': getattr(expert, 'tanggal_lahir', None) or 'Belum diisi',
-        'pendidikan_formal': getattr(expert, 'pendidikan_formal', None) or [],
-        'pendidikan_non_formal': getattr(expert, 'pendidikan_non_formal', None) or [],
-        'penguasaan_bahasa': getattr(expert, 'penguasaan_bahasa', None) or ['Bahasa Indonesia Baik', 'Bahasa Inggris Baik'],
-        'projects': [
-            {
-                'nama_proyek': p.nama_proyek,
-                'lokasi_proyek': getattr(p, 'lokasi_proyek', None) or 'Belum diisi',
-                'pengguna_jasa': getattr(p, 'pengguna_jasa', None) or p.pemberi_kerja or 'Belum diisi',
-                'nama_perusahaan': p.nama_perusahaan_lain or 'PT SUCOFINDO (PERSERO)',
-                'uraian_tugas': getattr(p, 'uraian_tugas', None) or 'Belum diisi',
-                'waktu_mulai': getattr(p, 'waktu_mulai', None) or (str(p.tahun) if p.tahun else ''),
-                'waktu_selesai': getattr(p, 'waktu_selesai', None) or (str(p.tahun) if p.tahun else ''),
-                'posisi_penugasan': getattr(p, 'posisi_penugasan', None) or p.peran or 'Belum diisi',
-                'status_kepegawaian': getattr(p, 'status_kepegawaian', None) or 'Tidak Tetap',
-                'surat_referensi': getattr(p, 'surat_referensi', None) or '-',
-            }
-            for p in expert.projects[:3]  # Max 3 projects (template has 3 project tables)
-        ]
-    }
-    
-    # Get template path
+    # Get template path - try multiple locations
+    # 1. Try project root (development)
     template_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
         'TEMPLATE_CV_EXPERT.docx'
     )
     
+    # 2. If not found, try one level up (deployment)
     if not os.path.exists(template_path):
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))),
+            'TEMPLATE_CV_EXPERT.docx'
+        )
+    
+    # 3. If still not found, try current working directory
+    if not os.path.exists(template_path):
+        template_path = os.path.join(os.getcwd(), 'TEMPLATE_CV_EXPERT.docx')
+    
+    # 4. If still not found, try backend parent directory
+    if not os.path.exists(template_path):
+        template_path = os.path.join(os.path.dirname(os.getcwd()), 'TEMPLATE_CV_EXPERT.docx')
+    
+    print(f"[CV Generator] Template path: {template_path}")
+    print(f"[CV Generator] Template exists: {os.path.exists(template_path)}")
+    print(f"[CV Generator] Current working directory: {os.getcwd()}")
+    
+    if not os.path.exists(template_path):
+        # List all attempted paths for debugging
+        attempted_paths = [
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'TEMPLATE_CV_EXPERT.docx'),
+            os.path.join(os.getcwd(), 'TEMPLATE_CV_EXPERT.docx'),
+            os.path.join(os.path.dirname(os.getcwd()), 'TEMPLATE_CV_EXPERT.docx'),
+        ]
         raise HTTPException(
             status_code=500, 
-            detail=f"CV template not found at: {template_path}. Please ensure TEMPLATE_CV_EXPERT.docx exists in project root."
+            detail=f"CV template not found. Tried paths: {', '.join(attempted_paths)}. Current dir: {os.getcwd()}"
         )
     
     # Generate CV
     try:
+        print(f"[CV Generator] Starting CV generation...")
         cv_file = generate_cv_from_template(expert_data, template_path)
+        print(f"[CV Generator] CV generated successfully")
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[CV Generator] Error generating CV: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate CV: {str(e)}"
