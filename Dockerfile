@@ -16,6 +16,11 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # This will put the 'app' folder at /home/user/app/app
 COPY --chown=user backend/ .
 
+# CV template lives at repo root and is loaded at runtime by
+# backend/app/api/v1/cv_generator_dynamic.py — copy it into WORKDIR so
+# the path-resolution fallbacks find it.
+COPY --chown=user TEMPLATE_CV_EXPERT.docx ./TEMPLATE_CV_EXPERT.docx
+
 # Copy production environment file
 COPY --chown=user .env.production .env
 
