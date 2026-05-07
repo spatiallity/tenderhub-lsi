@@ -11,6 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true                    # resolve LFS pointers to real files
+
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y git-lfs
+          git lfs install
+          git lfs pull
 
       - name: Push to Hugging Face
         env:
@@ -20,19 +29,16 @@ jobs:
             echo "Error: HF_TOKEN is not set in GitHub Secrets"
             exit 1
           fi
-          
-          # Configure git identity
+
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          
-          # Create a new orphan branch (no history)
+
+          # Orphan branch — clean history for HF.
           git checkout --orphan hf-deploy
-          
-          # Remove binary files before committing — HF Spaces rejects raw binaries
-          # (must use Xet/LFS). Strip everything HF doesn't need to run the API.
+
+          # Strip raw binaries HF rejects (it requires Xet/LFS for these).
+          # Keep TEMPLATE_CV_EXPERT.docx — it ships via LFS (.gitattributes).
           rm -f frontend/public/assets/sucofindo-logo.png
-          rm -f .gitattributes
-          # All Word docs (CV samples, templates, Office lock files)
           find . -path ./.git -prune -o -type f \( \
               -iname '*.docx' -o \
               -iname '*.doc'  -o \
@@ -45,18 +51,20 @@ jobs:
               -iname '*.gif'  -o \
               -iname '*.zip'  -o \
               -iname '~$*'    \
-            \) -print -delete || true
+            \) ! -name 'TEMPLATE_CV_EXPERT.docx' -print -delete || true
 
-          # Add all files (except removed binaries)
+          # Re-track template via LFS on the deploy branch so HF stores it via Xet/LFS.
+          cat > .gitattributes <<'GA'
+          TEMPLATE_CV_EXPERT.docx filter=lfs diff=lfs merge=lfs -text
+          GA
+
           git add -A
-          
-          # Create initial commit
-          git commit -m "Deploy to HuggingFace Space (no binary files)"
-          
-          # Add HF remote
+          git commit -m "Deploy to HuggingFace Space"
+
           git remote add hf https://spatiallity:$HF_TOKEN@huggingface.co/spaces/spatiallity/tenderhub-api || true
-          
-          # Force push to HuggingFace (orphan branch = clean history)
+
+          # LFS objects must reach HF too.
+          git lfs push --all hf || true
           git push hf hf-deploy:main --force
-          
-          echo "✅ Successfully synced to Hugging Face Spaces"
+
+          echo "Successfully synced to Hugging Face Spaces"
