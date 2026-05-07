@@ -508,31 +508,41 @@ async def _build_cv_for_expert(expert_id: int, db: AsyncSession):
             detail=f"Error preparing expert data: {str(e)}"
         )
     
-    # Get template path
-    template_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-        'TEMPLATE_CV_EXPERT.docx'
-    )
+    # Get template path - try multiple locations
+    # In HuggingFace: working dir is /home/user/app, file is at /home/user/app/TEMPLATE_CV_EXPERT.docx
+    # In local dev: file is at backend/TEMPLATE_CV_EXPERT.docx
     
-    if not os.path.exists(template_path):
-        template_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))),
-            'TEMPLATE_CV_EXPERT.docx'
-        )
+    possible_paths = [
+        # HuggingFace: /home/user/app/TEMPLATE_CV_EXPERT.docx
+        os.path.join(os.getcwd(), 'TEMPLATE_CV_EXPERT.docx'),
+        # Relative to this file: backend/app/api/v1/ -> backend/
+        os.path.join(os.path.dirname(__file__), '..', '..', '..', 'TEMPLATE_CV_EXPERT.docx'),
+        os.path.join(os.path.dirname(__file__), '..', '..', 'TEMPLATE_CV_EXPERT.docx'),
+        os.path.join(os.path.dirname(__file__), '..', 'TEMPLATE_CV_EXPERT.docx'),
+        # Absolute fallback
+        '/home/user/app/TEMPLATE_CV_EXPERT.docx',
+        '/app/TEMPLATE_CV_EXPERT.docx',
+    ]
     
-    if not os.path.exists(template_path):
-        template_path = os.path.join(os.getcwd(), 'TEMPLATE_CV_EXPERT.docx')
+    template_path = None
+    for p in possible_paths:
+        resolved = os.path.abspath(p)
+        print(f"[CV Generator Dynamic] Checking template path: {resolved}")
+        if os.path.exists(resolved):
+            template_path = resolved
+            print(f"[CV Generator Dynamic] ✅ Template found at: {resolved}")
+            break
     
-    if not os.path.exists(template_path):
-        template_path = os.path.join(os.path.dirname(os.getcwd()), 'TEMPLATE_CV_EXPERT.docx')
-    
-    print(f"[CV Generator Dynamic] Template path: {template_path}")
-    print(f"[CV Generator Dynamic] Template exists: {os.path.exists(template_path)}")
-    
-    if not os.path.exists(template_path):
+    if not template_path:
+        # List files in cwd for debugging
+        try:
+            cwd_files = os.listdir(os.getcwd())
+            print(f"[CV Generator Dynamic] Files in cwd ({os.getcwd()}): {cwd_files}")
+        except Exception:
+            pass
         raise HTTPException(
             status_code=500, 
-            detail=f"CV template not found at: {template_path}"
+            detail=f"CV template not found. Searched: {[os.path.abspath(p) for p in possible_paths]}"
         )
     
     # Generate CV with dynamic tables
