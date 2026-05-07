@@ -268,6 +268,7 @@ export default function TenderPage() {
       result = [...result].sort((a, b) => {
         let va, vb;
         switch (sortKey) {
+          case 'kd_tender': va = String(a.kd_tender || ''); vb = String(b.kd_tender || ''); break;
           case 'nama': va = (a.nama || '').toLowerCase(); vb = (b.nama || '').toLowerCase(); break;
           case 'instansi': va = (a.instansi || '').toLowerCase(); vb = (b.instansi || '').toLowerCase(); break;
           case 'hps': va = a.hps || 0; vb = b.hps || 0; break;

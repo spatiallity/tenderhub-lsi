@@ -71,8 +71,48 @@ function parseSirupXlsx(file) {
   });
 }
 
+// SIRUP "Pemilihan" cell looks like "January 2026". Convert to ISO 1st-of-month.
+const MONTHS_EN = { january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11 };
+const MONTHS_ID = { januari:0,februari:1,maret:2,april:3,mei:4,juni:5,juli:6,agustus:7,september:8,oktober:9,november:10,desember:11 };
+
+function parsePemilihan(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  // Already ISO
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return s.slice(0, 10);
+  // "<Month> <YYYY>" — English / Indonesian.
+  const m = s.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (m) {
+    const monKey = m[1].toLowerCase();
+    const idx = MONTHS_EN[monKey] ?? MONTHS_ID[monKey];
+    if (idx !== undefined) {
+      const yr = m[2];
+      const mm = String(idx + 1).padStart(2, '0');
+      return `${yr}-${mm}-01`;
+    }
+  }
+  // Fallback: let Date parse, snap to YYYY-MM-01.
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    const yr = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${yr}-${mm}-01`;
+  }
+  return null;
+}
+
+function daysUntil(isoDate) {
+  if (!isoDate) return null;
+  const d = new Date(`${isoDate}T00:00:00+07:00`);
+  if (isNaN(d.getTime())) return null;
+  return Math.ceil((d - new Date()) / 86400000);
+}
+
 // Map a rup_imports row -> shape compatible with rupList consumed by the table.
 function importedToRup(row) {
+  const tgl = parsePemilihan(row.tgl_awal_pemilihan);
+  const days = daysUntil(tgl);
   return {
     id: `imp-${row.kd_rup}`,
     kd_rup: row.kd_rup,
@@ -81,13 +121,13 @@ function importedToRup(row) {
     nama_klpd: row.nama_klpd,
     jenis_pengadaan: row.jenis_pengadaan,
     metode_pengadaan: row.metode_pengadaan,
-    tgl_awal_pemilihan: row.tgl_awal_pemilihan,
+    tgl_awal_pemilihan: tgl,                 // ISO yyyy-mm-dd or null
     pagu: row.pagu,
     provinsi: row.provinsi,
     kabupaten: row.kabupaten,
     recommendation: 'Lainnya',
     matched: [],
-    daysUntilSelection: 999,
+    daysUntilSelection: days ?? 0,
     tipe_paket: 'Imported',
     jenis_klpd: row.nama_klpd?.toUpperCase().includes('KEMENTERIAN')
       ? 'KEMENTERIAN'
@@ -237,6 +277,7 @@ export default function RupPage() {
       result = [...result].sort((a, b) => {
         let va, vb;
         switch (sortKey) {
+          case 'kd_rup': va = String(a.kd_rup || ''); vb = String(b.kd_rup || ''); break;
           case 'nama': va = (a.nama_paket || '').toLowerCase(); vb = (b.nama_paket || '').toLowerCase(); break;
           case 'satker': va = (a.nama_satker || '').toLowerCase(); vb = (b.nama_satker || '').toLowerCase(); break;
           case 'jenis': va = (a.jenis_pengadaan || '').toLowerCase(); vb = (b.jenis_pengadaan || '').toLowerCase(); break;
