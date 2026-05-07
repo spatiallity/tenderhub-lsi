@@ -7,12 +7,56 @@ import { useAppContext } from '../../store/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
+// Multi-line uraian editor — bullet rows + add/remove buttons.
+function UraianTugasEditor({ items, onChange, disabled }) {
+  const arr = Array.isArray(items) ? items : [];
+  const set = (i, v) => onChange(arr.map((x, j) => (j === i ? v : x)));
+  const remove = (i) => onChange(arr.filter((_, j) => j !== i));
+  const add = () => onChange([...arr, '']);
+  return (
+    <div className="flex flex-col gap-1.5">
+      {arr.length === 0 && (
+        <div className="text-[11px] text-slate-400 italic">Belum ada uraian. Klik "Tambah Uraian" untuk menambah.</div>
+      )}
+      {arr.map((it, i) => (
+        <div key={i} className="flex items-start gap-2">
+          <span className="text-slate-400 mt-2 leading-none">•</span>
+          <input
+            className="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Misal: Melakukan supervisi pelaksanaan kegiatan"
+            value={it}
+            onChange={e => set(i, e.target.value)}
+            disabled={disabled}
+          />
+          {!disabled && (
+            <button type="button" onClick={() => remove(i)}
+              className="text-red-400 hover:text-red-600 px-1 py-1.5">
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
+      ))}
+      {!disabled && (
+        <button type="button" onClick={add}
+          className="self-start inline-flex items-center gap-1 text-[11px] font-extrabold text-blue-700 hover:text-blue-900 mt-1">
+          <Plus size={12} /> Tambah Uraian
+        </button>
+      )}
+    </div>
+  );
+}
+
+const splitUraian = (s) => (typeof s === 'string' && s.trim()
+  ? s.split('\n').map(l => l.replace(/^\s*[•\-*]\s*/, '').trim()).filter(Boolean)
+  : []);
+const joinUraian = (arr) => (arr || []).map(s => s.trim()).filter(Boolean).join('\n');
+
 // Sub-component: editable CV fields for a single project
 function ProjectCVFields({ project, isGuest }) {
   const [draft, setDraft] = useState({
     lokasi_proyek: project.lokasi_proyek || '',
     pengguna_jasa: project.pengguna_jasa || '',
-    uraian_tugas: project.uraian_tugas || '',
+    uraian_tugas_items: splitUraian(project.uraian_tugas),
     waktu_mulai: project.waktu_mulai || '',
     waktu_selesai: project.waktu_selesai || '',
     posisi_penugasan: project.posisi_penugasan || '',
@@ -25,7 +69,11 @@ function ProjectCVFields({ project, isGuest }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.patch(`/experts/projects/${project.id}`, draft);
+      const { uraian_tugas_items, ...rest } = draft;
+      await api.patch(`/experts/projects/${project.id}`, {
+        ...rest,
+        uraian_tugas: joinUraian(uraian_tugas_items),
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch { alert('Gagal menyimpan'); } finally { setSaving(false); }
@@ -81,9 +129,11 @@ function ProjectCVFields({ project, isGuest }) {
         </div>
         <div className="flex flex-col gap-1 md:col-span-2">
           <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Uraian Tugas</label>
-          <textarea className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-blue-100 resize-y min-h-[60px]"
-            placeholder="Deskripsi tugas dalam proyek ini..."
-            value={draft.uraian_tugas} onChange={e => setDraft(p => ({ ...p, uraian_tugas: e.target.value }))} disabled={isGuest} />
+          <UraianTugasEditor
+            items={draft.uraian_tugas_items}
+            onChange={(v) => setDraft(p => ({ ...p, uraian_tugas_items: v }))}
+            disabled={isGuest}
+          />
         </div>
       </div>
       {!isGuest && (
@@ -99,12 +149,149 @@ function ProjectCVFields({ project, isGuest }) {
   );
 }
 
+// Comprehensive add-project form: basic + CV fields + uraian array.
+const EMPTY_PROJECT_FORM = {
+  proyek: '', klien: '', tahun: '', nilai: '', peran: '', bersama: 'Sucofindo',
+  lokasi_proyek: '', pengguna_jasa: '', waktu_mulai: '', waktu_selesai: '',
+  posisi_penugasan: '', status_kepegawaian: 'Tidak Tetap', surat_referensi: '-',
+  uraian_tugas_items: [],
+};
+
+function ProjectAddForm({ expertId, isGuest, onSaved, showToast, setExpertsRaw }) {
+  const [form, setForm] = useState(EMPTY_PROJECT_FORM);
+  const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target?.value !== undefined ? e.target.value : e }));
+
+  const save = async () => {
+    if (saving) return;
+    if (!form.proyek.trim() || !form.klien.trim()) {
+      alert('Nama proyek dan pemberi kerja wajib diisi.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = {
+        nama_proyek: form.proyek,
+        pemberi_kerja: form.klien,
+        tahun: form.tahun ? parseInt(form.tahun, 10) : new Date().getFullYear(),
+        nilai_proyek: Number(form.nilai || 0) * 1000000,
+        peran: form.peran || 'Tenaga Ahli',
+        bersama: form.bersama,
+        status_proyek: 'Selesai',
+      };
+      const res = await api.post(`/experts/${expertId}/projects`, body);
+      const created = res.data || {};
+      const newId = created.id;
+
+      const cvBody = {
+        lokasi_proyek: form.lokasi_proyek || null,
+        pengguna_jasa: form.pengguna_jasa || null,
+        waktu_mulai: form.waktu_mulai || null,
+        waktu_selesai: form.waktu_selesai || null,
+        posisi_penugasan: form.posisi_penugasan || null,
+        status_kepegawaian: form.status_kepegawaian || null,
+        surat_referensi: form.surat_referensi || null,
+        uraian_tugas: joinUraian(form.uraian_tugas_items),
+      };
+      let cvSaved = {};
+      if (newId) {
+        try {
+          const cvRes = await api.patch(`/experts/projects/${newId}`, cvBody);
+          cvSaved = cvRes.data || cvBody;
+        } catch (e) {
+          console.warn('[ProjectAddForm] CV patch failed, kept basic only', e);
+          cvSaved = cvBody;
+        }
+      }
+
+      setExpertsRaw(prev => prev.map(e => e.id === expertId ? {
+        ...e,
+        history: [...(e.history || []), {
+          id: newId,
+          proyek: created.nama_proyek || form.proyek,
+          klien: created.pemberi_kerja || form.klien,
+          tahun: created.tahun || form.tahun,
+          nilai: created.nilai_proyek || (Number(form.nilai || 0) * 1000000),
+          peran: created.peran || form.peran || 'Tenaga Ahli',
+          bersama: created.bersama || form.bersama,
+          status: created.status_proyek || 'Selesai',
+          nama_proyek: created.nama_proyek || form.proyek,
+          lokasi_proyek: cvSaved.lokasi_proyek || form.lokasi_proyek,
+          pengguna_jasa: cvSaved.pengguna_jasa || form.pengguna_jasa,
+          uraian_tugas: cvSaved.uraian_tugas || joinUraian(form.uraian_tugas_items),
+          waktu_mulai: cvSaved.waktu_mulai || form.waktu_mulai,
+          waktu_selesai: cvSaved.waktu_selesai || form.waktu_selesai,
+          posisi_penugasan: cvSaved.posisi_penugasan || form.posisi_penugasan,
+          status_kepegawaian: cvSaved.status_kepegawaian || form.status_kepegawaian,
+          surat_referensi: cvSaved.surat_referensi || form.surat_referensi,
+        }],
+        proyek: (e.proyek || 0) + 1,
+      } : e));
+
+      showToast?.('Riwayat pekerjaan tersimpan');
+      setForm(EMPTY_PROJECT_FORM);
+      onSaved?.();
+    } catch (err) {
+      console.error('[ProjectAddForm] save failed', err);
+      alert(`Gagal simpan: ${err.message || err}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isGuest) return null;
+
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-3">
+      <div className="font-extrabold text-[13px] mb-3">Tambah Riwayat Pekerjaan</div>
+
+      <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Data Dasar</div>
+      <div className="grid grid-cols-2 gap-2">
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Nama proyek *" value={form.proyek} onChange={set('proyek')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Pemberi kerja *" value={form.klien} onChange={set('klien')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Tahun (mis. 2025)" value={form.tahun} onChange={set('tahun')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" type="number" placeholder="Nilai (juta Rp)" value={form.nilai} onChange={set('nilai')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Peran (mis. Team Leader)" value={form.peran} onChange={set('peran')} />
+        <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" value={form.bersama} onChange={set('bersama')}>
+          <option>Sucofindo</option>
+          <option>Lain</option>
+        </select>
+      </div>
+
+      <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mt-4 mb-2">Detail untuk CV</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Lokasi proyek (mis. Subang, Jawa Barat)" value={form.lokasi_proyek} onChange={set('lokasi_proyek')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Pengguna jasa (mis. BKN)" value={form.pengguna_jasa} onChange={set('pengguna_jasa')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Waktu mulai (mis. Agustus 2025)" value={form.waktu_mulai} onChange={set('waktu_mulai')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Waktu selesai (mis. Desember 2025)" value={form.waktu_selesai} onChange={set('waktu_selesai')} />
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Posisi penugasan" value={form.posisi_penugasan} onChange={set('posisi_penugasan')} />
+        <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" value={form.status_kepegawaian} onChange={set('status_kepegawaian')}>
+          <option>Tidak Tetap</option>
+          <option>Tetap</option>
+        </select>
+        <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white md:col-span-2" placeholder="Nomor surat referensi (atau '-')" value={form.surat_referensi} onChange={set('surat_referensi')} />
+      </div>
+
+      <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mt-4 mb-2">Uraian Tugas</div>
+      <UraianTugasEditor
+        items={form.uraian_tugas_items}
+        onChange={(v) => setForm(p => ({ ...p, uraian_tugas_items: v }))}
+        disabled={false}
+      />
+
+      <Btn className="primary small mt-4" onClick={save} disabled={saving}>
+        <Plus size={14} /> {saving ? 'Menyimpan...' : 'Simpan Riwayat'}
+      </Btn>
+    </div>
+  );
+}
+
 export default function ExpertDetail({ expert, onClose }) {
   const { canAddReview, canAddHistory, isGuest } = useAuth();
   const {
     reviewDraft, setReviewDraft, addReview,
-    historyDraft, setHistoryDraft, addHistory,
-    updateExpertProfile, deleteExpert, deleteExpertHistory
+    updateExpertProfile, deleteExpert, deleteExpertHistory,
+    setExpertsRaw, showToast,
   } = useAppContext();
 
   if (!expert) return null;
@@ -113,7 +300,6 @@ export default function ExpertDetail({ expert, onClose }) {
   const [profileDraft, setProfileDraft] = useState({ nama: '', noHp: '', instansi: '' });
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isSavingReview, setIsSavingReview] = useState(false);
-  const [isSavingHistory, setIsSavingHistory] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   // CV state
@@ -311,35 +497,15 @@ export default function ExpertDetail({ expert, onClose }) {
           </table>
         </div>
 
-        {/* Tambah Riwayat */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-3">
-          <div className="font-extrabold text-[13px] mb-2">Tambah Riwayat Pekerjaan</div>
-          <div className="grid grid-cols-2 gap-2">
-            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama proyek" value={historyDraft.proyek} onChange={e => setHistoryDraft(p => ({ ...p, proyek: e.target.value }))} />
-            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Pemberi kerja" value={historyDraft.klien} onChange={e => setHistoryDraft(p => ({ ...p, klien: e.target.value }))} />
-            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Tahun" value={historyDraft.tahun} onChange={e => setHistoryDraft(p => ({ ...p, tahun: e.target.value }))} />
-            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nilai (juta Rp)" type="number" value={historyDraft.nilai} onChange={e => setHistoryDraft(p => ({ ...p, nilai: e.target.value }))} />
-            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Peran" value={historyDraft.peran} onChange={e => setHistoryDraft(p => ({ ...p, peran: e.target.value }))} />
-            <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" value={historyDraft.bersama} onChange={e => setHistoryDraft(p => ({ ...p, bersama: e.target.value }))}>
-              <option>Sucofindo</option><option>Lain</option>
-            </select>
-          </div>
-          <Btn 
-            className="primary small mt-3" 
-            onClick={async () => {
-              if (isSavingHistory) return;
-              setIsSavingHistory(true);
-              try {
-                await addHistory(expert.id);
-              } finally {
-                setIsSavingHistory(false);
-              }
-            }}
-            disabled={isSavingHistory}
-          >
-            <Plus size={14} />{isSavingHistory ? 'Menyimpan...' : 'Simpan Riwayat'}
-          </Btn>
-        </div>
+        {/* Tambah Riwayat — full form including CV fields + uraian array */}
+        {canAddHistory && (
+          <ProjectAddForm
+            expertId={expert.id}
+            isGuest={isGuest}
+            showToast={showToast}
+            setExpertsRaw={setExpertsRaw}
+          />
+        )}
       </div>
 
       {/* Rating & Review */}

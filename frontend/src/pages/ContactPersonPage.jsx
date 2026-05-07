@@ -4,19 +4,34 @@ import supabase from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { normalizeWa, waLink } from '../utils/format';
 
-const DIVISI_OPTIONS = ['FITI', 'FLP', 'SDA', 'Manajemen', 'Lainnya'];
+// Free-form divisi (Excel SBU LSI mengirim PDOS / PDOS-PJL / PDOS-PSD / Kepala SBU dll).
+// Helpers di bawah memetakan ke 4 warna kategori broad.
+const KNOWN_DIVISI = ['FITI', 'FLP', 'SDA', 'PDOS', 'PDOS-PJL', 'PDOS-PSD', 'Kepala SBU', 'Manajemen', 'Lainnya'];
 
-const DIVISI_COLOR = {
+function divisiBucket(d) {
+  if (!d) return 'Lainnya';
+  const u = d.toUpperCase();
+  if (u.includes('FITI')) return 'FITI';
+  if (u.includes('FLP')) return 'FLP';
+  if (u.includes('SDA')) return 'SDA';
+  if (u.includes('PDOS')) return 'PDOS';
+  if (u.includes('KEPALA') || u.includes('MANAJ')) return 'Manajemen';
+  return 'Lainnya';
+}
+
+const BUCKET_COLOR = {
   FITI: 'bg-amber-50 border-amber-200 text-amber-800',
   FLP: 'bg-blue-50 border-blue-200 text-blue-800',
   SDA: 'bg-green-50 border-green-200 text-green-800',
+  PDOS: 'bg-rose-50 border-rose-200 text-rose-800',
   Manajemen: 'bg-purple-50 border-purple-200 text-purple-800',
   Lainnya: 'bg-slate-50 border-slate-200 text-slate-700',
 };
 
-function ContactForm({ initial, onSubmit, onCancel }) {
+function ContactForm({ initial, divisiOptions, onSubmit, onCancel }) {
   const [form, setForm] = useState(initial || {
-    nama: '', jabatan: '', divisi: 'FITI', no_wa: '', email: '', foto_url: '', catatan: ''
+    nama: '', jabatan: '', divisi: divisiOptions[0] || 'Lainnya', sub_porto: '',
+    no_wa: '', email: '', catatan: ''
   });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   return (
@@ -26,12 +41,19 @@ function ContactForm({ initial, onSubmit, onCancel }) {
     >
       <input className="w-full border rounded-lg px-3 py-2 text-sm" required placeholder="Nama" value={form.nama} onChange={set('nama')} />
       <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Jabatan" value={form.jabatan || ''} onChange={set('jabatan')} />
-      <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.divisi} onChange={set('divisi')}>
-        {DIVISI_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-      </select>
+      <input
+        className="w-full border rounded-lg px-3 py-2 text-sm"
+        placeholder="Divisi (mis. FITI / FLP / SDA / PDOS-PJL)"
+        list="divisi-options"
+        value={form.divisi || ''}
+        onChange={set('divisi')}
+      />
+      <datalist id="divisi-options">
+        {divisiOptions.map(d => <option key={d} value={d} />)}
+      </datalist>
+      <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Sub-Porto (opsional, mis. PDOS-PJL)" value={form.sub_porto || ''} onChange={set('sub_porto')} />
       <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="No WA (08xx / +62xx)" value={form.no_wa || ''} onChange={set('no_wa')} />
       <input className="w-full border rounded-lg px-3 py-2 text-sm" type="email" placeholder="Email" value={form.email || ''} onChange={set('email')} />
-      <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="URL Foto (opsional)" value={form.foto_url || ''} onChange={set('foto_url')} />
       <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Catatan" value={form.catatan || ''} onChange={set('catatan')} />
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm rounded-lg border hover:bg-slate-50">Batal</button>
@@ -63,24 +85,32 @@ export default function ContactPersonPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Distinct divisi values present in the data, fallback ke KNOWN_DIVISI.
+  const divisiOptions = useMemo(() => {
+    const s = new Set([...KNOWN_DIVISI, ...items.map(i => i.divisi).filter(Boolean)]);
+    return Array.from(s);
+  }, [items]);
+
+  // Group cards by exact divisi value (so PDOS-PJL beda dengan PDOS-PSD).
   const grouped = useMemo(() => {
     const g = {};
-    DIVISI_OPTIONS.forEach(d => { g[d] = []; });
     (items || []).forEach(c => {
-      const d = DIVISI_OPTIONS.includes(c.divisi) ? c.divisi : 'Lainnya';
-      g[d].push(c);
+      const k = c.divisi || 'Lainnya';
+      g[k] = g[k] || [];
+      g[k].push(c);
     });
     return g;
   }, [items]);
+  const groupKeys = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
   const onSave = async (form) => {
     const payload = {
       nama: form.nama,
       jabatan: form.jabatan || null,
-      divisi: form.divisi,
+      divisi: form.divisi || 'Lainnya',
+      sub_porto: form.sub_porto || form.divisi || null,
       no_wa: form.no_wa ? normalizeWa(form.no_wa) : null,
       email: form.email || null,
-      foto_url: form.foto_url || null,
       catatan: form.catatan || null,
     };
     if (editing?.id) {
@@ -107,7 +137,7 @@ export default function ContactPersonPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Contact Person</h1>
-          <p className="text-sm text-slate-500">Kontak penting tiap divisi (FITI / FLP / SDA / Manajemen / Lainnya).</p>
+          <p className="text-sm text-slate-500">Kontak SBU LSI per divisi/sub-porto.</p>
         </div>
         {!isGuest && (
           <button
@@ -122,26 +152,28 @@ export default function ContactPersonPage() {
       {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
       {loading && <div className="text-sm text-slate-500">Memuat…</div>}
 
-      {!loading && DIVISI_OPTIONS.map(d => (
-        <section key={d}>
-          <h2 className="text-xs font-extrabold tracking-widest uppercase text-slate-500 mb-3">{d}</h2>
-          {grouped[d].length === 0 ? (
-            <div className="text-sm text-slate-400 italic">Belum ada kontak.</div>
-          ) : (
+      {!loading && groupKeys.length === 0 && (
+        <div className="text-sm text-slate-400 italic">Belum ada kontak.</div>
+      )}
+
+      {!loading && groupKeys.map(d => {
+        const color = BUCKET_COLOR[divisiBucket(d)];
+        return (
+          <section key={d}>
+            <h2 className="text-xs font-extrabold tracking-widest uppercase text-slate-500 mb-3">{d}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {grouped[d].map(c => (
-                <div key={c.id} className={`p-4 rounded-xl border ${DIVISI_COLOR[d]}`}>
+                <div key={c.id} className={`p-4 rounded-xl border ${color}`}>
                   <div className="flex items-start gap-3">
-                    {c.foto_url ? (
-                      <img src={c.foto_url} alt={c.nama} className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-white/70 flex items-center justify-center font-bold text-slate-700">
-                        {(c.nama || '?').slice(0,2).toUpperCase()}
-                      </div>
-                    )}
+                    <div className="w-12 h-12 rounded-full bg-white/70 flex items-center justify-center font-bold text-slate-700 shrink-0">
+                      {(c.nama || '?').slice(0,2).toUpperCase()}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-sm truncate">{c.nama}</div>
                       {c.jabatan && <div className="text-[12px] text-slate-600 truncate">{c.jabatan}</div>}
+                      {c.sub_porto && c.sub_porto !== c.divisi && (
+                        <div className="text-[11px] text-slate-500 mt-0.5">Sub-Porto: {c.sub_porto}</div>
+                      )}
                     </div>
                     {!isGuest && (
                       <div className="flex gap-1">
@@ -172,9 +204,9 @@ export default function ContactPersonPage() {
                 </div>
               ))}
             </div>
-          )}
-        </section>
-      ))}
+          </section>
+        );
+      })}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -188,6 +220,7 @@ export default function ContactPersonPage() {
             <div className="p-5">
               <ContactForm
                 initial={editing}
+                divisiOptions={divisiOptions}
                 onSubmit={onSave}
                 onCancel={() => { setShowForm(false); setEditing(null); }}
               />

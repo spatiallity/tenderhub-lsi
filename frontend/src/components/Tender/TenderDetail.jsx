@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ExternalLink, CheckCircle, Circle, Save, Trash2 } from 'lucide-react';
 import { Badge, MiniKpi, Btn } from '../UI/index';
 import { portfolioColor, levelColor, PRAKUAL_STAGES, PASCAKUAL_STAGES } from '../../utils/constants';
@@ -6,6 +6,30 @@ import { formatRupiah, formatDate, dateFrom } from '../../utils/helpers';
 import { useAppContext } from '../../store/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDebounce } from '../../hooks/useDebounce';
+import supabase from '../../services/supabase';
+
+// PIC dropdown sources contact_persons WHERE divisi/sub_porto IN PDOS-PJL/PDOS-PSD.
+const PIC_DIVISI = ['PDOS-PJL', 'PDOS-PSD'];
+
+function usePicCandidates() {
+  const [list, setList] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = `(${PIC_DIVISI.join(',')})`;
+      const { data, error } = await supabase
+        .from('contact_persons')
+        .select('id, nama, jabatan, divisi, sub_porto')
+        .or(`divisi.in.${list},sub_porto.in.${list}`)
+        .order('nama', { ascending: true });
+      if (cancelled) return;
+      if (error) { console.warn('[PIC] load failed', error); return; }
+      setList(data || []);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return list;
+}
 
 export default function TenderDetail({ tender }) {
   const {
@@ -17,6 +41,7 @@ export default function TenderDetail({ tender }) {
   } = useAppContext();
   
   const { isGuest } = useAuth();
+  const picCandidates = usePicCandidates();
 
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   const [isSavingNote, setIsSavingNote] = React.useState(false);
@@ -389,7 +414,7 @@ export default function TenderDetail({ tender }) {
         {isGuest ? (
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <div className="text-sm font-semibold text-amber-900">
-              PIC: <span className="font-extrabold">{users.find(u => u.id === localPIC)?.nama || 'Belum ditugaskan'}</span>
+              PIC: <span className="font-extrabold">{picCandidates.find(p => String(p.id) === String(localPIC))?.nama || users.find(u => u.id === localPIC)?.nama || 'Belum ditugaskan'}</span>
             </div>
             <div className="text-xs text-amber-700 mt-1">
               Mode Guest - Tidak dapat mengubah PIC
@@ -403,10 +428,13 @@ export default function TenderDetail({ tender }) {
               disabled={isAssigningPIC}
               className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">-- Pilih PIC Tender --</option>
-              {users.filter(u => u.aktif).map(u => (
-                <option key={u.id} value={u.id}>{u.nama} ({u.role})</option>
+              <option value="">-- Pilih PIC Tender (PDOS-PJL / PDOS-PSD) --</option>
+              {picCandidates.map(p => (
+                <option key={p.id} value={p.id}>{p.nama} — {p.sub_porto || p.divisi}</option>
               ))}
+              {picCandidates.length === 0 && (
+                <option disabled>Belum ada kontak PDOS-PJL/PSD. Import dulu.</option>
+              )}
             </select>
             <Btn 
               className="primary small whitespace-nowrap"

@@ -1,13 +1,153 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, MapPin, ChevronRight, Filter, X, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Filter, X, FileSpreadsheet, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAppContext } from '../store/AppContext';
 import { Badge, PageTitle, Card, Btn } from '../components/UI/index';
 import { portfolioColor, PROVINCES } from '../utils/constants';
 import { formatRupiah, activeKeywordCount, exportRupExcel, formatMonthYear } from '../utils/helpers';
 import { useDebounce } from '../hooks/useDebounce';
+import supabase from '../services/supabase';
+
+// Parse SIRUP "Cari Paket Penyedia" xlsx (header at row 3, 1-indexed).
+function parseSirupXlsx(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      try {
+        const wb = XLSX.read(reader.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        // Find header row by looking for 'Paket' + 'ID' tokens.
+        let headerIdx = rows.findIndex(r => Array.isArray(r) && r.includes('Paket') && r.includes('ID'));
+        if (headerIdx < 0) headerIdx = 2; // SIRUP default
+        const headers = rows[headerIdx].map(h => String(h || '').trim());
+        const ix = (name) => headers.indexOf(name);
+        const ixPaket = ix('Paket');
+        const ixPagu = ix('Pagu (Rp)');
+        const ixJenis = ix('Jenis Pengadaan');
+        const ixMetode = ix('Metode');
+        const ixPemilihan = ix('Pemilihan');
+        const ixKlpd = ix('K/L/PD');
+        const ixSatker = ix('Satuan Kerja');
+        const ixLokasi = ix('Lokasi');
+        const ixId = ix('ID');
+        if (ixId < 0 || ixPaket < 0) {
+          reject(new Error(`Header tidak dikenali. Pastikan format SIRUP "Cari Paket Penyedia". Header terdeteksi: ${headers.join(' | ')}`));
+          return;
+        }
+        const out = [];
+        for (let i = headerIdx + 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || !r[ixId]) continue;
+          const paketRaw = String(r[ixPaket] || '').trim();
+          // SIRUP "Paket" typically: "<kode-internal> <nama paket>". Take first whitespace-token as
+          // kode-internal hint, rest as nama.
+          const firstSpace = paketRaw.indexOf(' ');
+          const namaPaket = firstSpace > 0 ? paketRaw.slice(firstSpace + 1).trim() : paketRaw;
+          const lokasi = String(r[ixLokasi] || '').trim();
+          const [provinsi, kabupaten] = lokasi.split(',').map(s => s.trim());
+          out.push({
+            kd_rup: String(r[ixId]).trim(),
+            nama_paket: namaPaket || paketRaw,
+            pagu: Number(r[ixPagu]) || 0,
+            jenis_pengadaan: String(r[ixJenis] || '').trim(),
+            metode_pengadaan: String(r[ixMetode] || '').trim(),
+            tgl_awal_pemilihan: String(r[ixPemilihan] || '').trim(),
+            nama_klpd: String(r[ixKlpd] || '').trim(),
+            nama_satker: String(r[ixSatker] || '').trim(),
+            lokasi,
+            provinsi: provinsi || null,
+            kabupaten: kabupaten || null,
+          });
+        }
+        resolve(out);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Map a rup_imports row -> shape compatible with rupList consumed by the table.
+function importedToRup(row) {
+  return {
+    id: `imp-${row.kd_rup}`,
+    kd_rup: row.kd_rup,
+    nama_paket: row.nama_paket,
+    nama_satker: row.nama_satker,
+    nama_klpd: row.nama_klpd,
+    jenis_pengadaan: row.jenis_pengadaan,
+    metode_pengadaan: row.metode_pengadaan,
+    tgl_awal_pemilihan: row.tgl_awal_pemilihan,
+    pagu: row.pagu,
+    provinsi: row.provinsi,
+    kabupaten: row.kabupaten,
+    recommendation: 'Lainnya',
+    matched: [],
+    daysUntilSelection: 999,
+    tipe_paket: 'Imported',
+    jenis_klpd: row.nama_klpd?.toUpperCase().includes('KEMENTERIAN')
+      ? 'KEMENTERIAN'
+      : row.nama_klpd?.toUpperCase().includes('LEMBAGA')
+      ? 'LEMBAGA'
+      : 'PEMDA',
+    _imported: true,
+  };
+}
 
 export default function RupPage() {
   const { rupList, keywords, setSelectedRupId, loadingRup, newRupIds, setShowKeywordManager, internalStatuses } = useAppContext();
+  const [importedRows, setImportedRows] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const reloadImports = async () => {
+    const { data, error } = await supabase
+      .from('rup_imports')
+      .select('*')
+      .order('imported_at', { ascending: false });
+    if (error) { console.warn('[RUP imports] load failed', error); return; }
+    setImportedRows(data || []);
+  };
+
+  useEffect(() => { reloadImports(); }, []);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImporting(true);
+    try {
+      const rows = await parseSirupXlsx(file);
+      if (rows.length === 0) { alert('Tidak ada baris valid pada file.'); return; }
+      // Upsert by kd_rup. Supabase upsert needs unique key; rup_imports has kd_rup UNIQUE.
+      const { error } = await supabase
+        .from('rup_imports')
+        .upsert(rows, { onConflict: 'kd_rup' });
+      if (error) {
+        alert(`Gagal import: ${error.message}`);
+        return;
+      }
+      alert(`Berhasil import ${rows.length} paket RUP.`);
+      reloadImports();
+    } catch (err) {
+      console.error('[RUP import]', err);
+      alert(`Gagal parse file: ${err.message || err}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Merge: INAPROC rupList wins on kd_rup conflict; imports fill the rest.
+  const mergedRup = useMemo(() => {
+    const inaprocKeys = new Set((rupList || []).map(r => String(r.kd_rup)));
+    const onlyImports = importedRows
+      .filter(r => !inaprocKeys.has(String(r.kd_rup)))
+      .map(importedToRup);
+    return [...(rupList || []), ...onlyImports];
+  }, [rupList, importedRows]);
 
   const [portfolioFilter, setPortfolioFilter] = useState('Semua');
   const [levelFilter, setLevelFilter] = useState('Semua');
@@ -74,7 +214,7 @@ export default function RupPage() {
   }, [loadingRup, (rupList || []).length]);
 
   const filteredRup = useMemo(() => {
-    let result = (rupList || []).filter(r => {
+    let result = (mergedRup || []).filter(r => {
       const isIrrelevant = internalStatuses && internalStatuses[r.id] === 'Tidak Relevan';
       if (showIrrelevant) {
         if (!isIrrelevant) return false;
@@ -109,7 +249,7 @@ export default function RupPage() {
       });
     }
     return result;
-  }, [rupList, portfolioFilter, levelFilter, provinsiFilter, debouncedSearch, keywordCount, keywordOnly, sortKey, sortDir, showIrrelevant, internalStatuses]);
+  }, [mergedRup, portfolioFilter, levelFilter, provinsiFilter, debouncedSearch, keywordCount, keywordOnly, sortKey, sortDir, showIrrelevant, internalStatuses]);
 
   const clearAll = () => {
     setPortfolioFilter('Semua');
@@ -123,18 +263,27 @@ export default function RupPage() {
     <div className="flex flex-col gap-4">
       <PageTitle
         title="RUP Pipeline"
-        subtitle={`${filteredRup.length} paket RUP tampil dari ${rupList?.length || 0} paket. Gunakan ini sebagai radar awal sebelum paket naik menjadi tender.`}
+        subtitle={`${filteredRup.length} paket RUP tampil dari ${mergedRup.length} paket (INAPROC ${rupList?.length || 0} + impor ${importedRows.length}). INAPROC menang saat bentrok kode RUP.`}
         right={
           <div className="flex gap-2 flex-wrap items-center">
-            {filteredRup.length !== (rupList?.length || 0) && (
+            {filteredRup.length !== mergedRup.length && (
               <div className="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
                 <span className="text-xs font-bold text-blue-700">
                   {filteredRup.length} hasil
                 </span>
               </div>
             )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleFile}
+            />
+            <Btn className="ghost" disabled={importing} onClick={() => fileInputRef.current?.click()}>
+              <Upload size={16} />{importing ? 'Mengimpor…' : 'Import Excel SIRUP'}
+            </Btn>
             <Btn className="ghost" onClick={() => exportRupExcel(filteredRup)}><FileSpreadsheet size={16} />Export Excel</Btn>
-
           </div>
         }
       />

@@ -14,6 +14,77 @@ function fmtDate(s) {
   try { return new Date(s).toLocaleString('id-ID'); } catch { return s; }
 }
 
+const ENTITY_LABEL = {
+  experts: 'tenaga ahli',
+  contact_persons: 'contact person',
+  profiles: 'user',
+  tender_watchlist: 'status tender',
+};
+
+const FIELD_LABEL = {
+  status_internal: 'status internal',
+  no_wa: 'nomor WA',
+  nama: 'nama',
+  email: 'email',
+  jabatan: 'jabatan',
+  divisi: 'divisi',
+  catatan: 'catatan',
+  foto_url: 'foto',
+  role: 'peran',
+  is_active: 'status aktif',
+  posisi_diusulkan: 'posisi yang diusulkan',
+  tempat_lahir: 'tempat lahir',
+  tanggal_lahir: 'tanggal lahir',
+  pendidikan_formal: 'pendidikan formal',
+  pendidikan_non_formal: 'pendidikan non formal',
+  penguasaan_bahasa: 'penguasaan bahasa',
+  no_hp: 'nomor HP',
+  instansi: 'instansi',
+  availability: 'ketersediaan',
+};
+
+function entityName(row) {
+  const d = row.new_data || row.old_data || {};
+  return d.nama || d.name || d.nama_paket || d.email || row.entity_id || '';
+}
+
+function fieldLabel(k) {
+  return FIELD_LABEL[k] || k.replace(/_/g, ' ');
+}
+
+function fmtValue(v) {
+  if (v === null || v === undefined || v === '') return '(kosong)';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '(kosong)';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+function humanize(row) {
+  const actor = row.actor_email || 'Sistem';
+  const entity = ENTITY_LABEL[row.entity_table] || row.entity_table;
+  const name = entityName(row);
+
+  if (row.action === 'INSERT') {
+    return `${actor} menambahkan ${entity}${name ? ` "${name}"` : ''}.`;
+  }
+  if (row.action === 'DELETE') {
+    return `${actor} menghapus ${entity}${name ? ` "${name}"` : ''}.`;
+  }
+  // UPDATE
+  const changed = row.changed_fields || {};
+  const keys = Object.keys(changed);
+  if (keys.length === 0) {
+    return `${actor} memperbarui ${entity}${name ? ` "${name}"` : ''}.`;
+  }
+  // Show first 2 field changes verbosely, rest as count.
+  const verbose = keys.slice(0, 2).map((k) => {
+    const { old: o, new: n } = changed[k] || {};
+    return `${fieldLabel(k)} dari "${fmtValue(o)}" ke "${fmtValue(n)}"`;
+  }).join(' dan ');
+  const extra = keys.length > 2 ? ` (+${keys.length - 2} kolom lain)` : '';
+  return `${actor} mengubah ${entity}${name ? ` "${name}"` : ''}: ${verbose}${extra}.`;
+}
+
 export default function AuditLogPage() {
   const { isAdmin } = useAuth();
   const [rows, setRows] = useState([]);
@@ -124,9 +195,9 @@ export default function AuditLogPage() {
                     <td className="px-3 py-2">
                       <span className={`px-2 py-0.5 text-[11px] font-bold rounded border ${ACTION_COLOR[r.action] || ''}`}>{r.action}</span>
                     </td>
-                    <td className="px-3 py-2 font-mono text-[12px]">{r.entity_table}</td>
-                    <td className="px-3 py-2 font-mono text-[12px]">{r.entity_id}</td>
-                    <td className="px-3 py-2 text-slate-700">{r.summary}</td>
+                    <td className="px-3 py-2 text-[12px]">{ENTITY_LABEL[r.entity_table] || r.entity_table}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-slate-500 truncate max-w-[120px]" title={r.entity_id}>{r.entity_id}</td>
+                    <td className="px-3 py-2 text-slate-700">{humanize(r)}</td>
                   </tr>
                   {expanded[r.id] && (
                     <tr className="border-t bg-slate-50">
