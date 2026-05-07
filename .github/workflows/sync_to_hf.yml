@@ -25,6 +25,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          set -euo pipefail
           if [ -z "$HF_TOKEN" ]; then
             echo "Error: HF_TOKEN is not set in GitHub Secrets"
             exit 1
@@ -35,35 +36,41 @@ jobs:
 
           # Orphan branch — clean history for HF.
           git checkout --orphan hf-deploy
+          git add -A
 
-          # Strip raw binaries HF rejects (it requires Xet/LFS for these).
-          # Keep TEMPLATE_CV_EXPERT.docx — it ships via LFS (.gitattributes).
-          rm -f frontend/public/assets/sucofindo-logo.png
-          find . -path ./.git -prune -o -type f \( \
-              -iname '*.docx' -o \
-              -iname '*.doc'  -o \
-              -iname '*.xlsx' -o \
-              -iname '*.xls'  -o \
-              -iname '*.pdf'  -o \
-              -iname '*.png'  -o \
-              -iname '*.jpg'  -o \
-              -iname '*.jpeg' -o \
-              -iname '*.gif'  -o \
-              -iname '*.zip'  -o \
-              -iname '~$*'    \
-            \) ! -name 'TEMPLATE_CV_EXPERT.docx' -print -delete || true
+          # Drop every binary file from the index AND the working tree —
+          # HF Spaces rejects raw blobs of these formats. The template is the
+          # only exception (it's LFS-tracked and ships via Xet).
+          BIN_PATTERNS='\.(docx|doc|xlsx|xls|pdf|png|jpg|jpeg|gif|zip)$|(^|/)~\$'
 
-          # Re-track template via LFS on the deploy branch so HF stores it via Xet/LFS.
+          # Files to drop = tracked files matching binary regex MINUS template.
+          mapfile -t DROP < <(
+            git ls-files | grep -iE "$BIN_PATTERNS" | grep -v '^TEMPLATE_CV_EXPERT\.docx$' || true
+          )
+
+          if [ "${#DROP[@]}" -gt 0 ]; then
+            printf 'Dropping binary file: %s\n' "${DROP[@]}"
+            git rm -f --quiet "${DROP[@]}"
+            # Remove leftovers from filesystem too (e.g. files added by lfs pull
+            # that are no longer in the index).
+            for f in "${DROP[@]}"; do rm -f "$f"; done
+          else
+            echo "No binary files matched."
+          fi
+
+          # Make sure the template stays in the index as an LFS pointer.
+          # Regen .gitattributes so HF treats it as LFS.
           cat > .gitattributes <<'GA'
           TEMPLATE_CV_EXPERT.docx filter=lfs diff=lfs merge=lfs -text
           GA
+          git add .gitattributes TEMPLATE_CV_EXPERT.docx
 
-          git add -A
           git commit -m "Deploy to HuggingFace Space"
 
-          git remote add hf https://spatiallity:$HF_TOKEN@huggingface.co/spaces/spatiallity/tenderhub-api || true
+          git remote remove hf 2>/dev/null || true
+          git remote add hf https://spatiallity:$HF_TOKEN@huggingface.co/spaces/spatiallity/tenderhub-api
 
-          # LFS objects must reach HF too.
+          # LFS objects must reach HF too (template).
           git lfs push --all hf || true
           git push hf hf-deploy:main --force
 
