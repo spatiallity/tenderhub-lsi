@@ -266,10 +266,48 @@ export const AppProvider = ({ children }) => {
       .finally(() => setLoadingExperts(false));
   }, []); // Removed showToast - run only once
 
+  // Admin hide-lists (kd_tender / kd_rup) — loaded from Supabase.
+  const [hiddenTenderIds, setHiddenTenderIds] = useState(() => new Set());
+  const [hiddenRupIds, setHiddenRupIds] = useState(() => new Set());
+
+  const reloadHideLists = useCallback(async () => {
+    try {
+      const [t, r] = await Promise.all([
+        supabase.from('tender_hidden').select('kd_tender'),
+        supabase.from('rup_hidden').select('kd_rup'),
+      ]);
+      if (!t.error) setHiddenTenderIds(new Set((t.data || []).map(x => String(x.kd_tender))));
+      if (!r.error) setHiddenRupIds(new Set((r.data || []).map(x => String(x.kd_rup))));
+    } catch (e) {
+      console.warn('[hide-lists] load failed', e);
+    }
+  }, []);
+
+  useEffect(() => { reloadHideLists(); }, [reloadHideLists]);
+
+  const hideTender = useCallback(async (kdTender, reason) => {
+    const { error } = await supabase.from('tender_hidden').insert({ kd_tender: String(kdTender), reason: reason || null });
+    if (error) throw error;
+    setHiddenTenderIds(prev => new Set(prev).add(String(kdTender)));
+  }, []);
+
+  const hideRup = useCallback(async (kdRup, reason) => {
+    const { error } = await supabase.from('rup_hidden').insert({ kd_rup: String(kdRup), reason: reason || null });
+    if (error) throw error;
+    setHiddenRupIds(prev => new Set(prev).add(String(kdRup)));
+  }, []);
+
+  const deleteImportedRup = useCallback(async (kdRup) => {
+    const { error } = await supabase.from('rup_imports').delete().eq('kd_rup', String(kdRup));
+    if (error) throw error;
+  }, []);
+
   // Phase 1: Heavy enrichment (relevance, stages, deadlines) — only re-runs when raw data or keywords change
   const tendersEnriched = useMemo(() =>
-    tendersRaw.map(t => enrichTender(t, keywords, {})),
-    [tendersRaw, keywords]
+    tendersRaw
+      .filter(t => !hiddenTenderIds.has(String(t.kd_tender ?? t.id)))
+      .map(t => enrichTender(t, keywords, {})),
+    [tendersRaw, keywords, hiddenTenderIds]
   );
 
   // Phase 2: Cheap status overlay — only re-runs when internalStatuses change (lightweight merge)
@@ -281,10 +319,12 @@ export const AppProvider = ({ children }) => {
     [tendersEnriched, internalStatuses]
   );
 
-  // Enriched RUP
+  // Enriched RUP (also drop hidden kd_rup).
   const rupPlans = useMemo(() =>
-    rupRaw.map(r => ({ ...r, ...calcRupMatch(r, keywords) })),
-    [rupRaw, keywords]
+    rupRaw
+      .filter(r => !hiddenRupIds.has(String(r.kd_rup)))
+      .map(r => ({ ...r, ...calcRupMatch(r, keywords) })),
+    [rupRaw, keywords, hiddenRupIds]
   );
 
   // Derived counts
@@ -892,6 +932,7 @@ export const AppProvider = ({ children }) => {
     noteSaved, setNoteSaved,
     assignedPICs, setAssignedPICs, updateTenderPIC,
     expertCVs, setExpertCVs,
+    hiddenTenderIds, hiddenRupIds, hideTender, hideRup, deleteImportedRup, reloadHideLists,
     users, setUsers,
     addUser, updateUser, deleteUser,
     notifications, setNotifications,

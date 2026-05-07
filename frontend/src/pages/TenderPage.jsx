@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, X, FileSpreadsheet, MapPin, ChevronRight, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, X, FileSpreadsheet, MapPin, ChevronRight, Filter, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { useAppContext } from '../store/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Badge, CountdownBadge, PageTitle, Card, Btn } from '../components/UI/index';
@@ -120,13 +120,14 @@ export default function TenderPage() {
   // Subscribe to realtime watchlist changes
   useWatchlistRealtime();
 
-  const { isGuest } = useAuth();
+  const { isGuest, isAdmin } = useAuth();
   const {
     tenders, keywords, loadingTenders,
     addKeyword, removeKeyword,
     internalStatuses, setInternalStatuses, updateTenderStatus, setSelectedTenderId,
     hpsThreshold,
     setShowKeywordManager,
+    hideTender,
     newTenderIds,
     dashboardChartFilter,
     setDashboardChartFilter,
@@ -557,9 +558,26 @@ export default function TenderPage() {
                         />
                       </td>
                       <td className={`px-3 py-3 align-top sticky right-0 backdrop-blur-sm ${isNew ? 'bg-amber-50/95' : 'bg-white/95'}`}>
-                        <Btn className="primary small" onClick={() => setSelectedTenderId(t.id)}>
-                          Detail<ChevronRight size={14} />
-                        </Btn>
+                        <div className="flex items-center gap-1">
+                          <Btn className="primary small" onClick={() => setSelectedTenderId(t.id)}>
+                            Detail<ChevronRight size={14} />
+                          </Btn>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              title="Hapus tender (admin)"
+                              onClick={async () => {
+                                const kd = t.kd_tender || t.id;
+                                if (!confirm(`Hapus tender ${t.nama}?\nIni akan menyembunyikan tender ini dari semua user.`)) return;
+                                try { await hideTender(kd, 'admin delete'); }
+                                catch (e) { alert(`Gagal hapus: ${e.message || e}`); }
+                              }}
+                              className="p-1.5 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

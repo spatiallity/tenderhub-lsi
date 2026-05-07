@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, MapPin, ChevronRight, Filter, X, FileSpreadsheet, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Filter, X, FileSpreadsheet, Upload, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAppContext } from '../store/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Badge, PageTitle, Card, Btn } from '../components/UI/index';
 import { portfolioColor, PROVINCES } from '../utils/constants';
 import { formatRupiah, activeKeywordCount, exportRupExcel, formatMonthYear } from '../utils/helpers';
@@ -98,7 +99,8 @@ function importedToRup(row) {
 }
 
 export default function RupPage() {
-  const { rupList, keywords, setSelectedRupId, loadingRup, newRupIds, setShowKeywordManager, internalStatuses } = useAppContext();
+  const { rupList, keywords, setSelectedRupId, loadingRup, newRupIds, setShowKeywordManager, internalStatuses, hideRup, deleteImportedRup } = useAppContext();
+  const { isAdmin } = useAuth();
   const [importedRows, setImportedRows] = useState([]);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
@@ -461,9 +463,35 @@ export default function RupPage() {
                     </td>
                     <td className="px-3 py-3 align-top"><Badge color={portfolioColor[r.recommendation]}>{r.recommendation}</Badge></td>
                     <td className={`px-3 py-3 align-top ${isNew ? 'bg-cyan-50/95' : 'bg-white/95'}`}>
-                      <Btn className="primary small" onClick={() => setSelectedRupId(r.id)}>
-                        Detail<ChevronRight size={14} />
-                      </Btn>
+                      <div className="flex items-center gap-1">
+                        <Btn className="primary small" onClick={() => setSelectedRupId(r.id)}>
+                          Detail<ChevronRight size={14} />
+                        </Btn>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            title={r._imported ? 'Hapus baris RUP impor' : 'Sembunyikan RUP (admin)'}
+                            onClick={async () => {
+                              const label = r.nama_paket;
+                              if (!confirm(r._imported
+                                ? `Hapus baris RUP impor "${label}"?`
+                                : `Sembunyikan RUP "${label}" dari semua user?`)) return;
+                              try {
+                                if (r._imported) {
+                                  await deleteImportedRup(r.kd_rup);
+                                  // optimistic local refresh — list re-renders next tick
+                                  await reloadImports();
+                                } else {
+                                  await hideRup(r.kd_rup, 'admin delete');
+                                }
+                              } catch (e) { alert(`Gagal hapus: ${e.message || e}`); }
+                            }}
+                            className="p-1.5 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   );
