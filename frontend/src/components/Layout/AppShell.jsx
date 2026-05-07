@@ -339,18 +339,27 @@ export default function AppShell() {
                     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
                     try {
                       console.log('[Generate CV] Fetching CV for expert:', selectedExpert.id);
+                      console.log('[Generate CV] API Base:', apiBase);
+                      console.log('[Generate CV] Full URL:', `${apiBase}/cv/${selectedExpert.id}/cv`);
+                      
                       const response = await fetch(`${apiBase}/cv/${selectedExpert.id}/cv`, {
                         method: 'GET',
                         headers: { 'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
                       });
+                      
                       console.log('[Generate CV] Response status:', response.status);
+                      console.log('[Generate CV] Response headers:', Object.fromEntries(response.headers.entries()));
+                      
                       if (!response.ok) {
                         const errorText = await response.text();
                         console.error('[Generate CV] Error response:', errorText);
                         throw new Error(`HTTP ${response.status}: ${errorText}`);
                       }
+                      
                       const blob = await response.blob();
-                      console.log('[Generate CV] Blob size:', blob.size);
+                      console.log('[Generate CV] Blob size:', blob.size, 'bytes');
+                      console.log('[Generate CV] Blob type:', blob.type);
+                      
                       const url = window.URL.createObjectURL(blob);
                       const link = document.createElement('a');
                       link.href = url;
@@ -360,9 +369,10 @@ export default function AppShell() {
                       link.remove();
                       window.URL.revokeObjectURL(url);
                       console.log('[Generate CV] Download triggered successfully');
+                      alert('✅ CV berhasil di-generate dan didownload!');
                     } catch (err) {
                       console.error('[Generate CV] Failed:', err);
-                      alert(`Gagal generate CV: ${err.message}`);
+                      alert(`❌ Gagal generate CV: ${err.message}\n\nCek console untuk detail error.`);
                     }
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
