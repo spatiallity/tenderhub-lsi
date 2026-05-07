@@ -56,7 +56,16 @@ export const AppProvider = ({ children }) => {
   const [expertCVs, setExpertCVs] = useState({});
   const [users, setUsers] = useState(DEFAULT_USERS);
   const [notifications, setNotifications] = useState({ baru: true, deadline: true, status: true, ta: true });
-  const [coverage, setCoverage] = useState(() => PROVINCES.map((name, i) => ({ name, active: i < 10 })));
+  const [coverage, setCoverage] = useState(() => {
+    // Persist coverage selection in localStorage. Default: all 38 provinsi aktif.
+    try {
+      const saved = JSON.parse(localStorage.getItem('lsi-coverage') || 'null');
+      const map = new Map((saved || []).map(c => [c.name, !!c.active]));
+      return PROVINCES.map(name => ({ name, active: map.has(name) ? map.get(name) : true }));
+    } catch {
+      return PROVINCES.map(name => ({ name, active: true }));
+    }
+  });
   const [hpsThreshold, setHpsThreshold] = useState(200);
 
   // Panel state
@@ -817,17 +826,15 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
-    // Enforce: "Menang" only allowed after winner announcement stage
+    // Enforce: "Menang" only allowed after Pengumuman Pemenang stage
     if (newStatus === 'Menang') {
       const tender = tenders.find(t => t.id === tenderId);
       const stageName = (tender?.currentStageName || '').toLowerCase();
       const canBeWon =
-        stageName.includes('pemenang') ||
-        stageName.includes('sanggah') ||
-        stageName.includes('klarifikasi') ||
+        stageName.includes('pengumuman pemenang') ||
+        stageName.includes('masa sanggah') ||
         stageName.includes('penunjukan') ||
-        stageName.includes('kontrak') ||
-        (stageName.includes('pengumuman') && (tender?.currentStage || 0) > 1);
+        stageName.includes('kontrak');
 
       if (!canBeWon) {
         showToast('Status "Menang" hanya bisa diset setelah tahap Pengumuman Pemenang', 'warning');

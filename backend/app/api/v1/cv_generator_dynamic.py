@@ -13,7 +13,7 @@ from app.core.database import get_db
 from app.models.expert import Expert
 from docx import Document
 from docx.table import Table
-from docx.shared import Pt
+from docx.shared import Pt, Cm
 from docx.oxml.ns import qn
 from io import BytesIO
 from datetime import datetime
@@ -130,9 +130,25 @@ def replace_in_paragraph(paragraph, replacements):
                     r.text = ''
 
 
+def _apply_bullet_format(paragraph, line):
+    """If a line starts with a bullet glyph, swap it for `•\tTEXT` and apply a
+    hanging indent so wrapped lines align under the bullet's text — not under
+    the dot. Also tightens line spacing so the bulleted block reads cleanly."""
+    if line.startswith(('• ', '•\t', '- ', '* ')):
+        body = line[2:].lstrip() if line[1] in (' ', '\t') else line[1:].lstrip()
+        pf = paragraph.paragraph_format
+        pf.left_indent = Cm(0.6)
+        pf.first_line_indent = Cm(-0.6)
+        pf.space_after = Pt(2)
+        return f'•\t{body}'
+    return line
+
+
 def set_cell_multiline(cell, text):
     """Replace cell text with multi-line content. Splits on newlines into
-    separate paragraphs. Forces Arial on every new run."""
+    separate paragraphs. Forces Arial on every new run. Bullet lines (starting
+    with `• `, `- `, or `* `) get a proper hanging indent — wrapped lines
+    align under text, not under the bullet glyph."""
     paras = list(cell.paragraphs)
     first = paras[0]
     for p in paras[1:]:
@@ -142,11 +158,13 @@ def set_cell_multiline(cell, text):
     lines = (text or '').split('\n')
     if not lines:
         return
-    run = first.add_run(lines[0])
+    formatted_first = _apply_bullet_format(first, lines[0])
+    run = first.add_run(formatted_first)
     _force_arial(run)
     for line in lines[1:]:
         new_para = cell.add_paragraph()
-        run = new_para.add_run(line)
+        formatted = _apply_bullet_format(new_para, line)
+        run = new_para.add_run(formatted)
         _force_arial(run)
 
 

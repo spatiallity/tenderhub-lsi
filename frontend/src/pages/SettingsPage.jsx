@@ -212,17 +212,40 @@ export default function SettingsPage() {
 
           {/* Area Coverage */}
           <Card>
-            <h2 className="text-base font-extrabold tracking-tight mb-1">Coverage Wilayah</h2>
-            <p className="text-slate-500 text-xs mb-3">Tender dari provinsi ini akan diberi skor relevansi lebih tinggi.</p>
-            <div className="border border-slate-200 rounded-xl h-[180px] overflow-y-auto p-3 bg-slate-50">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div>
+                <h2 className="text-base font-extrabold tracking-tight">Coverage Wilayah</h2>
+                <p className="text-slate-500 text-xs">Tender dari provinsi ini akan diberi skor relevansi lebih tinggi. Default: seluruh provinsi aktif.</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <Btn
+                  className="ghost small"
+                  onClick={() => setCoverage(prev => prev.map(c => ({ ...c, active: true })))}
+                >
+                  Aktifkan Semua
+                </Btn>
+                <Btn
+                  className="ghost small"
+                  onClick={() => setCoverage(prev => prev.map(c => ({ ...c, active: false })))}
+                >
+                  Kosongkan
+                </Btn>
+              </div>
+            </div>
+            <div className="border border-slate-200 rounded-xl h-[220px] overflow-y-auto p-3 bg-slate-50 mt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {PROVINCES.map(p => (
                   <label key={p} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-slate-200/50 transition-colors">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={coverage.some(c => c.name === p && c.active)}
                       onChange={e => {
-                        setCoverage(prev => prev.map(c => c.name === p ? { ...c, active: e.target.checked } : c));
+                        setCoverage(prev => {
+                          const found = prev.some(c => c.name === p);
+                          return found
+                            ? prev.map(c => c.name === p ? { ...c, active: e.target.checked } : c)
+                            : [...prev, { name: p, active: e.target.checked }];
+                        });
                       }}
                       className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
@@ -230,6 +253,24 @@ export default function SettingsPage() {
                   </label>
                 ))}
               </div>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <div className="text-[11px] text-slate-500">
+                {coverage.filter(c => c.active).length} dari {PROVINCES.length} provinsi aktif.
+              </div>
+              <Btn
+                className="primary"
+                onClick={() => {
+                  try {
+                    localStorage.setItem('lsi-coverage', JSON.stringify(coverage));
+                    showToast('Coverage wilayah tersimpan');
+                  } catch {
+                    showToast('Gagal menyimpan coverage', 'error');
+                  }
+                }}
+              >
+                <Save size={16} /> Simpan Coverage
+              </Btn>
             </div>
           </Card>
 

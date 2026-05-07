@@ -350,20 +350,34 @@ const generateAdditionalRUP = (startId, count) => {
     'Pertanian', 'Perikanan', 'Kehutanan', 'Pertambangan', 'Migas', 'Telekomunikasi'
   ];
 
-  const provinces = [
-    'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'DKI Jakarta', 'Banten',
-    'Sumatera Utara', 'Sumatera Barat', 'Sumatera Selatan', 'Riau', 'Lampung',
-    'Kalimantan Timur', 'Kalimantan Selatan', 'Kalimantan Barat', 'Kalimantan Tengah',
-    'Sulawesi Selatan', 'Sulawesi Utara', 'Sulawesi Tengah', 'Sulawesi Tenggara',
-    'Bali', 'NTB', 'NTT', 'Papua', 'Papua Barat', 'Maluku', 'Maluku Utara'
-  ];
-
-  const cities = [
-    'Bandung', 'Semarang', 'Surabaya', 'Medan', 'Palembang', 'Makassar',
-    'Balikpapan', 'Samarinda', 'Pontianak', 'Manado', 'Denpasar', 'Mataram',
-    'Batam', 'Pekanbaru', 'Banjarmasin', 'Yogyakarta', 'Solo', 'Malang',
-    'Bogor', 'Tangerang', 'Bekasi', 'Depok', 'Cirebon', 'Tasikmalaya', 'Jambi'
-  ];
+  const CITY_BY_PROV = {
+    'Jawa Barat': ['Bandung', 'Bogor', 'Bekasi', 'Depok', 'Cirebon', 'Tasikmalaya'],
+    'Jawa Tengah': ['Semarang', 'Solo', 'Magelang', 'Pekalongan', 'Kendal'],
+    'Jawa Timur': ['Surabaya', 'Malang', 'Sidoarjo', 'Gresik', 'Jember'],
+    'DKI Jakarta': ['Jakarta Pusat', 'Jakarta Selatan', 'Jakarta Barat', 'Jakarta Timur'],
+    'Banten': ['Tangerang', 'Serang', 'Cilegon'],
+    'Sumatera Utara': ['Medan', 'Binjai', 'Pematang Siantar'],
+    'Sumatera Barat': ['Padang', 'Bukittinggi', 'Payakumbuh'],
+    'Sumatera Selatan': ['Palembang', 'Lubuk Linggau', 'Prabumulih'],
+    'Riau': ['Pekanbaru', 'Dumai', 'Kampar'],
+    'Lampung': ['Bandar Lampung', 'Metro', 'Lampung Selatan'],
+    'Kalimantan Timur': ['Balikpapan', 'Samarinda', 'Bontang'],
+    'Kalimantan Selatan': ['Banjarmasin', 'Banjarbaru', 'Tanah Bumbu'],
+    'Kalimantan Barat': ['Pontianak', 'Singkawang', 'Sintang'],
+    'Kalimantan Tengah': ['Palangka Raya', 'Sampit', 'Kapuas'],
+    'Sulawesi Selatan': ['Makassar', 'Parepare', 'Palopo'],
+    'Sulawesi Utara': ['Manado', 'Bitung', 'Tomohon'],
+    'Sulawesi Tengah': ['Palu', 'Poso', 'Donggala'],
+    'Sulawesi Tenggara': ['Kendari', 'Bau-Bau', 'Konawe'],
+    'Bali': ['Denpasar', 'Badung', 'Gianyar'],
+    'NTB': ['Mataram', 'Lombok Timur', 'Sumbawa'],
+    'NTT': ['Kupang', 'Ende', 'Maumere'],
+    'Papua': ['Jayapura', 'Merauke', 'Biak'],
+    'Papua Barat': ['Manokwari', 'Sorong', 'Fakfak'],
+    'Maluku': ['Ambon', 'Tual', 'Maluku Tengah'],
+    'Maluku Utara': ['Ternate', 'Tidore', 'Halmahera Tengah'],
+  };
+  const provinces = Object.keys(CITY_BY_PROV);
 
   const klpdKL = [
     'Kementerian PUPR', 'Kementerian Perhubungan', 'Kementerian ESDM',
@@ -390,7 +404,8 @@ const generateAdditionalRUP = (startId, count) => {
     const template = rupTemplates[i % rupTemplates.length];
     const subject = subjects[Math.floor(Math.random() * subjects.length)];
     const province = provinces[Math.floor(Math.random() * provinces.length)];
-    const city = cities[Math.floor(Math.random() * cities.length)];
+    const provinceCities = CITY_BY_PROV[province];
+    const city = provinceCities[Math.floor(Math.random() * provinceCities.length)];
     const jenis_klpd = jenisKLPD[Math.floor(Math.random() * jenisKLPD.length)];
     
     const pagu = (Math.floor(Math.random() * 90) + 10) * 100000000; // 1M - 9M
@@ -450,8 +465,8 @@ const generateAdditionalRUP = (startId, count) => {
   return rupList;
 };
 
-// Combine original RUP with generated ones
+// Combine original RUP with generated ones — 12 hand-curated + 8 generated = 20 total.
 export const FALLBACK_RUP = [
   ...FALLBACK_RUP_RAW.slice(0, 12),
-  ...generateAdditionalRUP(113, 88) // Generate 88 more RUP (113-200, but we'll use 113-200 as IDs)
+  ...generateAdditionalRUP(113, 8)
 ];

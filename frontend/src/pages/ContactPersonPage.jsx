@@ -101,7 +101,23 @@ export default function ContactPersonPage() {
     });
     return g;
   }, [items]);
-  const groupKeys = useMemo(() => Object.keys(grouped).sort(), [grouped]);
+  // Custom order: Kepala SBU → PDOS (any sub) → FLP → FITI → SDA → others (alphabetical).
+  const groupKeys = useMemo(() => {
+    const rank = (k) => {
+      const u = (k || '').toUpperCase();
+      if (u.includes('KEPALA') || u.includes('MANAJ')) return 0;
+      if (u.includes('PDOS')) return 1;
+      if (u.includes('FLP')) return 2;
+      if (u.includes('FITI')) return 3;
+      if (u.includes('SDA')) return 4;
+      return 5;
+    };
+    return Object.keys(grouped).sort((a, b) => {
+      const ra = rank(a), rb = rank(b);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b);
+    });
+  }, [grouped]);
 
   const onSave = async (form) => {
     const payload = {

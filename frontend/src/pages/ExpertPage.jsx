@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, MapPin, ChevronRight, Filter, Star, Plus, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Filter, Star, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAppContext } from '../store/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Badge, PageTitle, Card, Btn, Stars } from '../components/UI/index';
@@ -7,7 +7,7 @@ import { portfolioColor, availabilityColor, avatarColors } from '../utils/consta
 import { formatRupiah, initials } from '../utils/helpers';
 
 export default function ExpertPage() {
-  const { experts, setSelectedExpertId, addExpert, showToast, refetchTenders } = useAppContext();
+  const { experts, setSelectedExpertId, addExpert, showToast } = useAppContext();
   const { isGuest } = useAuth();
 
   const [expertSearch, setExpertSearch] = useState('');
@@ -85,9 +85,6 @@ export default function ExpertPage() {
         subtitle={`${filteredExperts.length} tenaga ahli tampil dari total ${experts?.length || 0}. Siapkan kandidat sejak fase RUP agar respons proposal lebih cepat.`}
         right={
           <div className="flex gap-2">
-            <Btn className="ghost" onClick={refetchTenders} title="Refresh data dari server">
-              <RefreshCw size={16} />Refresh
-            </Btn>
             {!isGuest && (
               <Btn className="primary" onClick={() => setShowForm(true)}>
                 <Plus size={16} />Tambah Tenaga Ahli

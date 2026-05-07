@@ -529,13 +529,35 @@ const generateAdditionalTenders = (startId, count) => {
     'Pertanian', 'Perikanan', 'Kehutanan', 'Pertambangan', 'Migas'
   ];
 
-  const provinces = [
-    'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'DKI Jakarta', 'Banten',
-    'Sumatera Utara', 'Sumatera Barat', 'Sumatera Selatan', 'Riau', 'Lampung',
-    'Kalimantan Timur', 'Kalimantan Selatan', 'Kalimantan Barat', 'Kalimantan Tengah',
-    'Sulawesi Selatan', 'Sulawesi Utara', 'Sulawesi Tengah', 'Sulawesi Tenggara',
-    'Bali', 'NTB', 'NTT', 'Papua', 'Papua Barat', 'Maluku', 'Maluku Utara'
-  ];
+  // Province -> list of plausible kota/kabupaten (so location stays internally consistent).
+  const CITY_BY_PROV = {
+    'Jawa Barat': ['Bandung', 'Bogor', 'Bekasi', 'Depok', 'Cirebon', 'Tasikmalaya'],
+    'Jawa Tengah': ['Semarang', 'Solo', 'Magelang', 'Pekalongan', 'Kendal'],
+    'Jawa Timur': ['Surabaya', 'Malang', 'Sidoarjo', 'Gresik', 'Jember'],
+    'DKI Jakarta': ['Jakarta Pusat', 'Jakarta Selatan', 'Jakarta Barat', 'Jakarta Timur'],
+    'Banten': ['Tangerang', 'Serang', 'Cilegon'],
+    'Sumatera Utara': ['Medan', 'Binjai', 'Pematang Siantar'],
+    'Sumatera Barat': ['Padang', 'Bukittinggi', 'Payakumbuh'],
+    'Sumatera Selatan': ['Palembang', 'Lubuk Linggau', 'Prabumulih'],
+    'Riau': ['Pekanbaru', 'Dumai', 'Kampar'],
+    'Lampung': ['Bandar Lampung', 'Metro', 'Lampung Selatan'],
+    'Kalimantan Timur': ['Balikpapan', 'Samarinda', 'Bontang'],
+    'Kalimantan Selatan': ['Banjarmasin', 'Banjarbaru', 'Tanah Bumbu'],
+    'Kalimantan Barat': ['Pontianak', 'Singkawang', 'Sintang'],
+    'Kalimantan Tengah': ['Palangka Raya', 'Sampit', 'Kapuas'],
+    'Sulawesi Selatan': ['Makassar', 'Parepare', 'Palopo'],
+    'Sulawesi Utara': ['Manado', 'Bitung', 'Tomohon'],
+    'Sulawesi Tengah': ['Palu', 'Poso', 'Donggala'],
+    'Sulawesi Tenggara': ['Kendari', 'Bau-Bau', 'Konawe'],
+    'Bali': ['Denpasar', 'Badung', 'Gianyar'],
+    'NTB': ['Mataram', 'Lombok Timur', 'Sumbawa'],
+    'NTT': ['Kupang', 'Ende', 'Maumere'],
+    'Papua': ['Jayapura', 'Merauke', 'Biak'],
+    'Papua Barat': ['Manokwari', 'Sorong', 'Fakfak'],
+    'Maluku': ['Ambon', 'Tual', 'Maluku Tengah'],
+    'Maluku Utara': ['Ternate', 'Tidore', 'Halmahera Tengah'],
+  };
+  const provinces = Object.keys(CITY_BY_PROV);
 
   const instansiKL = [
     'Kementerian PUPR', 'Kementerian Perhubungan', 'Kementerian ESDM',
@@ -548,13 +570,6 @@ const generateAdditionalTenders = (startId, count) => {
     'Dinas PUPR', 'Dinas Perhubungan', 'Dinas Perindustrian', 'DPMPTSP',
     'Bappeda', 'Dinas Kesehatan', 'Dinas Pendidikan', 'Dinas Pertanian',
     'Dinas Kelautan dan Perikanan', 'Dinas Pariwisata'
-  ];
-
-  const cities = [
-    'Bandung', 'Semarang', 'Surabaya', 'Medan', 'Palembang', 'Makassar',
-    'Balikpapan', 'Samarinda', 'Pontianak', 'Manado', 'Denpasar', 'Mataram',
-    'Batam', 'Pekanbaru', 'Banjarmasin', 'Yogyakarta', 'Solo', 'Malang',
-    'Bogor', 'Tangerang', 'Bekasi', 'Depok', 'Cirebon', 'Tasikmalaya'
   ];
 
   const namaPPK = [
@@ -584,7 +599,8 @@ const generateAdditionalTenders = (startId, count) => {
     const template = tenderTemplates[i % tenderTemplates.length];
     const subject = subjects[Math.floor(rand() * subjects.length)];
     const province = provinces[Math.floor(rand() * provinces.length)];
-    const city = cities[Math.floor(rand() * cities.length)];
+    const provinceCities = CITY_BY_PROV[province];
+    const city = provinceCities[Math.floor(rand() * provinceCities.length)];
     const level = levels[Math.floor(rand() * levels.length)];
     const metode = metodes[Math.floor(rand() * metodes.length)];
     const maxStage = metode === 'Prakualifikasi' ? 21 : 12;
@@ -655,16 +671,127 @@ const generateAdditionalTenders = (startId, count) => {
   return tenders;
 };
 
-// Combine original tenders with generated ones
+// Combine original tenders with generated ones — 12 hand-curated + 18 generated = 30 total.
 const allTendersRaw = [
   ...FALLBACK_TENDERS_RAW,
-  ...generateAdditionalTenders(13, 88) // Generate 88 more tenders (13-100)
+  ...generateAdditionalTenders(13, 18)
 ];
 
 // Apply ensureStageDeadlines to all tenders
 export const FALLBACK_TENDERS = allTendersRaw.map(ensureStageDeadlines);
 
-export const FALLBACK_EXPERTS = [
+// Augment a hand-curated expert with at least 10 dummy projects and 5 reviews
+// so demo screens look populated. Existing entries stay as the 1st project/review.
+const PROJECT_BANK = {
+  SDA: [
+    ['Survei Topografi Jalur Pipa', 'Pertamina Gas', 'Bandung, Jawa Barat'],
+    ['Pengadaan Tanah Tol Trans-Jawa', 'Kementerian PUPR', 'Semarang, Jawa Tengah'],
+    ['Inventarisasi ROW SUTT 150 kV', 'PLN UIP', 'Serang, Banten'],
+    ['DED Drainase Kawasan Industri', 'Pemprov Jawa Tengah', 'Kendal, Jawa Tengah'],
+    ['Pemetaan Risiko Banjir', 'Dinas SDA Jabar', 'Cirebon, Jawa Barat'],
+    ['Survei GIS Kawasan Tambang', 'Kementerian ESDM', 'Samarinda, Kalimantan Timur'],
+    ['Pengukuran Kadaster Tol', 'BPN Pusat', 'Bekasi, Jawa Barat'],
+    ['Studi Geoteknik Pelabuhan', 'Kementerian Perhubungan', 'Surabaya, Jawa Timur'],
+    ['Bush Clearing IKN', 'Otorita IKN', 'Penajam Paser Utara, Kalimantan Timur'],
+    ['Rehabilitasi Daerah Irigasi', 'Kementerian PUPR', 'Subang, Jawa Barat'],
+    ['Survei Hidrologi Bendungan', 'BBWS Citarum', 'Bandung, Jawa Barat'],
+    ['DED Embung Multifungsi', 'Pemprov NTB', 'Lombok Timur, NTB'],
+  ],
+  FLP: [
+    ['Survei Status Gizi Balita', 'Kementerian Kesehatan', 'Jakarta'],
+    ['Pendataan UMKM Pangan', 'Kemenkop UKM', 'Surabaya, Jawa Timur'],
+    ['Evaluasi Pelayanan Perizinan', 'DPMPTSP DKI', 'Jakarta'],
+    ['PMC Jaringan Gas Kota', 'Kementerian ESDM', 'Semarang, Jawa Tengah'],
+    ['Survei Kepuasan Masyarakat', 'Pemprov Jabar', 'Bandung, Jawa Barat'],
+    ['Kajian Kebijakan Pendidikan', 'Kemendikbud', 'Yogyakarta, DIY'],
+    ['Oversight Services Air Bersih', 'Kementerian PUPR', 'Padang, Sumatera Barat'],
+    ['Survei Kepatuhan Pelayanan', 'Ombudsman RI', 'Makassar, Sulawesi Selatan'],
+    ['Studi Bandara Perintis', 'Kementerian Perhubungan', 'Jayapura, Papua'],
+    ['Pendampingan PNPM Mandiri', 'Kemendes PDTT', 'Kupang, NTT'],
+    ['Instrumen Survei Layanan Publik', 'KemenPAN-RB', 'Jakarta'],
+    ['Riset Persepsi Layanan Kesehatan', 'BPJS Kesehatan', 'Bandung, Jawa Barat'],
+  ],
+  FITI: [
+    ['Masterplan KEK Pariwisata', 'BKPM', 'Mandalika, NTB'],
+    ['IPRO Hilirisasi Mineral', 'Kementerian ESDM', 'Konawe, Sulawesi Tenggara'],
+    ['Studi Kelayakan Kawasan Industri', 'Pemkab Gresik', 'Gresik, Jawa Timur'],
+    ['Roadmap Investasi Pariwisata', 'BKPM', 'Manado, Sulawesi Utara'],
+    ['Peta Peluang Investasi', 'BKPM', 'Sorong, Papua Barat'],
+    ['Feasibility Study Pelabuhan', 'Kementerian Perhubungan', 'Bitung, Sulawesi Utara'],
+    ['Masterplan Kawasan Industri Hijau', 'DPMPTSP Kaltara', 'Bulungan, Kalimantan Utara'],
+    ['Studi Hilirisasi Rumput Laut', 'Pemprov NTB', 'Lombok Timur, NTB'],
+    ['Investment Project Ready (IPRO)', 'BKPM', 'Surabaya, Jawa Timur'],
+    ['Profil Investasi Energi Terbarukan', 'Kementerian ESDM', 'Bali'],
+    ['Kajian Demand Bandara Internasional', 'AP II', 'Kertajati, Jawa Barat'],
+    ['Studi Investasi Cold Storage', 'KKP', 'Ambon, Maluku'],
+  ],
+};
+
+const REVIEW_BANK = [
+  ['PMO LSI', 5, 'Komunikasi rapi, deliverable on-time, dan dokumentasi lengkap.'],
+  ['PM SDA', 4, 'Kuat di analisis teknis, mau revisi cepat saat dibutuhkan.'],
+  ['Direktorat FLP', 5, 'Sangat solid pada metodologi survei dan rekomendasi.'],
+  ['Direktorat FITI', 5, 'Narasi investasi tajam dan model finansial dapat dipertanggungjawabkan.'],
+  ['Procurement Officer', 4, 'Profesional, dokumen kualifikasi tertib, presentasi clear.'],
+  ['Klien BUMN', 5, 'Tim koordinasi excellent, eskalasi cepat saat ada blocker.'],
+  ['Reviewer Independen', 4, 'Kualitas laporan akhir di atas rata-rata, tinggal poles editing.'],
+  ['Manajer Proyek', 5, 'Inisiatif tinggi dan handal mengelola anggota tim lapangan.'],
+];
+
+const TAHUN_OPTS = [2020, 2021, 2022, 2023, 2024, 2025];
+
+const augmentExpert = (expert) => {
+  // Pick portfolio bank — fall back to SDA when expert has no portofolio.
+  const portKey = (expert.portofolio && expert.portofolio[0]) || 'SDA';
+  const bank = PROJECT_BANK[portKey] || PROJECT_BANK.SDA;
+  const baseHistory = expert.history || [];
+  const baseReviews = expert.reviews || [];
+
+  // Deterministic offset so each expert lands on a different slice of the bank.
+  const off = (expert.id || 1) * 3;
+
+  const padHistory = [];
+  for (let i = baseHistory.length; i < 10; i++) {
+    const [proyek, klien, lokasi] = bank[(off + i) % bank.length];
+    const tahun = TAHUN_OPTS[(off + i) % TAHUN_OPTS.length];
+    const nilai = (((off + i) % 9) + 1) * 500_000_000;
+    padHistory.push({
+      proyek,
+      klien,
+      tahun,
+      nilai,
+      peran: ['Team Leader', 'Tenaga Ahli Utama', 'Ahli Madya', 'Koordinator Lapangan'][(off + i) % 4],
+      bersama: i % 3 === 0 ? 'Lain' : 'Sucofindo',
+      status: 'Selesai',
+      lokasi_proyek: lokasi,
+    });
+  }
+
+  const padReviews = [];
+  for (let i = baseReviews.length; i < 5; i++) {
+    const [reviewer, rating, komentar] = REVIEW_BANK[(off + i) % REVIEW_BANK.length];
+    const dt = new Date(2025, ((off + i) % 12), ((off + i) % 27) + 1);
+    padReviews.push({
+      reviewer,
+      rating,
+      komentar,
+      tanggal: dt.toLocaleDateString('id-ID'),
+    });
+  }
+
+  const finalReviews = [...baseReviews, ...padReviews];
+  const avgRating = finalReviews.reduce((s, r) => s + (r.rating || 0), 0) / Math.max(1, finalReviews.length);
+
+  return {
+    ...expert,
+    history: [...baseHistory, ...padHistory],
+    reviews: finalReviews,
+    proyek: Math.max(expert.proyek || 0, 10 + Math.floor((expert.id || 0) % 8)),
+    rating: Number(avgRating.toFixed(1)),
+  };
+};
+
+const _RAW_FALLBACK_EXPERTS = [
   {
     id: 1,
     nama: 'Ir. Bambang Sutrisno, M.T.',
@@ -874,3 +1001,5 @@ export const FALLBACK_EXPERTS = [
     reviews: [{ reviewer: 'Direktur LSI', rating: 5, komentar: 'Sangat inovatif dalam mengintegrasikan AI ke dalam alur pengadaan.', tanggal: '03/05/2026' }],
   },
 ];
+
+export const FALLBACK_EXPERTS = _RAW_FALLBACK_EXPERTS.map(augmentExpert);

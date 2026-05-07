@@ -287,7 +287,7 @@ function ProjectAddForm({ expertId, isGuest, onSaved, showToast, setExpertsRaw }
 }
 
 export default function ExpertDetail({ expert, onClose }) {
-  const { canAddReview, canAddHistory, isGuest } = useAuth();
+  const { canAddReview, canAddHistory, isGuest, user, profile } = useAuth();
   const {
     reviewDraft, setReviewDraft, addReview,
     updateExpertProfile, deleteExpert, deleteExpertHistory,
@@ -301,6 +301,12 @@ export default function ExpertDetail({ expert, onClose }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
+  // Auto-populate reviewer with logged-in user (read-only).
+  const reviewerName = profile?.name || user?.email?.split('@')[0] || 'User';
+  useEffect(() => {
+    setReviewDraft(p => p.reviewer === reviewerName ? p : { ...p, reviewer: reviewerName });
+  }, [reviewerName, setReviewDraft]);
 
   // CV state
   const [showCV, setShowCV] = useState(false);
@@ -531,7 +537,7 @@ export default function ExpertDetail({ expert, onClose }) {
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
           <div className="font-extrabold text-[13px] mb-2">Tambah Review</div>
           <div className="flex flex-col gap-2">
-            <input className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Nama reviewer" value={reviewDraft.reviewer} onChange={e => setReviewDraft(p => ({ ...p, reviewer: e.target.value }))} />
+            <div className="text-[11px] text-slate-500">Reviewer: <span className="font-bold text-slate-700">{reviewerName}</span></div>
             <Stars rating={reviewDraft.rating} size={22} onRate={(rating) => setReviewDraft(p => ({ ...p, rating }))} />
             <textarea className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none min-h-[76px] resize-y" placeholder="Komentar review..." value={reviewDraft.komentar} onChange={e => setReviewDraft(p => ({ ...p, komentar: e.target.value }))} />
             <Btn

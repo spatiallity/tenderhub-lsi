@@ -427,16 +427,16 @@ export default function RupPage() {
                 requestAnimationFrame(() => { isSyncingRef.current = false; });
               }}
             >
-              <table ref={tableRef} className="min-w-[1280px] w-full table-fixed text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[760px] md:min-w-0 w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
-                <col className="w-[7%]" />
-                <col className="w-[28%]" />
+                <col className="w-[6%]" />
+                <col className="w-[30%]" />
                 <col className="w-[19%]" />
                 <col className="w-[12%]" />
                 <col className="w-[12%]" />
                 <col className="w-[10%]" />
                 <col className="w-[6%]" />
-                <col className="w-[6%]" />
+                <col className="w-[5%]" />
               </colgroup>
               <thead>
                 <tr>

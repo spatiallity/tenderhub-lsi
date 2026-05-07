@@ -1,5 +1,14 @@
 FROM python:3.11-slim
 
+# Install LibreOffice (headless) so the CV PDF endpoint can convert DOCX -> PDF.
+# `--no-install-recommends` keeps the layer slim; fonts-liberation gives Arial-fallback.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libreoffice-core libreoffice-writer libreoffice-common \
+        fonts-liberation fonts-dejavu \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user for security (Hugging Face standard)
 RUN useradd -m -u 1000 user
 USER user

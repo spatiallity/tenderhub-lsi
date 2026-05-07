@@ -1,5 +1,5 @@
 import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 
 // Custom dot to match the design with value badges.
 // Strip leading zeros (1 not 01) and skip badge when value is 0.
@@ -98,28 +98,34 @@ export default function WinrateChart({ winrateRows, winrate, followed, won }) {
               itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
               labelStyle={{ color: '#64748b', marginBottom: '4px', fontSize: '12px' }}
             />
-            <Area 
-              type="monotone" 
-              dataKey="ikut" 
-              stroke="#3b82f6" 
+            <Area
+              type="monotone"
+              dataKey="ikut"
+              name="Tender Diikuti"
+              stroke="#3b82f6"
               strokeWidth={3}
-              fillOpacity={1} 
-              fill="url(#colorIkut)" 
+              fillOpacity={1}
+              fill="url(#colorIkut)"
               activeDot={{ r: 6, strokeWidth: 0, fill: '#3b82f6' }}
               dot={<CustomDot />}
               animationDuration={1500}
-            />
-            <Area 
-              type="monotone" 
-              dataKey="menang" 
-              stroke="#10b981" 
+            >
+              <LabelList dataKey="ikut" position="top" offset={18} fill="#1d4ed8" fontSize={11} fontWeight={700} formatter={(v) => Number(v) > 0 ? v : ''} />
+            </Area>
+            <Area
+              type="monotone"
+              dataKey="menang"
+              name="Tender Menang"
+              stroke="#10b981"
               strokeWidth={3}
-              fillOpacity={1} 
-              fill="url(#colorMenang)" 
+              fillOpacity={1}
+              fill="url(#colorMenang)"
               activeDot={{ r: 6, strokeWidth: 0, fill: '#10b981' }}
               dot={<CustomDot />}
               animationDuration={1500}
-            />
+            >
+              <LabelList dataKey="menang" position="bottom" offset={14} fill="#047857" fontSize={11} fontWeight={700} formatter={(v) => Number(v) > 0 ? v : ''} />
+            </Area>
           </AreaChart>
         </ResponsiveContainer>
       </div>

@@ -32,14 +32,12 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
   const isChanged = localStatus !== (committedStatus || 'Dipantau');
 
   const stageName = (tender.currentStageName || '').toLowerCase();
+  // "Menang" only after Pengumuman Pemenang stage is reached (or anything after it).
   const canBeWon = tender.currentStageName && (
-    stageName.includes('pemenang') ||
-    stageName.includes('sanggah') ||
-    stageName.includes('klarifikasi') ||
+    stageName.includes('pengumuman pemenang') ||
+    stageName.includes('masa sanggah') ||
     stageName.includes('penunjukan') ||
-    stageName.includes('kontrak') ||
-    // 'Pengumuman Pemenang' — include 'pengumuman' but exclude stage 1 (pengumuman pengadaan)
-    (stageName.includes('pengumuman') && (tender.currentStage || 0) > 1)
+    stageName.includes('kontrak')
   );
 
   const handleSave = async (e) => {
@@ -460,19 +458,19 @@ export default function TenderPage() {
                 requestAnimationFrame(() => { isSyncingRef.current = false; });
               }}
             >
-              <table ref={tableRef} className="min-w-[860px] xl:min-w-[1080px] w-full table-fixed text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[760px] md:min-w-0 w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
-                <col className="w-[110px] xl:w-[120px]" />
-                <col className="w-[220px] xl:w-[230px]" />
-                <col className="hidden xl:table-column xl:w-[150px]" />
+                <col className="w-[78px] xl:w-[88px]" />
+                <col className="w-[230px] xl:w-[260px]" />
+                <col className="hidden xl:table-column xl:w-[160px]" />
                 <col className="hidden" />
-                <col className="w-[112px] xl:w-[116px]" />
+                <col className="w-[108px] xl:w-[120px]" />
                 <col className="hidden" />
                 <col className="hidden" />
-                <col className="w-[145px] xl:w-[150px]" />
-                <col className="w-[128px] xl:w-[132px]" />
-                <col className="w-[112px] xl:w-[112px]" />
-                <col className="w-[83px] xl:w-[84px]" />
+                <col className="w-[140px] xl:w-[160px]" />
+                <col className="w-[120px] xl:w-[136px]" />
+                <col className="w-[108px] xl:w-[120px]" />
+                <col className="w-[78px] xl:w-[84px]" />
               </colgroup>
               <thead>
                 <tr>

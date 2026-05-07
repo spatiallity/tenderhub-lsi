@@ -129,7 +129,12 @@ export default function TenderDetail({ tender }) {
   const stages = tender.metode === 'Prakualifikasi' ? PRAKUAL_STAGES : PASCAKUAL_STAGES;
   const currentStage = tender.currentStage || 1;
   const currentStageName = stages[currentStage - 1]?.[0] || '';
-  const isWinnerAnnouncementReached = currentStageName === 'Pengumuman Pemenang' || currentStageName === 'Masa Sanggah Pemenang' || currentStageName.includes('Pemenang');
+  const _stageLower = currentStageName.toLowerCase();
+  const isWinnerAnnouncementReached =
+    _stageLower.includes('pengumuman pemenang') ||
+    _stageLower.includes('masa sanggah') ||
+    _stageLower.includes('penunjukan') ||
+    _stageLower.includes('kontrak');
   const deadlineLabel = tender.daysLeft < 0 ? `${Math.abs(tender.daysLeft)}h lewat` : `${tender.daysLeft}h`;
   const progressPercentage = ((currentStage - 1) / (stages.length - 1)) * 100;
 
@@ -430,7 +435,7 @@ export default function TenderDetail({ tender }) {
             >
               <option value="">-- Pilih PIC Tender (PDOS-PJL / PDOS-PSD) --</option>
               {picCandidates.map(p => (
-                <option key={p.id} value={p.id}>{p.nama} — {p.sub_porto || p.divisi}</option>
+                <option key={p.id} value={p.id}>{p.nama}</option>
               ))}
               {picCandidates.length === 0 && (
                 <option disabled>Belum ada kontak PDOS-PJL/PSD. Import dulu.</option>

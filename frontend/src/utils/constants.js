@@ -54,9 +54,46 @@ export const PASCAKUAL_STAGES = [
   ['Penandatanganan Kontrak', 'green'],
 ];
 
+// 38 provinsi Indonesia (2026, including 4 DOB Papua + Papua Barat Daya).
 export const PROVINCES = [
-  'DKI Jakarta', 'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Sumatera Utara', 'Sumatera Selatan',
-  'Kalimantan Timur', 'Kalimantan Utara', 'Sulawesi Tenggara', 'Sulawesi Utara', 'NTB', 'Bali', 'Riau', 'Papua'
+  'Aceh',
+  'Sumatera Utara',
+  'Sumatera Barat',
+  'Riau',
+  'Kepulauan Riau',
+  'Jambi',
+  'Sumatera Selatan',
+  'Kepulauan Bangka Belitung',
+  'Bengkulu',
+  'Lampung',
+  'DKI Jakarta',
+  'Jawa Barat',
+  'Banten',
+  'Jawa Tengah',
+  'DI Yogyakarta',
+  'Jawa Timur',
+  'Bali',
+  'NTB',
+  'NTT',
+  'Kalimantan Barat',
+  'Kalimantan Tengah',
+  'Kalimantan Selatan',
+  'Kalimantan Timur',
+  'Kalimantan Utara',
+  'Sulawesi Utara',
+  'Gorontalo',
+  'Sulawesi Tengah',
+  'Sulawesi Barat',
+  'Sulawesi Selatan',
+  'Sulawesi Tenggara',
+  'Maluku',
+  'Maluku Utara',
+  'Papua',
+  'Papua Barat',
+  'Papua Barat Daya',
+  'Papua Tengah',
+  'Papua Pegunungan',
+  'Papua Selatan',
 ];
 
 export const WINRATE_SERIES = [
