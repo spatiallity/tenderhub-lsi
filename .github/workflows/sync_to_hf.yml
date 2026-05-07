@@ -28,10 +28,25 @@ jobs:
           # Create a new orphan branch (no history)
           git checkout --orphan hf-deploy
           
-          # Remove binary files before committing
+          # Remove binary files before committing — HF Spaces rejects raw binaries
+          # (must use Xet/LFS). Strip everything HF doesn't need to run the API.
           rm -f frontend/public/assets/sucofindo-logo.png
           rm -f .gitattributes
-          
+          # All Word docs (CV samples, templates, Office lock files)
+          find . -path ./.git -prune -o -type f \( \
+              -iname '*.docx' -o \
+              -iname '*.doc'  -o \
+              -iname '*.xlsx' -o \
+              -iname '*.xls'  -o \
+              -iname '*.pdf'  -o \
+              -iname '*.png'  -o \
+              -iname '*.jpg'  -o \
+              -iname '*.jpeg' -o \
+              -iname '*.gif'  -o \
+              -iname '*.zip'  -o \
+              -iname '~$*'    \
+            \) -print -delete || true
+
           # Add all files (except removed binaries)
           git add -A
           
