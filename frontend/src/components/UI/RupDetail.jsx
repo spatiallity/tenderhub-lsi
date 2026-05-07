@@ -1,19 +1,11 @@
-import React, { useMemo } from 'react';
-import { Calendar, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { Calendar, TrendingUp, CheckCircle } from 'lucide-react';
 import { Badge, MiniKpi } from '../UI/index';
 import { portfolioColor } from '../../utils/constants';
 import { formatRupiah, formatMonthYear } from '../../utils/helpers';
-import { useAppContext } from '../../store/AppContext';
 
 export default function RupDetail({ rup }) {
-  const { internalStatuses, setInternalStatuses } = useAppContext();
-  
   if (!rup) return null;
-  
-  const status = internalStatuses[rup.id] || 'Dipantau';
-  const setStatus = (val) => setInternalStatuses(prev => ({ ...prev, [rup.id]: val }));
-
-
 
   return (
     <div className="flex flex-col gap-4">
@@ -174,20 +166,6 @@ export default function RupDetail({ rup }) {
         </div>
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2">
-        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-          Status Internal
-        </div>
-        <select 
-          value={status} 
-          onChange={e => setStatus(e.target.value)} 
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
-        >
-          {['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'].map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </div>
     </div>
   );
 }

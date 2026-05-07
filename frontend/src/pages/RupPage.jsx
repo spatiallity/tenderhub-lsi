@@ -235,18 +235,20 @@ export default function RupPage() {
                 requestAnimationFrame(() => { isSyncingRef.current = false; });
               }}
             >
-              <table ref={tableRef} className="min-w-[1150px] w-full table-fixed text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[1280px] w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
-                <col className="w-[31%]" />
-                <col className="w-[20%]" />
+                <col className="w-[7%]" />
+                <col className="w-[28%]" />
+                <col className="w-[19%]" />
                 <col className="w-[12%]" />
-                <col className="w-[13%]" />
                 <col className="w-[12%]" />
-                <col className="w-[8%]" />
-                <col className="w-[8%]" />
+                <col className="w-[10%]" />
+                <col className="w-[6%]" />
+                <col className="w-[6%]" />
               </colgroup>
               <thead>
                 <tr>
+                  {renderSortTh('kd_rup', 'Kode RUP')}
                   {renderSortTh('nama', 'Paket Pengadaan')}
                   {renderSortTh('satker', 'Satuan Kerja / K/L/PD')}
                   {renderSortTh('jenis', 'Jenis Pengadaan')}
@@ -267,6 +269,9 @@ export default function RupPage() {
                   return (
                   <tr key={r.id} className={`transition-colors ${isNew ? 'bg-cyan-50/80 hover:bg-cyan-100/70 shadow-[inset_4px_0_0_#06b6d4]' : 'hover:bg-slate-50'}`}>
                     <td className="px-3 py-3 align-top">
+                      <div className="font-mono text-[11px] font-bold text-slate-700 break-all">{r.kd_rup || '-'}</div>
+                    </td>
+                    <td className="px-3 py-3 align-top">
                       <button
                         onClick={() => setSelectedRupId(r.id)}
                         className="font-extrabold leading-snug line-clamp-2 text-left hover:text-blue-700 transition-colors"
@@ -278,7 +283,6 @@ export default function RupPage() {
                       <div className="text-slate-500 text-[11px] mt-1 flex items-center gap-1.5 min-w-0">
                         <MapPin size={12} className="shrink-0" /><span className="truncate">{r.kabupaten || ''}, {r.provinsi || ''}</span>
                       </div>
-                      <div className="text-slate-500 text-[10px] mt-0.5">Kode RUP: {r.kd_rup}</div>
                     </td>
                     <td className="px-3 py-3 align-top">
                       <div className="text-xs font-bold text-slate-900 line-clamp-2">{r.nama_satker}</div>

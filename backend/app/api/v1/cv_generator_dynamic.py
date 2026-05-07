@@ -13,10 +13,31 @@ from app.core.database import get_db
 from app.models.expert import Expert
 from docx import Document
 from docx.table import Table
+from docx.shared import Pt
+from docx.oxml.ns import qn
 from io import BytesIO
 from datetime import datetime
 import os
 import copy
+import shutil
+import subprocess
+import tempfile
+
+CV_FONT_NAME = 'Arial'
+CV_FONT_SIZE_PT = 11
+
+
+def _force_arial(run):
+    """Force Arial on a run including East Asia / complex script font slots
+    (Word otherwise falls back to the document default)."""
+    run.font.name = CV_FONT_NAME
+    rpr = run._element.get_or_add_rPr()
+    rfonts = rpr.find(qn('w:rFonts'))
+    if rfonts is None:
+        rfonts = rpr.makeelement(qn('w:rFonts'), {})
+        rpr.append(rfonts)
+    for attr in ('w:ascii', 'w:hAnsi', 'w:cs', 'w:eastAsia'):
+        rfonts.set(qn(attr), CV_FONT_NAME)
 
 router = APIRouter()
 
@@ -25,14 +46,117 @@ async def cv_options(expert_id: int):
     """Handle CORS preflight for CV generation"""
     return {}
 
+
+def _find_libreoffice() -> str | None:
+    """Locate the LibreOffice/soffice binary or return None."""
+    for cand in ("soffice", "libreoffice"):
+        path = shutil.which(cand)
+        if path:
+            return path
+    common = [
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        "/usr/bin/libreoffice",
+        "/usr/bin/soffice",
+        "/usr/local/bin/soffice",
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    ]
+    for p in common:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def convert_docx_to_pdf(docx_bytes: bytes) -> bytes:
+    """Convert DOCX bytes to PDF bytes using LibreOffice headless. Raises HTTPException on failure."""
+    soffice = _find_libreoffice()
+    if not soffice:
+        raise HTTPException(
+            status_code=503,
+            detail="PDF conversion unavailable: LibreOffice (soffice) not installed on server. Install LibreOffice or use DOCX export."
+        )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        in_path = os.path.join(tmpdir, "input.docx")
+        with open(in_path, "wb") as f:
+            f.write(docx_bytes)
+
+        cmd = [soffice, "--headless", "--norestore", "--nologo",
+               "--convert-to", "pdf", "--outdir", tmpdir, in_path]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            raise HTTPException(status_code=504, detail="PDF conversion timed out (>120s).")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"LibreOffice invocation failed: {e}")
+
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or b"").decode("utf-8", errors="ignore")
+            raise HTTPException(status_code=500, detail=f"LibreOffice conversion failed: {err[:500]}")
+
+        out_path = os.path.join(tmpdir, "input.pdf")
+        if not os.path.exists(out_path):
+            raise HTTPException(status_code=500, detail="LibreOffice did not produce a PDF file.")
+
+        with open(out_path, "rb") as f:
+            return f.read()
+
 def replace_in_paragraph(paragraph, replacements):
-    """Replace placeholders in a paragraph"""
-    for placeholder, value in replacements.items():
+    """Replace placeholders in a paragraph. Longest keys first to avoid
+    substring collisions like {Posisi} clobbering {Posisi Tenaga Ahli}.
+    Falls back to whole-paragraph rewrite when a placeholder is split across
+    multiple runs (common Word quirk — runs get re-segmented on edits).
+    Forces Arial on any run that received replacement content."""
+    keys = sorted(replacements.keys(), key=len, reverse=True)
+    for placeholder in keys:
+        value = str(replacements[placeholder])
+        if placeholder not in paragraph.text:
+            continue
+        replaced_in_run = False
+        for run in paragraph.runs:
+            if placeholder in run.text:
+                run.text = run.text.replace(placeholder, value)
+                _force_arial(run)
+                replaced_in_run = True
+        if replaced_in_run and placeholder not in paragraph.text:
+            continue
         if placeholder in paragraph.text:
-            # Replace in runs to preserve formatting
-            for run in paragraph.runs:
-                if placeholder in run.text:
-                    run.text = run.text.replace(placeholder, str(value))
+            full = paragraph.text.replace(placeholder, value)
+            runs = paragraph.runs
+            if runs:
+                runs[0].text = full
+                _force_arial(runs[0])
+                for r in runs[1:]:
+                    r.text = ''
+
+
+def set_cell_multiline(cell, text):
+    """Replace cell text with multi-line content. Splits on newlines into
+    separate paragraphs. Forces Arial on every new run."""
+    paras = list(cell.paragraphs)
+    first = paras[0]
+    for p in paras[1:]:
+        p._element.getparent().remove(p._element)
+    for r in list(first.runs):
+        r._element.getparent().remove(r._element)
+    lines = (text or '').split('\n')
+    if not lines:
+        return
+    run = first.add_run(lines[0])
+    _force_arial(run)
+    for line in lines[1:]:
+        new_para = cell.add_paragraph()
+        run = new_para.add_run(line)
+        _force_arial(run)
+
+
+def strip_contoh_lines(table):
+    """Remove paragraphs that begin with 'Contoh:' from every cell."""
+    for row in table.rows:
+        for cell in row.cells:
+            for p in list(cell.paragraphs):
+                if p.text.strip().lower().startswith('contoh:'):
+                    p._element.getparent().remove(p._element)
 
 def fill_project_table(table, project, project_num):
     """Fill a project table with data from a single project"""
@@ -84,7 +208,8 @@ def fill_project_table(table, project, project_num):
         '{Uraian deskripsi pekerjaan 2}': '',
         '{Bulan Awal, Tahun}': waktu_mulai,
         '{Bulan Akhir, Tahun}': waktu_selesai,
-        '{Durasi}': f"{waktu_mulai} – {waktu_selesai}" if waktu_mulai and waktu_selesai else '',
+        # {Durasi} would otherwise duplicate the range — leave blank, post-pass strips empty parens.
+        '{Durasi}': '',
         '{Posisi Penugasan}': project.get('posisi_penugasan') or project.get('peran', ''),
         '{Status Kepegawaian}': project.get('status_kepegawaian', 'Tidak Tetap'),
         '{Nomor Surat Referensi}': project.get('surat_referensi', '-'),
@@ -95,6 +220,36 @@ def fill_project_table(table, project, project_num):
         for cell in row.cells:
             for paragraph in cell.paragraphs:
                 replace_in_paragraph(paragraph, replacements)
+
+    # Strip 'Contoh: …' helper rows the template ships with.
+    strip_contoh_lines(table)
+
+    # Collapse empty parens left behind when {Durasi} resolved to ''.
+    import re as _re
+    for row in table.rows:
+        for cell in row.cells:
+            for p in cell.paragraphs:
+                if '()' in p.text or '( )' in p.text:
+                    new = _re.sub(r'\s*\(\s*\)', '', p.text)
+                    if new != p.text:
+                        runs = p.runs
+                        if runs:
+                            runs[0].text = new
+                            for r in runs[1:]:
+                                r.text = ''
+
+    # Inject Uraian Tugas content by row label (template ships an empty value cell).
+    uraian_tugas_raw = (project.get('uraian_tugas') or '').strip()
+    if uraian_tugas_raw:
+        if '\n' in uraian_tugas_raw:
+            lines = [l.strip() for l in uraian_tugas_raw.split('\n') if l.strip()]
+            uraian_text = '\n'.join(l if l.startswith('•') else f'• {l}' for l in lines)
+        else:
+            uraian_text = f'• {uraian_tugas_raw}'
+        for row in table.rows:
+            if len(row.cells) >= 5 and row.cells[2].text.strip().lower() == 'uraian tugas':
+                set_cell_multiline(row.cells[4], uraian_text)
+                break
 
 def generate_cv_from_template_dynamic(expert_data, template_path):
     """
@@ -146,8 +301,14 @@ def generate_cv_from_template_dynamic(expert_data, template_path):
     else:
         penguasaan_bahasa_text = "• Bahasa Indonesia: Sangat Baik\n• Bahasa Inggris: Baik"
     
-    # Prepare replacements for header table
+    # Prepare replacements for header table — match TEMPLATE_CV_EXPERT.docx exactly.
     header_replacements = {
+        # Current template names
+        '{Posisi}': posisi_diusulkan,
+        '{Nama Tenaga Ahli}': nama,
+        '{Tempat}': tempat_lahir,
+        '{Hari, Tanggal Bulan Tahun}': tanggal_lahir,
+        # Legacy placeholders (kept for older template variants)
         '{Posisi yang Diusulkan}': posisi_diusulkan,
         '{Nama Lengkap}': nama,
         '{Tempat Lahir}': tempat_lahir,
@@ -156,6 +317,14 @@ def generate_cv_from_template_dynamic(expert_data, template_path):
         '{Pendidikan Formal}': pendidikan_formal_text,
         '{Pendidikan Non-Formal}': pendidikan_non_formal_text,
         '{Penguasaan Bahasa}': penguasaan_bahasa_text,
+    }
+
+    # Header rows whose value cell is empty in the template — fill by label.
+    header_label_to_text = {
+        'pendidikan': pendidikan_formal_text,
+        'pendidikan non formal': pendidikan_non_formal_text,
+        'pendidikan non-formal': pendidikan_non_formal_text,
+        'penguasaan bahasa': penguasaan_bahasa_text,
     }
     
     try:
@@ -167,6 +336,16 @@ def generate_cv_from_template_dynamic(expert_data, template_path):
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
                         replace_in_paragraph(paragraph, header_replacements)
+
+            # Fill rows whose value cell is empty in the template (Pendidikan, Bahasa, …)
+            for row in header_table.rows:
+                if len(row.cells) < 4:
+                    continue
+                label = row.cells[1].text.strip().lower()
+                if label in header_label_to_text:
+                    text = header_label_to_text[label]
+                    if text and not row.cells[3].text.strip():
+                        set_cell_multiline(row.cells[3], text)
         
         # Handle projects dynamically
         projects = expert_data.get('projects', [])
@@ -218,7 +397,15 @@ def generate_cv_from_template_dynamic(expert_data, template_path):
             print(f"[CV Generator Dynamic] Processing signature table")
             
             tanggal_sekarang = datetime.now().strftime('%d %B %Y')
+            # Length-sorted replace inside replace_in_paragraph protects
+            # {Posisi Tenaga Ahli} from being clobbered by {Posisi}.
             signature_replacements = {
+                # Current template
+                '{Nama Tenaga Ahli}': nama,
+                '{Posisi Tenaga Ahli}': posisi_diusulkan,
+                '{Tangal Bulan Tahun}': tanggal_sekarang,   # template typo "Tangal"
+                '{Tanggal Bulan Tahun}': tanggal_sekarang,  # tolerate fixed spelling
+                # Legacy
                 '{Tanggal}': tanggal_sekarang,
                 '{Nama}': nama,
                 '{Posisi}': posisi_diusulkan,
@@ -246,17 +433,8 @@ def generate_cv_from_template_dynamic(expert_data, template_path):
     print(f"[CV Generator Dynamic] CV generated successfully with {len(projects)} project tables")
     return output
 
-@router.get("/{expert_id}/cv")
-async def generate_expert_cv_dynamic(
-    expert_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Generate CV document for an expert using Sucofindo template
-    Supports UNLIMITED number of projects (dynamic table generation)
-    Returns a downloadable DOCX file
-    """
-    
+async def _build_cv_for_expert(expert_id: int, db: AsyncSession):
+    """Shared logic: load expert + render DOCX. Returns (BytesIO, expert)."""
     try:
         # Get expert with all related data
         result = await db.execute(
@@ -355,14 +533,57 @@ async def generate_expert_cv_dynamic(
             detail=f"Failed to generate CV: {str(e)}"
         )
     
-    # Return as downloadable file
+    return cv_file, expert
+
+
+@router.get("/{expert_id}/cv")
+async def generate_expert_cv_dynamic(
+    expert_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate CV document for an expert using Sucofindo template.
+    Supports UNLIMITED number of projects (dynamic table generation).
+    Returns a downloadable DOCX file.
+    """
+    cv_file, expert = await _build_cv_for_expert(expert_id, db)
     filename = f"CV_{expert.nama.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.docx"
-    
+
     from fastapi.responses import Response
-    
     return Response(
         content=cv_file.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache",
+        }
+    )
+
+
+@router.options("/{expert_id}/cv/pdf")
+async def cv_pdf_options(expert_id: int):
+    """CORS preflight for PDF route."""
+    return {}
+
+
+@router.get("/{expert_id}/cv/pdf")
+async def generate_expert_cv_pdf(
+    expert_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate expert CV as PDF (DOCX rendered then converted via LibreOffice headless).
+    Returns 503 if LibreOffice is not installed on the server.
+    """
+    cv_file, expert = await _build_cv_for_expert(expert_id, db)
+    print(f"[CV Generator Dynamic] Converting to PDF via LibreOffice…")
+    pdf_bytes = convert_docx_to_pdf(cv_file.getvalue())
+    filename = f"CV_{expert.nama.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+    from fastapi.responses import Response
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-cache",

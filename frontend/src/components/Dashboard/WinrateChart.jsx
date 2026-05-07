@@ -1,37 +1,26 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-// Custom dot to match the design with value badges
+// Custom dot to match the design with value badges.
+// Strip leading zeros (1 not 01) and skip badge when value is 0.
 const CustomDot = (props) => {
-  const { cx, cy, stroke, value, dataKey, payload } = props;
+  const { cx, cy, stroke, value, dataKey } = props;
   if (!cx || !cy) return null;
+  const num = Number(value) || 0;
+  const showBadge = num > 0;
+  const text = dataKey === 'rate' ? `${num}%` : String(num);
 
-  // Render a badge above the dot
   return (
     <g>
       <circle cx={cx} cy={cy} r={5} fill="#fff" stroke={stroke} strokeWidth={2.5} />
-      {/* Only show badge if value > 0 to match the clean look, or show all. The mockup shows all. */}
-      <g transform={`translate(${cx}, ${cy - 22})`}>
-        <rect 
-          x={-18} 
-          y={-10} 
-          width={36} 
-          height={20} 
-          rx={4} 
-          fill={stroke} 
-          fillOpacity={0.15} 
-        />
-        <text 
-          x={0} 
-          y={4} 
-          textAnchor="middle" 
-          fill={stroke} 
-          fontSize="11px" 
-          fontWeight="bold"
-        >
-          {dataKey === 'rate' ? `${value}%` : value}
-        </text>
-      </g>
+      {showBadge && (
+        <g transform={`translate(${cx}, ${cy - 22})`}>
+          <rect x={-18} y={-10} width={36} height={20} rx={4} fill={stroke} fillOpacity={0.15} />
+          <text x={0} y={4} textAnchor="middle" fill={stroke} fontSize="11px" fontWeight="bold">
+            {text}
+          </text>
+        </g>
+      )}
     </g>
   );
 };
@@ -102,7 +91,7 @@ export default function WinrateChart({ winrateRows, winrate, followed, won }) {
               axisLine={false} 
               tickLine={false} 
               tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
-              tickFormatter={(val) => val}
+              tickFormatter={(val) => String(Number(val) || 0)}
             />
             <Tooltip 
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}

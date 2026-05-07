@@ -458,8 +458,9 @@ export default function TenderPage() {
                 requestAnimationFrame(() => { isSyncingRef.current = false; });
               }}
             >
-              <table ref={tableRef} className="min-w-[800px] xl:min-w-[1040px] w-full table-fixed text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[860px] xl:min-w-[1080px] w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
+                <col className="w-[110px] xl:w-[120px]" />
                 <col className="w-[220px] xl:w-[230px]" />
                 <col className="hidden xl:table-column xl:w-[150px]" />
                 <col className="hidden" />
@@ -468,12 +469,12 @@ export default function TenderPage() {
                 <col className="hidden" />
                 <col className="w-[145px] xl:w-[150px]" />
                 <col className="w-[128px] xl:w-[132px]" />
-                <col className="hidden xl:table-column xl:w-[106px]" />
                 <col className="w-[112px] xl:w-[112px]" />
                 <col className="w-[83px] xl:w-[84px]" />
               </colgroup>
               <thead>
                 <tr>
+                  {renderSortTh('kd_tender', 'Kode Tender')}
                   {renderSortTh('nama', 'Nama Paket Pekerjaan')}
                   {renderSortTh('instansi', 'Instansi / Satker', 'hidden xl:table-cell')}
                   <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap">Jenis KLPD</th>
@@ -482,7 +483,6 @@ export default function TenderPage() {
                   <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap">Sumber Dana</th>
                   {renderSortTh('stage', 'Status Tahap Tender')}
                   {renderSortTh('deadline', 'Deadline')}
-                  {renderSortTh('metode', 'Metode Pemilihan', 'hidden xl:table-cell')}
                   {renderSortTh('status', 'Status Internal')}
                   <th className="bg-slate-50 border-b border-slate-200 sticky right-0 z-10"></th>
                 </tr>
@@ -492,6 +492,10 @@ export default function TenderPage() {
                   const isNew = newTenderSet.has(String(t.id));
                   return (
                     <tr key={t.id} className={`transition-colors ${isNew ? 'bg-amber-50/80 hover:bg-amber-100/70 shadow-[inset_4px_0_0_#f59e0b]' : 'hover:bg-slate-50'}`}>
+                      <td className="px-3 py-3 align-top">
+                        <div className="font-mono text-[11px] font-bold text-slate-700 break-all">{t.kd_tender || '-'}</div>
+                        <div className="text-slate-500 text-[10px] mt-1">TA {t.tahun_anggaran}</div>
+                      </td>
                       <td className="px-3 py-3 align-top">
                         <button
                           onClick={() => setSelectedTenderId(t.id)}
@@ -504,7 +508,6 @@ export default function TenderPage() {
                         <div className="text-slate-500 text-[11px] mt-1 flex items-center gap-1.5 min-w-0">
                           <MapPin size={12} className="shrink-0" /><span className="truncate">{t.lokasi_pekerjaan || t.provinsi}</span>
                         </div>
-                        <div className="text-slate-500 text-[10px] mt-0.5">KD Tender: {t.kd_tender} | TA {t.tahun_anggaran}</div>
                       </td>
                       <td className="px-3 py-3 align-top hidden xl:table-cell">
                         <div className="text-xs font-bold text-slate-900 line-clamp-2">{t.instansi}</div>
@@ -543,10 +546,6 @@ export default function TenderPage() {
                         <div className="text-[10px] text-slate-500 mt-1">
                           Tahap {t.deadlineRefStageNo}: {t.deadlineRefStageName}
                         </div>
-                      </td>
-                      <td className="px-3 py-3 align-top hidden xl:table-cell">
-                        <Badge color="gray">{t.mtd_pemilihan || t.metode}</Badge>
-                        <div className="text-slate-500 text-[10px] mt-1">{t.kualifikasi_paket}</div>
                       </td>
                       <td className="px-3 py-3 align-top">
                         <StatusCell

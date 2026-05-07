@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Home, Target, Calendar, ListChecks, 
+import {
+  Home, Target, Calendar, ListChecks,
   Users, Settings, ChevronLeft, ChevronRight, Menu, X,
-  Bell, User
+  Bell, User, Phone, ScrollText
 } from 'lucide-react';
 import { useAppContext } from '../../store/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import useKeyboardShortcut from '../../hooks/useKeyboardShortcut';
 import Header from './Header';
 import TenderDetail from '../Tender/TenderDetail';
 import RupDetail from '../UI/RupDetail';
 import ExpertDetail from '../Expert/ExpertDetail';
+import CvDownloadMenu from '../Expert/CvDownloadMenu';
 import SidePanel from '../UI/SidePanel';
 import PotensiChartPanel from '../Tender/PotensiChartPanel';
 import UrgentPanel from '../Tender/UrgentPanel';
@@ -25,7 +27,8 @@ export default function AppShell() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { 
+  const { isAdmin } = useAuth();
+  const {
     selectedTenderId, setSelectedTenderId, tenders,
     selectedRupId, setSelectedRupId, rupList,
     selectedExpertId, setSelectedExpertId, experts,
@@ -83,14 +86,20 @@ export default function AppShell() {
   const navItems = [
     { section: 'Utama', items: [
       { id: '/', icon: Home, label: 'Dashboard', tooltip: 'Ringkasan KPI, aktivitas terbaru, dan performa tender.' },
+    ]},
+    { section: 'Tender Ops', items: [
       { id: '/rup', icon: Calendar, label: 'RUP Pipeline', badge: newRupCount || 0, tooltip: 'Radar awal paket RUP sebelum naik menjadi tender.' },
       { id: '/tender', icon: Target, label: 'Tender Intelligence', badge: newTenderCount || 0, tooltip: 'Daftar tender aktif berbasis keyword, filter, dan prioritas follow-up.' },
       { id: '/status', icon: ListChecks, label: 'Status Tender', tooltip: 'Pantau progres tender yang Akan/Sudah Diikuti.' },
     ]},
     { section: 'Support Layanan Pusat', items: [
       { id: '/experts', icon: Users, label: 'Tenaga Ahli', tooltip: 'Kelola database tenaga ahli, ketersediaan, dan riwayat pekerjaan.' },
+      { id: '/contacts', icon: Phone, label: 'Contact Person', tooltip: 'Kontak penting per divisi (FITI/FLP/SDA/Manajemen).' },
+    ]},
+    ...(isAdmin ? [{ section: 'Admin', items: [
+      { id: '/audit', icon: ScrollText, label: 'Audit Log', tooltip: 'Riwayat perubahan data — admin only.' },
       { id: '/settings', icon: Settings, label: 'Pengaturan', tooltip: 'Atur keyword, threshold, coverage wilayah, dan pengguna.' },
-    ]}
+    ]}] : []),
   ];
 
   const selectedTender = tenders?.find(t => t.id === selectedTenderId);
@@ -142,7 +151,7 @@ export default function AppShell() {
       >
         <div className="flex flex-col h-full p-4">
           {/* Logo & Toggle */}
-          <div className={`flex items-start justify-between mb-8 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
+          <div className={`flex items-start justify-between mb-3 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
             <div className={`overflow-hidden transition-all duration-300 flex flex-col ${sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 hidden'}`}>
               {/* TenderHub Title */}
               <div>
@@ -155,9 +164,9 @@ export default function AppShell() {
             
             {/* Desktop Toggle */}
             {!isMobile && (
-              <button 
+              <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 ${sidebarOpen ? 'mt-8' : ''}`}
+                className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0`}
                 aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
               >
                 {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
@@ -179,9 +188,9 @@ export default function AppShell() {
           {/* Navigation */}
           <nav className="flex-1 flex flex-col gap-1.5 overflow-y-auto px-1" style={{ scrollbarWidth: 'none' }}>
             {navItems.map((group, idx) => (
-              <div key={idx} className="mb-2">
+              <div key={idx} className="mb-1">
                 {group.section !== 'Utama' && sidebarOpen && (
-                  <div className="px-3 mb-2 mt-4 text-[10px] font-extrabold tracking-widest uppercase text-slate-400">
+                  <div className="px-3 mb-1 mt-2 text-[10px] font-extrabold tracking-widest uppercase text-slate-400">
                     {group.section}
                   </div>
                 )}
@@ -334,54 +343,7 @@ export default function AppShell() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={async () => {
-                    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-                    try {
-                      console.log('[Generate CV] Fetching CV for expert:', selectedExpert.id);
-                      console.log('[Generate CV] API Base:', apiBase);
-                      console.log('[Generate CV] Full URL:', `${apiBase}/cv/${selectedExpert.id}/cv`);
-                      
-                      const response = await fetch(`${apiBase}/cv/${selectedExpert.id}/cv`, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-                      });
-                      
-                      console.log('[Generate CV] Response status:', response.status);
-                      console.log('[Generate CV] Response headers:', Object.fromEntries(response.headers.entries()));
-                      
-                      if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('[Generate CV] Error response:', errorText);
-                        throw new Error(`HTTP ${response.status}: ${errorText}`);
-                      }
-                      
-                      const blob = await response.blob();
-                      console.log('[Generate CV] Blob size:', blob.size, 'bytes');
-                      console.log('[Generate CV] Blob type:', blob.type);
-                      
-                      const url = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.setAttribute('download', `CV_${selectedExpert.nama.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.docx`);
-                      document.body.appendChild(link);
-                      link.click();
-                      link.remove();
-                      window.URL.revokeObjectURL(url);
-                      console.log('[Generate CV] Download triggered successfully');
-                      alert('✅ CV berhasil di-generate dan didownload!');
-                    } catch (err) {
-                      console.error('[Generate CV] Failed:', err);
-                      alert(`❌ Gagal generate CV: ${err.message}\n\nCek console untuk detail error.`);
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Generate CV
-                </button>
+                <CvDownloadMenu expert={selectedExpert} />
                 <button
                   onClick={() => setSelectedExpertId(null)}
                   className="p-2 hover:bg-slate-100 rounded-lg transition-colors"

@@ -22,6 +22,8 @@ const RupPage = lazy(() => import('./pages/RupPage'));
 const StatusPage = lazy(() => import('./pages/StatusPage'));
 const ExpertPage = lazy(() => import('./pages/ExpertPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const ContactPersonPage = lazy(() => import('./pages/ContactPersonPage'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 
 // Configure React Query with optimized defaults
 const queryClient = new QueryClient({
@@ -102,13 +104,29 @@ function App() {
                     </Suspense>
                   } 
                 />
-                <Route 
-                  path="settings" 
+                <Route
+                  path="settings"
                   element={
                     <Suspense fallback={<LoadingOverlay message="Memuat Pengaturan..." />}>
                       <SettingsPage />
                     </Suspense>
-                  } 
+                  }
+                />
+                <Route
+                  path="contacts"
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat Contact Person..." />}>
+                      <ContactPersonPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="audit"
+                  element={
+                    <Suspense fallback={<LoadingOverlay message="Memuat Audit Log..." />}>
+                      <AuditLogPage />
+                    </Suspense>
+                  }
                 />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>

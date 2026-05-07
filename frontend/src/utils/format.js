@@ -23,6 +23,23 @@ export const initials = (name) => {
     return name.split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 };
 
+export const normalizeWa = (raw) => {
+    if (!raw) return '';
+    let digits = String(raw).replace(/\D/g, '');
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.startsWith('0')) digits = '62' + digits.slice(1);
+    if (digits.startsWith('8')) digits = '62' + digits;
+    if (!digits.startsWith('62')) digits = '62' + digits;
+    return digits;
+};
+
+export const waLink = (raw, message) => {
+    const num = normalizeWa(raw);
+    if (!num) return '';
+    const base = `https://wa.me/${num}`;
+    return message ? `${base}?text=${encodeURIComponent(message)}` : base;
+};
+
 export const portfolioColor = { FLP: "blue", SDA: "green", FITI: "amber" };
 export const internalStatusColor = { "Dipantau": "gray", "Akan Diikuti": "amber", "Sudah Diikuti": "green", "Tidak Relevan": "red" };
 export const levelColor = { "K/L": "gray", "Provinsi": "blue", "Kab/Kota": "teal" };
