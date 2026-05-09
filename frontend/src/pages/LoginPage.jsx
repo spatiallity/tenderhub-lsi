@@ -124,11 +124,6 @@ export default function LoginPage() {
       {/* Right Panel — Login Form */}
       <div className="flex-1 flex items-center justify-center p-4 lg:p-6 bg-slate-50 overflow-y-auto">
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center mb-4">
-            <img src={tenderhubLogo} alt="TenderHub" className="h-10 w-auto object-contain" />
-          </div>
-
           {/* Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="mb-6 flex flex-col items-center text-center">

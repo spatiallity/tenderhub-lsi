@@ -545,7 +545,7 @@ function StatsView({ allTenders, tenderClaims }) {
 export default function StatusPage() {
   const [showIrrelevant, setShowIrrelevant] = useState(false);
   const { tenders, setSelectedTenderId, tenderClaims } = useAppContext();
-  const { isAdmin, isPusat, isCabang, unitKerja } = useAuth();
+  const { isAdmin, isPusat, isCabang, isGuest, unitKerja } = useAuth();
 
   const [view, setView] = useState('stats');                // 'stats' | 'kanban' | 'calendar' (Statistik default)
   const [adminViewBranch, setAdminViewBranch] = useState(null);
@@ -554,15 +554,19 @@ export default function StatusPage() {
 
   // Determine effective branch.
   const ownBranch = unitKerja || null;
-  const viewBranch = isAdmin ? adminViewBranch : (overrideBranch || ownBranch);
+  // Guest gets an admin-style global read-only view (same branch picker, same
+  // global filter, no edit rights). isAdmin is preserved as-is so actual
+  // admins keep their full capabilities.
+  const hasGlobalView = isAdmin || isGuest;
+  const viewBranch = hasGlobalView ? adminViewBranch : (overrideBranch || ownBranch);
   const isViewingOther = viewBranch && ownBranch && viewBranch !== ownBranch;
-  const readOnly = isAdmin || isViewingOther;
+  const readOnly = hasGlobalView || isViewingOther;
 
   const filteredTenders = useMemo(() => {
-    if (isAdmin && !viewBranch) return tenders;
+    if (hasGlobalView && !viewBranch) return tenders;
     if (!viewBranch) return [];
     return tenders.filter(t => tenderClaims[t.id]?.unit_kerja === viewBranch);
-  }, [tenders, tenderClaims, viewBranch, isAdmin]);
+  }, [tenders, tenderClaims, viewBranch, hasGlobalView]);
 
   const statusBuckets = useMemo(() => ({
     'Akan Diikuti':  filteredTenders.filter(t => t.internalStatus === 'Akan Diikuti'),
@@ -572,17 +576,17 @@ export default function StatusPage() {
     'Tidak Relevan': filteredTenders.filter(t => t.internalStatus === 'Tidak Relevan'),
   }), [filteredTenders]);
 
-  // Branch picker (admin uses adminViewBranch, others use overrideBranch).
+  // Branch picker (admin/guest use adminViewBranch, others use overrideBranch).
   const renderBranchPicker = () => (
     <select
-      value={(isAdmin ? adminViewBranch : overrideBranch) || ''}
+      value={(hasGlobalView ? adminViewBranch : overrideBranch) || ''}
       onChange={e => {
         const v = e.target.value || null;
-        if (isAdmin) setAdminViewBranch(v); else setOverrideBranch(v);
+        if (hasGlobalView) setAdminViewBranch(v); else setOverrideBranch(v);
       }}
       className="px-3 py-2 border border-slate-200 rounded-xl bg-white shadow-sm text-xs font-bold"
     >
-      <option value="">{isAdmin ? 'Pilih cabang...' : `Cabang sendiri (${unitKerjaLabel(ownBranch || '')})`}</option>
+      <option value="">{hasGlobalView ? 'Pilih cabang...' : `Cabang sendiri (${unitKerjaLabel(ownBranch || '')})`}</option>
       {REGIONS.map(region => (
         <optgroup key={region} label={`Wilayah ${region}`}>
           {UNIT_KERJA_BY_REGION[region].map(u => (
@@ -593,14 +597,18 @@ export default function StatusPage() {
     </select>
   );
 
-  // Admin global overview when no branch picked AND not on stats tab.
-  if (isAdmin && !adminViewBranch && view !== 'stats') {
+  // Global overview (admin or guest) when no branch picked AND not on stats tab.
+  if (hasGlobalView && !adminViewBranch && view !== 'stats') {
+    const overviewTitle = isGuest ? 'Status Tender — Overview (Guest)' : 'Status Tender — Admin Overview';
+    const overviewSubtitle = isGuest
+      ? 'Ringkasan claim per cabang — mode tamu (read-only). Pilih cabang untuk lihat Kanban atau klik tab Statistik untuk grafik global.'
+      : 'Ringkasan claim per cabang. Pilih cabang untuk lihat Kanban (read-only) atau klik tab Statistik untuk grafik global.';
     return (
       <div className="flex flex-col h-full">
         <div className="flex-shrink-0">
           <PageTitle
-            title="Status Tender — Admin Overview"
-            subtitle="Ringkasan claim per cabang. Pilih cabang untuk lihat Kanban (read-only) atau klik tab Statistik untuk grafik global."
+            title={overviewTitle}
+            subtitle={overviewSubtitle}
             right={
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-0 p-0.5 bg-slate-100 rounded-lg">
@@ -626,8 +634,8 @@ export default function StatusPage() {
     );
   }
 
-  // No branch + not admin: prompt assignment.
-  if (!viewBranch && !isAdmin) {
+  // No branch + not admin/guest: prompt assignment.
+  if (!viewBranch && !hasGlobalView) {
     return (
       <div className="flex flex-col h-full">
         <div className="flex-shrink-0">
@@ -645,6 +653,7 @@ export default function StatusPage() {
   const subtitleParts = [];
   if (viewBranch) subtitleParts.push(unitKerjaLabel(viewBranch));
   if (isAdmin) subtitleParts.push('admin · read-only');
+  else if (isGuest) subtitleParts.push('tamu · read-only');
   else if (isViewingOther) subtitleParts.push('mode pantau cabang lain · read-only');
   else subtitleParts.push('cabang Anda');
 
@@ -681,7 +690,7 @@ export default function StatusPage() {
                 </button>
               </div>
 
-              {isAdmin && (
+              {hasGlobalView && (
                 <button
                   type="button"
                   onClick={() => setAdminViewBranch(null)}
@@ -693,7 +702,7 @@ export default function StatusPage() {
 
               {renderBranchPicker()}
 
-              {!isAdmin && overrideBranch && overrideBranch !== ownBranch && (
+              {!hasGlobalView && overrideBranch && overrideBranch !== ownBranch && (
                 <button
                   type="button"
                   onClick={() => setOverrideBranch(null)}
@@ -726,7 +735,7 @@ export default function StatusPage() {
       {readOnly && viewBranch && (
         <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-800 font-semibold">
           <Eye size={14} />
-          Mode read-only — Anda sedang melihat data {unitKerjaLabel(viewBranch)}{!isAdmin ? '. Hanya pemilik atau admin yang bisa mengubah.' : '.'}
+          Mode read-only — Anda sedang melihat data {unitKerjaLabel(viewBranch)}{!hasGlobalView ? '. Hanya pemilik atau admin yang bisa mengubah.' : '.'}
         </div>
       )}
 
