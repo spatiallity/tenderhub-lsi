@@ -154,8 +154,13 @@ export const AppProvider = ({ children }) => {
         const picsMap = {};
         const notesMap = {};
 
-        // Fetch watchlist from Supabase directly
+        // Fetch watchlist from Supabase. Index by BOTH kd_tender + tender.id
+        // so consumers can lookup by either key (TenderPage uses t.id, some
+        // legacy code uses kd_tender).
         const claimsMap = {};
+        const kdToId = new Map(
+          FALLBACK_TENDERS.map(t => [parseInt(t.kd_tender || t.id), t.id])
+        );
         try {
           const { data: watchlistData, error } = await supabase
             .from('tender_watchlist')
@@ -163,18 +168,22 @@ export const AppProvider = ({ children }) => {
 
           if (!error && watchlistData) {
             watchlistData.forEach(w => {
-              const tenderId = w.kd_tender;
-              if (w.status_internal) statusMap[tenderId] = w.status_internal;
-              if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
-              if (w.catatan_internal) {
-                try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
-              }
-              if (w.unit_kerja) {
-                claimsMap[tenderId] = {
-                  unit_kerja: w.unit_kerja,
-                  unit_kerja_region: w.unit_kerja_region || getRegion(w.unit_kerja),
-                };
-              }
+              const kd = w.kd_tender;
+              const localId = kdToId.get(kd) ?? kd;  // fall back to kd if no match
+              // Index by both keys so any consumer can look up claim/status.
+              [kd, localId].forEach(key => {
+                if (w.status_internal) statusMap[key] = w.status_internal;
+                if (w.assigned_pic) picsMap[key] = w.assigned_pic;
+                if (w.catatan_internal) {
+                  try { notesMap[key] = JSON.parse(w.catatan_internal); } catch {}
+                }
+                if (w.unit_kerja) {
+                  claimsMap[key] = {
+                    unit_kerja: w.unit_kerja,
+                    unit_kerja_region: w.unit_kerja_region || getRegion(w.unit_kerja),
+                  };
+                }
+              });
             });
           } else if (error) {
             console.error('Supabase watchlist error:', error.message);
@@ -772,34 +781,48 @@ export const AppProvider = ({ children }) => {
       const picsMap = {};
       const notesMap = {};
 
-      // Fetch watchlist from Supabase
+      // Fetch watchlist from Supabase. Index by both kd_tender + tender.id.
       try {
         const { data: watchlistData, error } = await supabase
           .from('tender_watchlist')
-          .select('kd_tender, status_internal, assigned_pic, catatan_internal');
+          .select('kd_tender, status_internal, assigned_pic, catatan_internal, unit_kerja, unit_kerja_region');
 
+        const claimsMap = {};
+        const kdToId = new Map(
+          (tendersRaw || []).map(t => [parseInt(t.kd_tender || t.id), t.id])
+        );
         if (!error && watchlistData) {
           watchlistData.forEach(w => {
-            if (w.status_internal) statusMap[w.kd_tender] = w.status_internal;
-            if (w.assigned_pic) picsMap[w.kd_tender] = w.assigned_pic;
-            if (w.catatan_internal) {
-              try { notesMap[w.kd_tender] = JSON.parse(w.catatan_internal); } catch {}
-            }
+            const kd = w.kd_tender;
+            const localId = kdToId.get(kd) ?? kd;
+            [kd, localId].forEach(key => {
+              if (w.status_internal) statusMap[key] = w.status_internal;
+              if (w.assigned_pic) picsMap[key] = w.assigned_pic;
+              if (w.catatan_internal) {
+                try { notesMap[key] = JSON.parse(w.catatan_internal); } catch {}
+              }
+              if (w.unit_kerja) {
+                claimsMap[key] = {
+                  unit_kerja: w.unit_kerja,
+                  unit_kerja_region: w.unit_kerja_region || getRegion(w.unit_kerja),
+                };
+              }
+            });
           });
         }
-        
-        // Update states with watchlist data
+
         setInternalStatuses(prev => ({ ...prev, ...statusMap }));
         setAssignedPICs(prev => ({ ...prev, ...picsMap }));
         setTenderNotes(prev => ({ ...prev, ...notesMap }));
-        
+        setTenderClaims(prev => ({ ...prev, ...claimsMap }));
+
       } catch (watchlistErr) {
         console.error('Failed to refetch watchlist:', watchlistErr);
       }
     } catch (err) {
       console.error('Failed to refetch:', err);
     }
-  }, []);
+  }, [tendersRaw]);
 
   // Helper: upsert a watchlist entry via Supabase directly
   const ensureWatchlistEntry = useCallback(async (tenderId, patch = {}) => {
