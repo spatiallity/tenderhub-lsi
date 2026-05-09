@@ -28,3 +28,8 @@ frontend/public/assets/**/*.svg
 frontend/public/assets/**/*.ico
 frontend/public/assets/**/*.pdf
 frontend/public/assets/**/*.zip
+
+# Local dev copy of the CV template — the root TEMPLATE_CV_EXPERT.docx is
+# the source of truth and gets shipped to HF via the sync workflow. The
+# backend copy here is only needed for the local uvicorn dev server.
+backend/TEMPLATE_CV_EXPERT.docx

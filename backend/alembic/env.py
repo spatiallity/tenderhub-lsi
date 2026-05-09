@@ -1,12 +1,10 @@
 import asyncio
 from logging.config import fileConfig
-from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.core.config import settings
-from app.core.database import Base
+from app.core.database import Base, engine as app_engine
 from app.models import *  # Import all models
 
 config = context.config
@@ -34,14 +32,12 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 async def run_async_migrations() -> None:
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    async with connectable.connect() as connection:
+    # Reuse the app engine (already configured with ``statement_cache_size=0``
+    # and matching SSL / server_settings for Supabase's pgbouncer pooler).
+    # A fresh ``async_engine_from_config`` would fall back to asyncpg defaults
+    # and blow up with ``DuplicatePreparedStatementError`` against pgbouncer.
+    async with app_engine.connect() as connection:
         await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
 
 def run_migrations_online() -> None:
     asyncio.run(run_async_migrations())

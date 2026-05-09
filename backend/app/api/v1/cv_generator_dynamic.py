@@ -519,6 +519,8 @@ async def _build_cv_for_expert(expert_id: int, db: AsyncSession):
         os.path.join(os.path.dirname(__file__), '..', '..', '..', 'TEMPLATE_CV_EXPERT.docx'),
         os.path.join(os.path.dirname(__file__), '..', '..', 'TEMPLATE_CV_EXPERT.docx'),
         os.path.join(os.path.dirname(__file__), '..', 'TEMPLATE_CV_EXPERT.docx'),
+        # Workspace root (one level above backend/) — local dev layout
+        os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'TEMPLATE_CV_EXPERT.docx'),
         # Absolute fallback
         '/home/user/app/TEMPLATE_CV_EXPERT.docx',
         '/app/TEMPLATE_CV_EXPERT.docx',
