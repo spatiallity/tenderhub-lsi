@@ -42,11 +42,15 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
     stageName.includes('kontrak')
   );
   // "Akan Diikuti" tidak boleh kalau sudah lewat:
-  //   Prakualifikasi → "Kirim Persyaratan Kualifikasi" (stage 4 — index 3)
-  //   Pascakualifikasi → "Upload Dokumen Penawaran" (stage 4 — index 3)
-  // Setelah stage tersebut, tender wajib langsung jadi Sudah Diikuti / Menang / Kalah.
-  const cutoffStage = (tender.metode === 'Prakualifikasi') ? 4 : 4;
-  const canBeAkan = (tender.currentStage || 0) <= cutoffStage;
+  //   Prakualifikasi → "Kirim Persyaratan Kualifikasi" (stage 4)
+  //   Pascakualifikasi → "Upload Dokumen Penawaran" (stage 4)
+  const cutoffStage = 4;
+  const pastCutoff = (tender.currentStage || 0) > cutoffStage;
+  const canBeAkan = !pastCutoff;
+  // "Terlewat" — tender masih Dipantau / Akan Diikuti TAPI sudah lewat cutoff
+  // = berarti tim tidak ikut serta. Tampilkan badge "Terlewat" instead.
+  const isTerlewat = pastCutoff && (localStatus === 'Dipantau' || localStatus === 'Akan Diikuti');
+  const displayStatus = isTerlewat ? 'Terlewat' : localStatus;
 
   const handleSave = async (e) => {
     e.stopPropagation();
@@ -62,24 +66,28 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
     }
   };
 
-  // Guests + non-owners can only view (read-only badge).
-  if (isGuest || lockedByClaim) {
+  const STATUS_PILL = {
+    'Dipantau':      'bg-slate-50 text-slate-700 border-slate-200',
+    'Akan Diikuti':  'bg-blue-50 text-blue-700 border-blue-200',
+    'Sudah Diikuti': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'Menang':        'bg-green-50 text-green-700 border-green-200',
+    'Kalah':         'bg-red-50 text-red-700 border-red-200',
+    'Tidak Relevan': 'bg-amber-50 text-amber-700 border-amber-200',
+    'Terlewat':      'bg-rose-50 text-rose-700 border-rose-300',
+  };
+
+  // Guests + non-owners + Terlewat (final state, no edit) → read-only badge.
+  if (isGuest || lockedByClaim || isTerlewat) {
     return (
       <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
-        <span className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold text-center ${
-          {
-            'Dipantau':     'bg-slate-50 text-slate-700 border-slate-200',
-            'Akan Diikuti': 'bg-blue-50 text-blue-700 border-blue-200',
-            'Sudah Diikuti':'bg-indigo-50 text-indigo-700 border-indigo-200',
-            'Menang':       'bg-green-50 text-green-700 border-green-200',
-            'Kalah':        'bg-red-50 text-red-700 border-red-200',
-            'Tidak Relevan':'bg-amber-50 text-amber-700 border-amber-200',
-          }[localStatus] || 'bg-slate-50 text-slate-700 border-slate-200'
-        }`}>
-          {localStatus}
+        <span className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold text-center ${STATUS_PILL[displayStatus] || STATUS_PILL['Dipantau']}`}>
+          {displayStatus}
         </span>
         {lockedByClaim && (
           <ClaimBadge claim={claim} viewerOwns={false} readOnly size="xs" />
+        )}
+        {isTerlewat && !lockedByClaim && (
+          <ClaimBadge claim={claim} viewerOwns={!!viewerOwns} size="xs" />
         )}
       </div>
     );
