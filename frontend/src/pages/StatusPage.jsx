@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Inbox, Building2, Users as UsersIcon, LayoutGrid, Calendar as CalendarIcon,
+  Inbox, Users as UsersIcon, LayoutGrid, Calendar as CalendarIcon,
   ChevronLeft, ChevronRight, Eye, BarChart3,
 } from 'lucide-react';
 import {
@@ -545,28 +545,27 @@ function StatsView({ allTenders, tenderClaims }) {
 export default function StatusPage() {
   const [showIrrelevant, setShowIrrelevant] = useState(false);
   const { tenders, setSelectedTenderId, tenderClaims } = useAppContext();
-  const { isAdmin, isPusat, isCabang, isGuest, unitKerja } = useAuth();
+  const { isAdmin, isGuest, unitKerja } = useAuth();
 
   const [view, setView] = useState('stats');                // 'stats' | 'kanban' | 'calendar' (Statistik default)
   const [adminViewBranch, setAdminViewBranch] = useState(null);
-  // Cabang/pusat: optional override branch (read-only when not their own).
-  const [overrideBranch, setOverrideBranch] = useState(null);
 
-  // Determine effective branch.
+  // Global overview — every visitor (admin, pusat, cabang, user, guest)
+  // lands on the cross-branch statistik + branch picker. Previously only
+  // admin/guest got this; cabang users were locked to their own branch
+  // and non-branch accounts hit a dead-end "Anda belum di-assign" screen.
   const ownBranch = unitKerja || null;
-  // Guest gets an admin-style global read-only view (same branch picker, same
-  // global filter, no edit rights). isAdmin is preserved as-is so actual
-  // admins keep their full capabilities.
-  const hasGlobalView = isAdmin || isGuest;
-  const viewBranch = hasGlobalView ? adminViewBranch : (overrideBranch || ownBranch);
+  const viewBranch = adminViewBranch;
   const isViewingOther = viewBranch && ownBranch && viewBranch !== ownBranch;
-  const readOnly = hasGlobalView || isViewingOther;
+  // Read-only applies to roles that can't edit (admin oversees without
+  // editing, guest has no account) and to anyone viewing a branch that
+  // isn't theirs. Cabang/pusat viewing their OWN branch stays editable.
+  const readOnly = isAdmin || isGuest || isViewingOther || !ownBranch;
 
   const filteredTenders = useMemo(() => {
-    if (hasGlobalView && !viewBranch) return tenders;
-    if (!viewBranch) return [];
+    if (!viewBranch) return tenders;  // Overview screens see every tender
     return tenders.filter(t => tenderClaims[t.id]?.unit_kerja === viewBranch);
-  }, [tenders, tenderClaims, viewBranch, hasGlobalView]);
+  }, [tenders, tenderClaims, viewBranch]);
 
   const statusBuckets = useMemo(() => ({
     'Akan Diikuti':  filteredTenders.filter(t => t.internalStatus === 'Akan Diikuti'),
@@ -576,17 +575,14 @@ export default function StatusPage() {
     'Tidak Relevan': filteredTenders.filter(t => t.internalStatus === 'Tidak Relevan'),
   }), [filteredTenders]);
 
-  // Branch picker (admin/guest use adminViewBranch, others use overrideBranch).
+  // Branch picker — shared by every role. Empty value = global overview.
   const renderBranchPicker = () => (
     <select
-      value={(hasGlobalView ? adminViewBranch : overrideBranch) || ''}
-      onChange={e => {
-        const v = e.target.value || null;
-        if (hasGlobalView) setAdminViewBranch(v); else setOverrideBranch(v);
-      }}
+      value={adminViewBranch || ''}
+      onChange={e => setAdminViewBranch(e.target.value || null)}
       className="px-3 py-2 border border-slate-200 rounded-xl bg-white shadow-sm text-xs font-bold"
     >
-      <option value="">{hasGlobalView ? 'Pilih cabang...' : `Cabang sendiri (${unitKerjaLabel(ownBranch || '')})`}</option>
+      <option value="">Semua cabang (overview)</option>
       {REGIONS.map(region => (
         <optgroup key={region} label={`Wilayah ${region}`}>
           {UNIT_KERJA_BY_REGION[region].map(u => (
@@ -597,12 +593,16 @@ export default function StatusPage() {
     </select>
   );
 
-  // Global overview (admin or guest) when no branch picked AND not on stats tab.
-  if (hasGlobalView && !adminViewBranch && view !== 'stats') {
-    const overviewTitle = isGuest ? 'Status Tender — Overview (Guest)' : 'Status Tender — Admin Overview';
-    const overviewSubtitle = isGuest
-      ? 'Ringkasan claim per cabang — mode tamu (read-only). Pilih cabang untuk lihat Kanban atau klik tab Statistik untuk grafik global.'
-      : 'Ringkasan claim per cabang. Pilih cabang untuk lihat Kanban (read-only) atau klik tab Statistik untuk grafik global.';
+  // Global overview — every role lands here first (no branch picked yet)
+  // when they aren't on the Statistik tab. Statistik tab is already global
+  // so we let that render via the main branch below.
+  if (!adminViewBranch && view !== 'stats') {
+    const overviewTitle = 'Status Tender — Overview';
+    const overviewSubtitle = isAdmin
+      ? 'Ringkasan claim per cabang (admin). Pilih cabang untuk lihat Kanban atau klik Statistik untuk grafik global.'
+      : isGuest
+        ? 'Ringkasan claim per cabang — mode tamu (read-only). Pilih cabang untuk lihat Kanban atau Statistik untuk grafik global.'
+        : 'Ringkasan claim seluruh cabang. Pilih cabang untuk lihat Kanban atau Statistik untuk grafik global.';
     return (
       <div className="flex flex-col h-full">
         <div className="flex-shrink-0">
@@ -634,28 +634,13 @@ export default function StatusPage() {
     );
   }
 
-  // No branch + not admin/guest: prompt assignment.
-  if (!viewBranch && !hasGlobalView) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="flex-shrink-0">
-          <PageTitle title="Status Tender" subtitle="Anda belum di-assign ke unit kerja manapun." />
-        </div>
-        <Card className="mt-4 p-8 text-center text-slate-500">
-          <Building2 size={32} className="mx-auto mb-2 text-slate-300" />
-          <p className="text-sm font-bold">Belum ada unit kerja.</p>
-          <p className="text-xs mt-1">Hubungi Admin untuk meng-assign akun Anda ke salah satu cabang atau SBU LSI Pusat.</p>
-        </Card>
-      </div>
-    );
-  }
-
   const subtitleParts = [];
   if (viewBranch) subtitleParts.push(unitKerjaLabel(viewBranch));
+  else subtitleParts.push('Semua cabang');
   if (isAdmin) subtitleParts.push('admin · read-only');
   else if (isGuest) subtitleParts.push('tamu · read-only');
   else if (isViewingOther) subtitleParts.push('mode pantau cabang lain · read-only');
-  else subtitleParts.push('cabang Anda');
+  else if (viewBranch && !isViewingOther) subtitleParts.push('cabang Anda');
 
   return (
     <div className="flex flex-col h-full">
@@ -690,7 +675,7 @@ export default function StatusPage() {
                 </button>
               </div>
 
-              {hasGlobalView && (
+              {adminViewBranch && (
                 <button
                   type="button"
                   onClick={() => setAdminViewBranch(null)}
@@ -701,16 +686,6 @@ export default function StatusPage() {
               )}
 
               {renderBranchPicker()}
-
-              {!hasGlobalView && overrideBranch && overrideBranch !== ownBranch && (
-                <button
-                  type="button"
-                  onClick={() => setOverrideBranch(null)}
-                  className="px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-bold text-blue-600 hover:bg-blue-50"
-                >
-                  ← Cabang sendiri
-                </button>
-              )}
 
               {view === 'kanban' && (
                 <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-xl bg-white shadow-sm">
@@ -731,11 +706,11 @@ export default function StatusPage() {
         />
       </div>
 
-      {/* Read-only banner when viewing other branch. */}
+      {/* Read-only banner when not editable for this branch. */}
       {readOnly && viewBranch && (
         <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-800 font-semibold">
           <Eye size={14} />
-          Mode read-only — Anda sedang melihat data {unitKerjaLabel(viewBranch)}{!hasGlobalView ? '. Hanya pemilik atau admin yang bisa mengubah.' : '.'}
+          Mode read-only — Anda sedang melihat data {unitKerjaLabel(viewBranch)}{!isAdmin && !isGuest ? '. Hanya pemilik atau admin yang bisa mengubah.' : '.'}
         </div>
       )}
 
