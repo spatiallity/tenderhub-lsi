@@ -153,7 +153,7 @@ export default function AppShell() {
       >
         <div className="flex flex-col h-full p-4">
           {/* Logo & Toggle */}
-          <div className={`flex items-start justify-between mb-3 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
+          <div className={`flex items-start justify-between mb-8 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
             <div className={`overflow-hidden transition-all duration-300 flex items-center gap-2 ${sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 hidden'}`}>
               <img
                 src={tenderhubLogo}
