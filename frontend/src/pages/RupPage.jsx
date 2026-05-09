@@ -296,8 +296,31 @@ export default function RupPage() {
   const keywordCount = useMemo(() => activeKeywordCount(keywords), [keywords]);
   const newRupSet = useMemo(() => new Set((newRupIds || []).map(String)), [newRupIds]);
 
+  const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
   const tableRef = useRef(null);
+  const isSyncingRef = useRef(false);
+  const [scrollSpacerWidth, setScrollSpacerWidth] = useState(0);
+
+  useEffect(() => {
+    const updateSpacer = () => {
+      const el = tableRef.current;
+      if (!el) return;
+      setScrollSpacerWidth(el.scrollWidth || 0);
+    };
+    updateSpacer();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateSpacer);
+      if (tableScrollRef.current) ro.observe(tableScrollRef.current);
+      if (tableRef.current) ro.observe(tableRef.current);
+    }
+    window.addEventListener('resize', updateSpacer);
+    return () => {
+      window.removeEventListener('resize', updateSpacer);
+      if (ro) ro.disconnect();
+    };
+  }, [loadingRup, (rupList || []).length]);
 
   const filteredRup = useMemo(() => {
     let result = (mergedRup || []).filter(r => {
@@ -450,9 +473,34 @@ export default function RupPage() {
           <div className="p-10 text-center text-slate-500">Memuat data RUP...</div>
         ) : (
           <>
+            {/* Top synced horizontal scrollbar */}
+            <div
+              ref={topScrollRef}
+              className="overflow-x-auto border-b border-slate-200 bg-slate-50/60"
+              onScroll={() => {
+                if (isSyncingRef.current) return;
+                const a = topScrollRef.current;
+                const b = tableScrollRef.current;
+                if (!a || !b) return;
+                isSyncingRef.current = true;
+                b.scrollLeft = a.scrollLeft;
+                requestAnimationFrame(() => { isSyncingRef.current = false; });
+              }}
+            >
+              <div className="h-4" style={{ width: scrollSpacerWidth || 0 }} />
+            </div>
             <div
               ref={tableScrollRef}
               className="overflow-x-auto pb-2"
+              onScroll={() => {
+                if (isSyncingRef.current) return;
+                const a = topScrollRef.current;
+                const b = tableScrollRef.current;
+                if (!a || !b) return;
+                isSyncingRef.current = true;
+                a.scrollLeft = b.scrollLeft;
+                requestAnimationFrame(() => { isSyncingRef.current = false; });
+              }}
             >
               <table ref={tableRef} className="min-w-[1100px] xl:min-w-[1240px] w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>

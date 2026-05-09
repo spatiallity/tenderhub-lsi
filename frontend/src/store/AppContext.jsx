@@ -913,9 +913,10 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
+    const tender = tenders.find(t => t.id === tenderId);
+
     // Enforce: "Menang" only allowed after Pengumuman Pemenang stage
     if (newStatus === 'Menang') {
-      const tender = tenders.find(t => t.id === tenderId);
       const stageName = (tender?.currentStageName || '').toLowerCase();
       const canBeWon =
         stageName.includes('pengumuman pemenang') ||
@@ -925,6 +926,18 @@ export const AppProvider = ({ children }) => {
 
       if (!canBeWon) {
         showToast('Status "Menang" hanya bisa diset setelah tahap Pengumuman Pemenang', 'warning');
+        return;
+      }
+    }
+
+    // Enforce: "Akan Diikuti" tidak boleh kalau sudah lewat tahap pengumpulan dokumen.
+    //   Prakualifikasi → cutoff stage 4 (Kirim Persyaratan Kualifikasi)
+    //   Pascakualifikasi → cutoff stage 4 (Upload Dokumen Penawaran)
+    if (newStatus === 'Akan Diikuti') {
+      const cutoff = 4;
+      if ((tender?.currentStage || 0) > cutoff) {
+        const tahapText = tender?.metode === 'Prakualifikasi' ? 'Kirim Persyaratan Kualifikasi' : 'Upload Dokumen Penawaran';
+        showToast(`Tidak bisa "Akan Diikuti" — sudah lewat tahap ${tahapText}. Pakai Sudah Diikuti / Menang / Kalah.`, 'warning');
         return;
       }
     }

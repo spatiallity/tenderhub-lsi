@@ -61,6 +61,7 @@ async function seedTenders() {
       instansi: t.instansi,
       jenis_klpd: t.jenis_klpd,
       level: t.level,
+      lokasi: t.lokasi_pekerjaan,
     }) || { unit_kerja: PUSAT, unit_kerja_region: getRegion(PUSAT) };
     const kdTender = parseInt(t.kd_tender || t.id);
     if (!kdTender) { fail++; continue; }
@@ -96,6 +97,8 @@ async function seedRup() {
       provinsi: r.provinsi,
       instansi: r.nama_klpd,
       jenis_klpd: r.jenis_klpd,
+      lokasi: r.kabupaten || r.nama_klpd,
+      kabupaten: r.kabupaten,
     }) || { unit_kerja: PUSAT, unit_kerja_region: getRegion(PUSAT) };
     const status = flat[i % flat.length];
     const { error } = await client.from('rup_watchlist').upsert({

@@ -67,7 +67,7 @@ export default function LoginPage() {
   );
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       {/* Left Panel — Branding */}
       <div className="hidden lg:flex lg:w-[52%] flex-col relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2744 40%, #0c3a4a 70%, #0d4a42 100%)' }}
@@ -81,22 +81,11 @@ export default function LoginPage() {
           style={{ background: 'radial-gradient(circle, white, transparent)' }} />
 
         <div className="relative z-10 flex flex-col h-full p-12">
-          {/* Logo */}
-          <div className="flex items-center gap-4 mb-16">
-            <img src={tenderhubLogo} alt="TenderHub" className="h-28 w-auto object-contain" />
-            <div>
-              <div className="text-xl font-black tracking-tight leading-none">
-                <span className="text-white">Tender</span>
-                <span style={{ color: '#13B2AA' }}>Hub</span>
-              </div>
-              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                PT Sucofindo — SBU LSI
-              </div>
+          {/* Hero text — logo dihapus dari kiri (cukup di kanan card). */}
+          <div className="mb-10">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+              PT Sucofindo — SBU LSI
             </div>
-          </div>
-
-          {/* Hero text */}
-          <div className="mb-12">
             <h1 className="text-4xl font-black text-white leading-tight mb-4">
               Sistem Cerdas<br />
               <span style={{ color: '#13B2AA' }}>Monitoring Tender</span><br />
@@ -108,12 +97,12 @@ export default function LoginPage() {
           </div>
 
           {/* Feature list */}
-          <div className="flex flex-col gap-4 flex-1">
+          <div className="flex flex-col gap-3 flex-1">
             {FEATURES.map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="flex items-start gap-4 group">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all"
+              <div key={label} className="flex items-start gap-3 group">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all"
                   style={{ background: 'rgba(19, 178, 170, 0.15)', border: '1px solid rgba(19, 178, 170, 0.3)' }}>
-                  <Icon size={18} style={{ color: '#13B2AA' }} />
+                  <Icon size={16} style={{ color: '#13B2AA' }} />
                 </div>
                 <div>
                   <div className="text-sm font-bold text-white">{label}</div>
@@ -124,8 +113,8 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-white/10">
-            <p className="text-xs text-slate-500">
+          <div className="mt-6 pt-4 border-t border-white/10">
+            <p className="text-[11px] text-slate-500">
               © 2026 PT Sucofindo (Persero) · SBU Layanan Publik, Sumber Daya Alam, dan Investasi
             </p>
           </div>
@@ -133,22 +122,22 @@ export default function LoginPage() {
       </div>
 
       {/* Right Panel — Login Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
+      <div className="flex-1 flex items-center justify-center p-4 lg:p-6 bg-slate-50 overflow-y-auto">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center mb-10">
-            <img src={tenderhubLogo} alt="TenderHub" className="h-12 w-auto object-contain" />
+          <div className="lg:hidden flex items-center justify-center mb-4">
+            <img src={tenderhubLogo} alt="TenderHub" className="h-10 w-auto object-contain" />
           </div>
 
           {/* Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="mb-6 flex flex-col items-center text-center">
-              <img src={tenderhubLogo} alt="TenderHub" className="h-32 w-auto mb-4 object-contain" />
-              <h2 className="text-2xl font-black text-slate-900 mb-1">Selamat Datang</h2>
-              <p className="text-sm text-slate-500">Masuk dengan akun SBU LSI Anda untuk melanjutkan.</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="mb-4 flex flex-col items-center text-center">
+              <img src={tenderhubLogo} alt="TenderHub" className="h-20 w-auto mb-2 object-contain" />
+              <h2 className="text-xl font-black text-slate-900 mb-0.5">Selamat Datang</h2>
+              <p className="text-xs text-slate-500">Masuk dengan akun SBU LSI Anda untuk melanjutkan.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               {/* Email */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -164,7 +153,7 @@ export default function LoginPage() {
                     autoComplete="email"
                     autoFocus
                     required
-                    className="w-full pl-10 pr-4 py-3 text-sm border border-slate-300 rounded-xl outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white"
+                    className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 rounded-xl outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white"
                   />
                 </div>
               </div>
@@ -183,7 +172,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     autoComplete="current-password"
                     required
-                    className="w-full pl-10 pr-12 py-3 text-sm border border-slate-300 rounded-xl outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white"
+                    className="w-full pl-10 pr-12 py-2.5 text-sm border border-slate-300 rounded-xl outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white"
                   />
                   <button
                     type="button"
@@ -209,7 +198,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={submitting || !email || !password}
-                className="w-full py-3 px-6 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-6 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 style={{
                   background: submitting
                     ? '#64748b'
@@ -230,7 +219,7 @@ export default function LoginPage() {
           </div>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 mt-5">
+          <div className="flex items-center gap-3 mt-3">
             <div className="flex-1 h-px bg-slate-200" />
             <span className="text-xs text-slate-400 font-medium">atau</span>
             <div className="flex-1 h-px bg-slate-200" />
@@ -240,19 +229,13 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleGuestLogin}
-            className="mt-4 w-full py-3 px-6 rounded-xl text-sm font-bold text-slate-600 border border-slate-300 bg-white hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+            className="mt-3 w-full py-2.5 px-6 rounded-xl text-sm font-bold text-slate-600 border border-slate-300 bg-white hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
           >
             <UserCheck size={16} className="text-slate-400" />
             Masuk sebagai Guest
           </button>
-          <p className="text-center text-xs text-slate-400 mt-2 leading-relaxed">
-            Mode Guest: akses terbatas, tidak dapat mengubah data.
-          </p>
-
-          {/* Bottom note */}
-          <p className="text-center text-xs text-slate-400 mt-4 leading-relaxed">
-            Akun dikelola oleh Admin SBU LSI.<br />
-            Hubungi admin jika belum memiliki akses.
+          <p className="text-center text-[11px] text-slate-400 mt-2 leading-relaxed">
+            Mode Guest: akses terbatas. Akun dikelola Admin SBU LSI.
           </p>
         </div>
       </div>

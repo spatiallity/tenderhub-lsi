@@ -41,6 +41,12 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
     stageName.includes('penunjukan') ||
     stageName.includes('kontrak')
   );
+  // "Akan Diikuti" tidak boleh kalau sudah lewat:
+  //   Prakualifikasi → "Kirim Persyaratan Kualifikasi" (stage 4 — index 3)
+  //   Pascakualifikasi → "Upload Dokumen Penawaran" (stage 4 — index 3)
+  // Setelah stage tersebut, tender wajib langsung jadi Sudah Diikuti / Menang / Kalah.
+  const cutoffStage = (tender.metode === 'Prakualifikasi') ? 4 : 4;
+  const canBeAkan = (tender.currentStage || 0) <= cutoffStage;
 
   const handleSave = async (e) => {
     e.stopPropagation();
@@ -97,10 +103,15 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
         }`}
       >
         {(INTERNAL_STATUS_OPTIONS || ['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan']).map(opt => {
-          const isDisabled = opt === 'Menang' && !canBeWon;
+          const disabledMenang = opt === 'Menang' && !canBeWon;
+          const disabledAkan = opt === 'Akan Diikuti' && !canBeAkan;
+          const isDisabled = disabledMenang || disabledAkan;
+          let suffix = '';
+          if (disabledMenang) suffix = ' (Belum Pengumuman)';
+          else if (disabledAkan) suffix = ' (Sudah lewat tahap Kirim/Upload)';
           return (
             <option key={opt} value={opt} disabled={isDisabled}>
-              {opt}{isDisabled ? ' (Belum Pengumuman)' : ''}
+              {opt}{suffix}
             </option>
           );
         })}
@@ -183,8 +194,31 @@ export default function TenderPage() {
   const keywordCount = useMemo(() => activeKeywordCount(keywords), [keywords]);
   const newTenderSet = useMemo(() => new Set((newTenderIds || []).map(String)), [newTenderIds]);
 
+  const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
   const tableRef = useRef(null);
+  const isSyncingRef = useRef(false);
+  const [scrollSpacerWidth, setScrollSpacerWidth] = useState(0);
+
+  useEffect(() => {
+    const updateSpacer = () => {
+      const el = tableRef.current;
+      if (!el) return;
+      setScrollSpacerWidth(el.scrollWidth || 0);
+    };
+    updateSpacer();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateSpacer);
+      if (tableScrollRef.current) ro.observe(tableScrollRef.current);
+      if (tableRef.current) ro.observe(tableRef.current);
+    }
+    window.addEventListener('resize', updateSpacer);
+    return () => {
+      window.removeEventListener('resize', updateSpacer);
+      if (ro) ro.disconnect();
+    };
+  }, [loadingTenders, tenders.length]);
 
   useEffect(() => {
     // Default behavior: when there are active keywords, show only matched tenders.
@@ -411,9 +445,34 @@ export default function TenderPage() {
           <div className="p-10 text-center text-slate-500">Memuat data tender...</div>
         ) : (
           <>
+            {/* Top synced horizontal scrollbar */}
+            <div
+              ref={topScrollRef}
+              className="overflow-x-auto border-b border-slate-200 bg-slate-50/60"
+              onScroll={() => {
+                if (isSyncingRef.current) return;
+                const a = topScrollRef.current;
+                const b = tableScrollRef.current;
+                if (!a || !b) return;
+                isSyncingRef.current = true;
+                b.scrollLeft = a.scrollLeft;
+                requestAnimationFrame(() => { isSyncingRef.current = false; });
+              }}
+            >
+              <div className="h-4" style={{ width: scrollSpacerWidth || 0 }} />
+            </div>
             <div
               ref={tableScrollRef}
               className="overflow-x-auto pb-2 max-w-full"
+              onScroll={() => {
+                if (isSyncingRef.current) return;
+                const a = topScrollRef.current;
+                const b = tableScrollRef.current;
+                if (!a || !b) return;
+                isSyncingRef.current = true;
+                a.scrollLeft = b.scrollLeft;
+                requestAnimationFrame(() => { isSyncingRef.current = false; });
+              }}
             >
               <table ref={tableRef} className="min-w-[1180px] xl:min-w-[1320px] w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
