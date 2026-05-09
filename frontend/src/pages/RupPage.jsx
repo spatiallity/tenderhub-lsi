@@ -351,13 +351,6 @@ export default function RupPage() {
           case 'jadwal': va = a.daysUntilSelection ?? 999; vb = b.daysUntilSelection ?? 999; break;
           case 'pagu': va = a.pagu || 0; vb = b.pagu || 0; break;
           case 'portfolio': va = (a.recommendation || '').toLowerCase(); vb = (b.recommendation || '').toLowerCase(); break;
-          case 'status_internal': {
-            // Order by ranked status priority then alpha.
-            const order = { 'Menang': 1, 'Sudah Diikuti': 2, 'Akan Diikuti': 3, 'Dipantau': 4, 'Kalah': 5, 'Tidak Relevan': 6 };
-            va = order[rupClaims[String(a.kd_rup)]?.status_internal] || 99;
-            vb = order[rupClaims[String(b.kd_rup)]?.status_internal] || 99;
-            break;
-          }
           default: return 0;
         }
         if (va < vb) return -1 * dir;
@@ -502,15 +495,14 @@ export default function RupPage() {
                 requestAnimationFrame(() => { isSyncingRef.current = false; });
               }}
             >
-              <table ref={tableRef} className="min-w-[1100px] xl:min-w-[1240px] w-full table-fixed text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[980px] xl:min-w-[1100px] w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
-                <col className="w-[70px] xl:w-[78px]" />     {/* Kode RUP — narrow */}
-                <col className="w-[260px] xl:w-[300px]" />   {/* Paket */}
-                <col className="w-[160px] xl:w-[180px]" />   {/* Satker / K/L/PD — narrower */}
-                <col className="w-[110px] xl:w-[120px]" />   {/* Jenis */}
-                <col className="w-[120px] xl:w-[130px]" />   {/* Jadwal */}
-                <col className="w-[110px] xl:w-[120px]" />   {/* Pagu */}
-                <col className="w-[120px] xl:w-[130px]" />   {/* Status Internal */}
+                <col className="w-[70px] xl:w-[78px]" />     {/* Kode RUP */}
+                <col className="w-[280px] xl:w-[320px]" />   {/* Paket */}
+                <col className="w-[180px] xl:w-[200px]" />   {/* Satker / K/L/PD */}
+                <col className="w-[120px] xl:w-[130px]" />   {/* Jenis */}
+                <col className="w-[130px] xl:w-[140px]" />   {/* Jadwal */}
+                <col className="w-[120px] xl:w-[130px]" />   {/* Pagu */}
                 <col className="w-[80px] xl:w-[90px]" />     {/* Aksi */}
               </colgroup>
               <thead>
@@ -521,7 +513,6 @@ export default function RupPage() {
                   {renderSortTh('jenis', 'Jenis Pengadaan')}
                   {renderSortTh('jadwal', 'Jadwal Pemilihan')}
                   {renderSortTh('pagu', 'Pagu Anggaran')}
-                  {renderSortTh('status_internal', 'Status Internal')}
                   <th className="bg-slate-50 border-b border-slate-200 text-center"></th>
                 </tr>
               </thead>
@@ -576,24 +567,6 @@ export default function RupPage() {
                     </td>
                     <td className="px-3 py-3 align-top whitespace-nowrap">
                       <div className="font-extrabold text-sm">{formatRupiah(r.pagu)}</div>
-                    </td>
-                    <td className="px-3 py-3 align-top">
-                      {(() => {
-                        const claim = rupClaims[String(r.kd_rup)] || null;
-                        const viewerOwns = claim?.unit_kerja && claim.unit_kerja === unitKerja;
-                        const canEdit = canEditClaim(claim?.unit_kerja);
-                        return (
-                          <RupStatusCell
-                            rup={r}
-                            claim={claim}
-                            canEdit={canEdit}
-                            viewerOwns={viewerOwns}
-                            isGuest={isGuest}
-                            updateRupStatus={updateRupStatus}
-                            showToast={showToast}
-                          />
-                        );
-                      })()}
                     </td>
                     <td className={`px-3 py-3 align-top ${isNew ? 'bg-cyan-50/95' : 'bg-white/95'}`}>
                       <div className="flex items-center gap-1">

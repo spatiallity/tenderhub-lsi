@@ -129,9 +129,9 @@ export default function WinrateChart({ winrateRows, winrate, followed, won, filt
         </ResponsiveContainer>
       </div>
 
-      {/* Footer Summary */}
-      <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
-        <div className="flex gap-8 items-center">
+      {/* Footer Summary — stack vertikal di mobile, horizontal di lg+. */}
+      <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex flex-wrap gap-6 items-center">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
@@ -146,18 +146,16 @@ export default function WinrateChart({ winrateRows, winrate, followed, won, filt
             </div>
             <div className="text-[20px] font-black text-slate-800 ml-4">{won}</div>
           </div>
-          
-          <div className="w-[1px] h-10 bg-slate-200 mx-2" />
-          
-          <div className="text-[12px] text-slate-500 font-medium max-w-[280px] leading-relaxed">
-            Performa akumulasi tender {scopeLabel || 'SBU LSI'} sepanjang periode 2025 - 2026.
-          </div>
         </div>
 
-        <div className="bg-[#fff8f0] px-6 py-3.5 rounded-2xl flex flex-col items-center">
+        <div className="text-[12px] text-slate-500 font-medium leading-relaxed flex-1 lg:max-w-[280px]">
+          Performa akumulasi tender {scopeLabel || 'SBU LSI'} sepanjang periode 2025 - 2026.
+        </div>
+
+        <div className="bg-[#fff8f0] px-4 py-2.5 rounded-2xl flex flex-col items-center self-start lg:self-auto shrink-0">
           <div className="text-[10px] font-black text-amber-600 uppercase tracking-wider mb-1">Periode Terbaik</div>
-          <div className="text-[16px] font-black text-amber-900">{bestWinrate.label}</div>
-          <div className="text-[13px] font-bold text-amber-700">{bestWinrate.rate}% Winrate</div>
+          <div className="text-[14px] font-black text-amber-900">{bestWinrate.label}</div>
+          <div className="text-[12px] font-bold text-amber-700">{bestWinrate.rate}% Winrate</div>
         </div>
       </div>
     </div>

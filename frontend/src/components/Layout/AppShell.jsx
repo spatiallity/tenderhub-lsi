@@ -28,7 +28,8 @@ export default function AppShell() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile, signOut } = useAuth();
+  const [showMobileUserMenu, setShowMobileUserMenu] = useState(false);
   const {
     selectedTenderId, setSelectedTenderId, tenders,
     selectedRupId, setSelectedRupId, rupList,
@@ -263,26 +264,54 @@ export default function AppShell() {
               <Menu size={20} />
             </button>
             
-            {/* Mobile Logo */}
-            <img src={tenderhubLogo} alt="TenderHub" className="h-9 w-auto object-contain" />
+            {/* Mobile Logo — bigger */}
+            <img src={tenderhubLogo} alt="TenderHub" className="h-12 w-auto object-contain" />
             
             {/* Mobile Actions */}
-            <div className="flex items-center gap-2">
-              <button 
+            <div className="flex items-center gap-2 relative">
+              <button
+                onClick={() => navigate('/status')}
                 className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors relative"
                 aria-label="Notifications"
+                title="Notifikasi tender baru / deadline mendekat"
               >
                 <Bell size={18} />
                 {(newTenderCount + newRupCount) > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
                 )}
               </button>
-              <button 
+              <button
+                onClick={() => setShowMobileUserMenu(s => !s)}
                 className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 aria-label="User profile"
+                title={profile?.name || 'Akun'}
               >
                 <User size={18} />
               </button>
+              {showMobileUserMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowMobileUserMenu(false)} />
+                  <div className="absolute right-0 top-12 z-40 w-56 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100">
+                      <div className="text-sm font-bold text-slate-900 truncate">{profile?.name || 'User'}</div>
+                      <div className="text-xs text-slate-500 truncate">{profile?.email || profile?.role || '—'}</div>
+                      {profile?.unit_kerja && <div className="text-[10px] text-slate-400 mt-0.5">{profile.unit_kerja}</div>}
+                    </div>
+                    <button
+                      onClick={() => { setShowMobileUserMenu(false); navigate('/settings'); }}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                    >
+                      <Settings size={14} /> Pengaturan
+                    </button>
+                    <button
+                      onClick={async () => { setShowMobileUserMenu(false); await signOut(); navigate('/login'); }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-slate-100"
+                    >
+                      <X size={14} /> Logout
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>

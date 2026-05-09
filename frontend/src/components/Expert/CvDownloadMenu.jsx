@@ -50,10 +50,12 @@ export default function CvDownloadMenu({ expert }) {
       await fetchAndSave(url, MIME[fmt], `CV_${safeName}_${date}.${fmt}`);
     } catch (err) {
       console.error('[CvDownloadMenu] download failed', err);
-      // 503 / 502 / 504 = HF Space crashed or sleeping. PDF needs LibreOffice on
-      // the backend; fall back to DOCX if user asked for PDF.
+      // 502/503/504 = HF Space down. 404 = expert id not in backend dummy data
+      // (frontend has expert from Supabase but backend dummy doesn't know it).
+      // Both cases: try DOCX from backend; if also fails, give clear toast.
       const isUpstreamDown = [502, 503, 504].includes(err.status);
-      if (fmt === 'pdf' && isUpstreamDown) {
+      const isMissing = err.status === 404;
+      if (fmt === 'pdf' && (isUpstreamDown || isMissing)) {
         try {
           const docxUrl = `${apiBase}/cv/${expert.id}/cv`;
           await fetchAndSave(docxUrl, MIME.docx, `CV_${safeName}_${date}.docx`);
@@ -64,9 +66,14 @@ export default function CvDownloadMenu({ expert }) {
           console.error('[CvDownloadMenu] DOCX fallback failed', fallbackErr);
         }
       }
-      const friendly = isUpstreamDown
-        ? `Server CV sedang down (HTTP ${err.status}). Coba lagi beberapa menit lagi atau restart HuggingFace Space.`
-        : `Gagal download CV (${fmt.toUpperCase()}): ${err.message}`;
+      let friendly;
+      if (isUpstreamDown) {
+        friendly = `Server CV sedang down (HTTP ${err.status}). Coba lagi beberapa menit lagi atau restart HuggingFace Space.`;
+      } else if (isMissing) {
+        friendly = `Tenaga ahli ini belum ter-sync ke server CV. Backend perlu rebuild/redeploy supaya data baru bisa di-generate jadi CV.`;
+      } else {
+        friendly = `Gagal download CV (${fmt.toUpperCase()}): ${err.message}`;
+      }
       alert(friendly);
     } finally {
       setBusy(null);

@@ -56,6 +56,10 @@ async function seedTenders() {
   const nowIso = new Date().toISOString();
   let ok = 0, fail = 0;
   for (const t of FALLBACK_TENDERS) {
+    const status = t.internalStatus || 'Dipantau';
+    // Dipantau = unclaimed. Skip — leave row absent in tender_watchlist.
+    if (status === 'Dipantau') continue;
+
     const route = branchFor({
       provinsi: t.provinsi,
       instansi: t.instansi,
@@ -70,7 +74,7 @@ async function seedTenders() {
       nama_paket: t.nama,
       nama_klpd: t.instansi,
       hps: t.hps,
-      status_internal: t.internalStatus || 'Dipantau',
+      status_internal: status,
       unit_kerja: route.unit_kerja,
       unit_kerja_region: route.unit_kerja_region,
       claimed_at: nowIso,
@@ -85,14 +89,22 @@ async function seedTenders() {
 async function seedRup() {
   console.log(`[seed] rup: ${FALLBACK_RUP.length} entries`);
   const nowIso = new Date().toISOString();
-  const statuses = ['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'];
-  const weights  = [40,         30,             15,              5,        5,       5];
+  // No Dipantau in claims — Dipantau = unclaimed.
+  const statuses = ['Akan Diikuti', 'Sudah Diikuti', 'Menang', 'Kalah', 'Tidak Relevan'];
+  const weights  = [50,             25,              10,       10,       5];
   const flat = [];
   statuses.forEach((s, i) => { for (let n = 0; n < weights[i]; n++) flat.push(s); });
 
   let ok = 0, fail = 0;
-  for (let i = 0; i < FALLBACK_RUP.length; i++) {
-    const r = FALLBACK_RUP[i];
+  // Claim ~60% of RUP (rest stay Dipantau / unclaimed).
+  const target = Math.round(FALLBACK_RUP.length * 0.6);
+  const indices = [...FALLBACK_RUP.keys()];
+  // simple deterministic pick of first N after shuffle by id
+  indices.sort((a, b) => (FALLBACK_RUP[a].id || 0) - (FALLBACK_RUP[b].id || 0));
+  const claimIndices = indices.slice(0, target);
+
+  for (let i = 0; i < claimIndices.length; i++) {
+    const r = FALLBACK_RUP[claimIndices[i]];
     const route = branchFor({
       provinsi: r.provinsi,
       instansi: r.nama_klpd,
@@ -113,7 +125,7 @@ async function seedRup() {
     }, { onConflict: 'kd_rup' });
     if (error) { fail++; console.warn(`  [rup ${r.kd_rup}] ${error.message}`); }
     else ok++;
-    if ((ok + fail) % 25 === 0) process.stdout.write(`  ${ok + fail}/${FALLBACK_RUP.length}\r`);
+    if ((ok + fail) % 25 === 0) process.stdout.write(`  ${ok + fail}/${claimIndices.length}\r`);
   }
   console.log(`[seed] rup: ok=${ok} fail=${fail}`);
 }
