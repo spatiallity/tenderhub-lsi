@@ -83,7 +83,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col h-full p-12">
           {/* Logo */}
           <div className="flex items-center gap-4 mb-16">
-            <img src={tenderhubLogo} alt="TenderHub" className="h-20 w-auto object-contain bg-white/95 rounded-xl p-2 shadow-lg" />
+            <img src={tenderhubLogo} alt="TenderHub" className="h-28 w-auto object-contain" />
             <div>
               <div className="text-xl font-black tracking-tight leading-none">
                 <span className="text-white">Tender</span>
@@ -143,7 +143,7 @@ export default function LoginPage() {
           {/* Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
             <div className="mb-6 flex flex-col items-center text-center">
-              <img src={tenderhubLogo} alt="TenderHub" className="h-24 w-auto mb-4 object-contain" />
+              <img src={tenderhubLogo} alt="TenderHub" className="h-32 w-auto mb-4 object-contain" />
               <h2 className="text-2xl font-black text-slate-900 mb-1">Selamat Datang</h2>
               <p className="text-sm text-slate-500">Masuk dengan akun SBU LSI Anda untuk melanjutkan.</p>
             </div>

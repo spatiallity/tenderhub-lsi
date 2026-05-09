@@ -167,10 +167,10 @@ export default function TenderPage() {
   const renderSortTh = (k, label, className = '') => (
     <th
       key={k}
-      className={`bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 whitespace-nowrap cursor-pointer hover:text-slate-700 hover:bg-slate-100 transition-colors select-none ${className}`}
+      className={`bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 whitespace-nowrap cursor-pointer hover:text-slate-700 hover:bg-slate-100 transition-colors select-none text-center ${className}`}
       onClick={() => toggleSort(k)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center justify-center gap-1">
         {label}
         {sortKey === k ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={10} className="opacity-30" />}
       </span>
@@ -183,33 +183,8 @@ export default function TenderPage() {
   const keywordCount = useMemo(() => activeKeywordCount(keywords), [keywords]);
   const newTenderSet = useMemo(() => new Set((newTenderIds || []).map(String)), [newTenderIds]);
 
-  const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
   const tableRef = useRef(null);
-  const isSyncingRef = useRef(false);
-  const [scrollSpacerWidth, setScrollSpacerWidth] = useState(0);
-
-  useEffect(() => {
-    const updateSpacer = () => {
-      const el = tableRef.current;
-      if (!el) return;
-      setScrollSpacerWidth(el.scrollWidth || 0);
-    };
-    updateSpacer();
-
-    let ro;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(updateSpacer);
-      if (tableScrollRef.current) ro.observe(tableScrollRef.current);
-      if (tableRef.current) ro.observe(tableRef.current);
-    }
-
-    window.addEventListener('resize', updateSpacer);
-    return () => {
-      window.removeEventListener('resize', updateSpacer);
-      if (ro) ro.disconnect();
-    };
-  }, [loadingTenders, tenders.length]);
 
   useEffect(() => {
     // Default behavior: when there are active keywords, show only matched tenders.
@@ -436,60 +411,20 @@ export default function TenderPage() {
           <div className="p-10 text-center text-slate-500">Memuat data tender...</div>
         ) : (
           <>
-            {/* Slider horizontal (di atas tabel) */}
-            <div
-              ref={topScrollRef}
-              className="overflow-x-auto hscroll border-b border-slate-200 bg-slate-50/60"
-              onScroll={() => {
-                if (isSyncingRef.current) return;
-                const a = topScrollRef.current;
-                const b = tableScrollRef.current;
-                if (!a || !b) return;
-                isSyncingRef.current = true;
-                b.scrollLeft = a.scrollLeft;
-                requestAnimationFrame(() => { isSyncingRef.current = false; });
-              }}
-            >
-              {/* spacer to create horizontal scrollbar */}
-              <div className="h-4" style={{ width: scrollSpacerWidth || 0 }} />
-            </div>
-
             <div
               ref={tableScrollRef}
-              className="overflow-x-auto hscrollHide pb-2 max-w-full"
-              onScroll={() => {
-                if (isSyncingRef.current) return;
-                const a = topScrollRef.current;
-                const b = tableScrollRef.current;
-                if (!a || !b) return;
-                isSyncingRef.current = true;
-                a.scrollLeft = b.scrollLeft;
-                requestAnimationFrame(() => { isSyncingRef.current = false; });
-              }}
+              className="overflow-x-auto pb-2 max-w-full"
             >
-              <table ref={tableRef} className="min-w-[760px] md:min-w-0 w-full table-fixed text-left border-collapse text-[12px]">
-              <colgroup>
-                <col className="w-[78px] xl:w-[88px]" />
-                <col className="w-[230px] xl:w-[260px]" />
-                <col className="hidden xl:table-column xl:w-[160px]" />
-                <col className="hidden" />
-                <col className="w-[108px] xl:w-[120px]" />
-                <col className="hidden" />
-                <col className="hidden" />
-                <col className="w-[140px] xl:w-[160px]" />
-                <col className="w-[120px] xl:w-[136px]" />
-                <col className="w-[108px] xl:w-[120px]" />
-                <col className="w-[78px] xl:w-[84px]" />
-              </colgroup>
+              <table ref={tableRef} className="w-full table-auto text-left border-collapse text-[12px]">
               <thead>
                 <tr>
                   {renderSortTh('kd_tender', 'Kode Tender')}
                   {renderSortTh('nama', 'Nama Paket Pekerjaan')}
                   {renderSortTh('instansi', 'Instansi / Satker', 'hidden xl:table-cell')}
-                  <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap">Jenis KLPD</th>
+                  <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap text-center">Jenis KLPD</th>
                   {renderSortTh('hps', 'Pagu / HPS')}
-                  <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap">Sub-Portofolio</th>
-                  <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap">Sumber Dana</th>
+                  <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap text-center">Sub-Portofolio</th>
+                  <th className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 hidden whitespace-nowrap text-center">Sumber Dana</th>
                   {renderSortTh('stage', 'Status Tahap Tender')}
                   {renderSortTh('deadline', 'Deadline')}
                   {renderSortTh('status', 'Status Internal')}

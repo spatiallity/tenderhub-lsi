@@ -97,12 +97,12 @@ def main():
 
     # Super admin first.
     print("\n>> Super Admin")
-    upsert_user(client, "admin@lsi.co.id", "Super Admin", "admin", None)
+    upsert_user(client, "admin@sucofindo.co.id", "Super Admin", "admin", None)
 
     # Each branch.
     for unit in UNIT_KERJA:
         name = unit["name"]
-        email = f"{email_slug(name)}@lsi.co.id"
+        email = f"{email_slug(name)}@sucofindo.co.id"
         display = f"Admin {name}"
         role = "pusat" if name == "SBU LSI" else "cabang"
         print(f"\n>> {display} ({email}, role={role})")

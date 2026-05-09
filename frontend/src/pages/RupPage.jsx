@@ -280,10 +280,10 @@ export default function RupPage() {
   const renderSortTh = (k, label, className = '') => (
     <th
       key={k}
-      className={`bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 whitespace-nowrap cursor-pointer hover:text-slate-700 hover:bg-slate-100 transition-colors select-none ${className}`}
+      className={`bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 whitespace-nowrap cursor-pointer hover:text-slate-700 hover:bg-slate-100 transition-colors select-none text-center ${className}`}
       onClick={() => toggleSort(k)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center justify-center gap-1">
         {label}
         {sortKey === k ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={10} className="opacity-30" />}
       </span>
@@ -296,32 +296,8 @@ export default function RupPage() {
   const keywordCount = useMemo(() => activeKeywordCount(keywords), [keywords]);
   const newRupSet = useMemo(() => new Set((newRupIds || []).map(String)), [newRupIds]);
 
-  const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
   const tableRef = useRef(null);
-  const isSyncingRef = useRef(false);
-  const [scrollSpacerWidth, setScrollSpacerWidth] = useState(0);
-
-  useEffect(() => {
-    const updateSpacer = () => {
-      const el = tableRef.current;
-      if (!el) return;
-      setScrollSpacerWidth(el.scrollWidth || 0);
-    };
-    updateSpacer();
-
-    let ro;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(updateSpacer);
-      if (tableScrollRef.current) ro.observe(tableScrollRef.current);
-      if (tableRef.current) ro.observe(tableRef.current);
-    }
-    window.addEventListener('resize', updateSpacer);
-    return () => {
-      window.removeEventListener('resize', updateSpacer);
-      if (ro) ro.disconnect();
-    };
-  }, [loadingRup, (rupList || []).length]);
 
   const filteredRup = useMemo(() => {
     let result = (mergedRup || []).filter(r => {
@@ -475,44 +451,10 @@ export default function RupPage() {
         ) : (
           <>
             <div
-              ref={topScrollRef}
-              className="overflow-x-auto hscroll border-b border-slate-200 bg-slate-50/60"
-              onScroll={() => {
-                if (isSyncingRef.current) return;
-                const a = topScrollRef.current;
-                const b = tableScrollRef.current;
-                if (!a || !b) return;
-                isSyncingRef.current = true;
-                b.scrollLeft = a.scrollLeft;
-                requestAnimationFrame(() => { isSyncingRef.current = false; });
-              }}
-            >
-              <div className="h-4" style={{ width: scrollSpacerWidth || 0 }} />
-            </div>
-            <div
               ref={tableScrollRef}
-              className="overflow-x-auto hscrollHide pb-2"
-              onScroll={() => {
-                if (isSyncingRef.current) return;
-                const a = topScrollRef.current;
-                const b = tableScrollRef.current;
-                if (!a || !b) return;
-                isSyncingRef.current = true;
-                a.scrollLeft = b.scrollLeft;
-                requestAnimationFrame(() => { isSyncingRef.current = false; });
-              }}
+              className="overflow-x-auto pb-2"
             >
-              <table ref={tableRef} className="min-w-[760px] md:min-w-0 w-full table-fixed text-left border-collapse text-[12px]">
-              <colgroup>
-                <col className="w-[6%]" />
-                <col className="w-[28%]" />
-                <col className="w-[18%]" />
-                <col className="w-[11%]" />
-                <col className="w-[11%]" />
-                <col className="w-[10%]" />
-                <col className="w-[12%]" />
-                <col className="w-[5%]" />
-              </colgroup>
+              <table ref={tableRef} className="w-full table-auto text-left border-collapse text-[12px]">
               <thead>
                 <tr>
                   {renderSortTh('kd_rup', 'Kode RUP')}
@@ -522,7 +464,7 @@ export default function RupPage() {
                   {renderSortTh('jadwal', 'Jadwal Pemilihan')}
                   {renderSortTh('pagu', 'Pagu Anggaran')}
                   {renderSortTh('status_internal', 'Status Internal')}
-                  <th className="bg-slate-50 border-b border-slate-200"></th>
+                  <th className="bg-slate-50 border-b border-slate-200 text-center"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
