@@ -76,8 +76,9 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
     'Terlewat':      'bg-rose-50 text-rose-700 border-rose-300',
   };
 
-  // Guests + non-owners + Terlewat (final state, no edit) → read-only badge.
-  if (isGuest || lockedByClaim || isTerlewat) {
+  // Guests + non-owners → read-only.
+  // Terlewat masih bisa diedit (tim mungkin sudah submit di SPSE tapi lupa update).
+  if (isGuest || lockedByClaim) {
     return (
       <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
         <span className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold text-center ${STATUS_PILL[displayStatus] || STATUS_PILL['Dipantau']}`}>
@@ -86,15 +87,17 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
         {lockedByClaim && (
           <ClaimBadge claim={claim} viewerOwns={false} readOnly size="xs" />
         )}
-        {isTerlewat && !lockedByClaim && (
-          <ClaimBadge claim={claim} viewerOwns={!!viewerOwns} size="xs" />
-        )}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+      {isTerlewat && (
+        <span className={`w-full rounded-lg border px-2 py-0.5 text-[10px] font-bold text-center ${STATUS_PILL['Terlewat']}`} title="Sudah lewat deadline upload/kirim — masih bisa di-update kalau tim sudah submit di SPSE.">
+          ⚠ Terlewat — masih editable
+        </span>
+      )}
       <select
         value={localStatus}
         onChange={e => setLocalStatus(e.target.value)}

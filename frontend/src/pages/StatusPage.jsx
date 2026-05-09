@@ -365,17 +365,23 @@ const STATUS_FILL = {
   'Dipantau':      '#cbd5e1',
 };
 
-function StatsView({ tenders, tenderClaims, scope, scopeLabel }) {
-  // Tenders relevant to scope already filtered by caller — `tenders` arg.
-  // For per-branch chart, we ALWAYS want global breakdown so admin/cabang can
-  // compare branches. Pull from `globalTenders` separately when scope = single branch?
-  // Simplification: per-branch chart uses the FULL tender list from props.
+function StatsView({ allTenders, tenderClaims }) {
+  // Default scope = 'all' (Semua Cabang + SBU). User picks branch nanti.
+  const [scope, setScope] = useState('all');
+  const scopeLabel = scope === 'all' ? 'Semua Cabang + SBU LSI Pusat' : unitKerjaLabel(scope);
+
+  // Filter tenders for win/lose donut + per-stage chart based on scope.
+  // Per-branch bar always uses ALL data so user can compare across branches.
+  const scopedTenders = useMemo(() => {
+    if (scope === 'all') return allTenders;
+    return allTenders.filter(t => tenderClaims[t.id]?.unit_kerja === scope);
+  }, [allTenders, tenderClaims, scope]);
 
   // Per-branch counts (only branches with > 0 active tenders).
   const perBranch = useMemo(() => {
     const map = {};
     UNIT_KERJA.forEach(u => { map[u.name] = { name: u.name, total: 0, akan: 0, sudah: 0, menang: 0, kalah: 0 }; });
-    tenders.forEach(t => {
+    allTenders.forEach(t => {
       const u = tenderClaims[t.id]?.unit_kerja;
       if (!u || !map[u]) return;
       const s = t.internalStatus;
@@ -385,7 +391,10 @@ function StatsView({ tenders, tenderClaims, scope, scopeLabel }) {
       else if (s === 'Kalah')         { map[u].kalah++;  map[u].total++; }
     });
     return Object.values(map).filter(b => b.total > 0).sort((a, b) => b.total - a.total);
-  }, [tenders, tenderClaims]);
+  }, [allTenders, tenderClaims]);
+
+  // For below = scoped data.
+  const tenders = scopedTenders;
 
   // Per-stage (currentStageName) counts — use scoped tenders only (active statuses).
   const perStage = useMemo(() => {
@@ -411,6 +420,27 @@ function StatsView({ tenders, tenderClaims, scope, scopeLabel }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Scope picker */}
+      <Card className="!p-3 flex flex-wrap items-center gap-2">
+        <UsersIcon size={14} className="text-blue-600" />
+        <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">Scope statistik</span>
+        <select
+          value={scope}
+          onChange={e => setScope(e.target.value)}
+          className="ml-auto text-xs font-bold border border-slate-200 rounded-lg px-3 py-1.5 bg-white"
+        >
+          <option value="all">Semua Cabang + SBU LSI Pusat</option>
+          {REGIONS.map(region => (
+            <optgroup key={region} label={`Wilayah ${region}`}>
+              {UNIT_KERJA_BY_REGION[region].map(u => (
+                <option key={u} value={u}>{unitKerjaLabel(u)}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <span className="basis-full text-[10px] text-slate-500 font-semibold">Sedang lihat: {scopeLabel}</span>
+      </Card>
+
       {/* Top row: per-branch bar + win/lose donut */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
         <Card className="!p-4">
@@ -718,12 +748,7 @@ export default function StatusPage() {
         </div>
       ) : (
         <div className="mt-4">
-          <StatsView
-            tenders={view === 'stats' && (isAdmin && !adminViewBranch) ? tenders : filteredTenders}
-            tenderClaims={tenderClaims}
-            scope={viewBranch || 'all'}
-            scopeLabel={viewBranch ? unitKerjaLabel(viewBranch) : 'Semua Cabang + Pusat'}
-          />
+          <StatsView allTenders={tenders} tenderClaims={tenderClaims} />
         </div>
       )}
     </div>

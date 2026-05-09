@@ -25,8 +25,8 @@ export default function DashboardPage() {
   const { unitKerja: viewerUnit } = useAuth();
   const navigate = useNavigate();
   const [showPotensiSidebar, setShowPotensiSidebar] = useState(false);
-  // 'all' | 'mine' | <unit_kerja name>
-  const [winrateScope, setWinrateScope] = useState(viewerUnit ? 'mine' : 'all');
+  // 'all' | 'mine' | <unit_kerja name>. Default 'all' so user lihat global dulu.
+  const [winrateScope, setWinrateScope] = useState('all');
 
   // Resolve scope -> set of unit_kerja names to include (null = all).
   const winrateUnitFilter = useMemo(() => {

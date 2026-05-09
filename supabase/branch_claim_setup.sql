@@ -144,6 +144,16 @@ ALTER TABLE public.rup_watchlist ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "RUP watchlist read all"
   ON public.rup_watchlist FOR SELECT TO authenticated USING (TRUE);
 
+-- Anon read so dev mode (no real Supabase login) can see claims.
+DROP POLICY IF EXISTS "RUP watchlist read public" ON public.rup_watchlist;
+CREATE POLICY "RUP watchlist read public"
+  ON public.rup_watchlist FOR SELECT TO public USING (TRUE);
+
+-- Mirror for tender_watchlist (matches existing public visibility behavior).
+DROP POLICY IF EXISTS "Tender watchlist read public" ON public.tender_watchlist;
+CREATE POLICY "Tender watchlist read public"
+  ON public.tender_watchlist FOR SELECT TO public USING (TRUE);
+
 CREATE POLICY "RUP watchlist insert by branch or admin"
   ON public.rup_watchlist FOR INSERT TO authenticated
   WITH CHECK (

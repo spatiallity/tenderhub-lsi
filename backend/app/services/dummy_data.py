@@ -210,7 +210,9 @@ def _expand_rup_to_100(rows):
             item = deepcopy(base)
             item["id"] = next_id
             item["datamart_id"] = f"RUP-2026-{next_id:04d}"
-            item["kd_rup"] = str(70000000 + next_id)
+            # Match frontend FALLBACK_RUP generator formula so kd_rup overlaps
+            # with rup_watchlist seeded from frontend dummies.
+            item["kd_rup"] = str(60124000 + next_id)
             item["nama_paket"] = f"{base['nama_paket']} Batch {seq}"
             klpd, jenis_klpd, satker = extra_klpd[seq % len(extra_klpd)]
             item["nama_klpd"] = klpd

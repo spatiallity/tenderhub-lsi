@@ -718,7 +718,15 @@ const generateAdditionalTenders = (startId, count) => {
     const bucket = DOMAIN_BUCKETS[Math.floor(rand() * DOMAIN_BUCKETS.length)];
     const pkg = bucket.packages[Math.floor(rand() * bucket.packages.length)];
 
-    let currentStage = Math.floor(rand() * Math.min(10, maxStage)) + 1;
+    // Bias stages 1-4 (pre-deadline) heavily so most tenders aren't Terlewat.
+    // Distribution: 70% in stages 1-4, 30% in stages 5-10.
+    let currentStage;
+    const stageRoll = rand();
+    if (stageRoll < 0.7) {
+      currentStage = Math.floor(rand() * 4) + 1;          // stage 1-4
+    } else {
+      currentStage = Math.floor(rand() * Math.min(6, Math.max(1, maxStage - 4))) + 5;  // stage 5-10
+    }
     let status = internalStatuses[Math.floor(rand() * internalStatuses.length)];
     let won = status === 'Sudah Diikuti' && rand() > 0.7;
 
