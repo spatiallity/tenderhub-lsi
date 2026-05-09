@@ -3,8 +3,9 @@ import { Search, MapPin, ChevronRight, Filter, X, FileSpreadsheet, Upload, Trash
 import * as XLSX from 'xlsx';
 import { useAppContext } from '../store/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Badge, PageTitle, Card, Btn } from '../components/UI/index';
-import { portfolioColor, PROVINCES } from '../utils/constants';
+import { Badge, PageTitle, Card, Btn, ClaimBadge } from '../components/UI/index';
+import { portfolioColor, PROVINCES, INTERNAL_STATUS_OPTIONS } from '../utils/constants';
+import { unitKerjaLabel } from '../utils/unitKerja';
 import { formatRupiah, activeKeywordCount, exportRupExcel, formatMonthYear } from '../utils/helpers';
 import { useDebounce } from '../hooks/useDebounce';
 import supabase from '../services/supabase';
@@ -138,9 +139,76 @@ function importedToRup(row) {
   };
 }
 
+// Inline RUP status cell: select + Save when changed; locked badge for non-owners.
+function RupStatusCell({ rup, claim, canEdit, viewerOwns, isGuest, updateRupStatus, showToast }) {
+  const initial = claim?.status_internal || 'Dipantau';
+  const [localStatus, setLocalStatus] = useState(initial);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => { setLocalStatus(initial); }, [initial]);
+
+  const lockedByClaim = !canEdit && claim?.unit_kerja;
+  const isChanged = localStatus !== initial;
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await updateRupStatus(rup.id, localStatus, rup);
+    } finally { setIsSaving(false); }
+  };
+
+  if (isGuest || lockedByClaim) {
+    return (
+      <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+        <span className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold text-center ${
+          {
+            'Dipantau':     'bg-slate-50 text-slate-700 border-slate-200',
+            'Akan Diikuti': 'bg-blue-50 text-blue-700 border-blue-200',
+            'Sudah Diikuti':'bg-indigo-50 text-indigo-700 border-indigo-200',
+            'Menang':       'bg-green-50 text-green-700 border-green-200',
+            'Kalah':        'bg-red-50 text-red-700 border-red-200',
+            'Tidak Relevan':'bg-amber-50 text-amber-700 border-amber-200',
+          }[localStatus] || 'bg-slate-50 text-slate-700 border-slate-200'
+        }`}>{localStatus}</span>
+        {lockedByClaim && <ClaimBadge claim={claim} viewerOwns={false} readOnly size="xs" />}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+      <select
+        value={localStatus}
+        onChange={e => setLocalStatus(e.target.value)}
+        disabled={isSaving}
+        className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold cursor-pointer outline-none focus:ring-2 focus:ring-blue-200 transition-colors disabled:opacity-50 ${
+          {
+            'Dipantau':     'bg-slate-50 text-slate-700 border-slate-200',
+            'Akan Diikuti': 'bg-blue-50 text-blue-700 border-blue-200',
+            'Sudah Diikuti':'bg-indigo-50 text-indigo-700 border-indigo-200',
+            'Menang':       'bg-green-50 text-green-700 border-green-200',
+            'Kalah':        'bg-red-50 text-red-700 border-red-200',
+            'Tidak Relevan':'bg-amber-50 text-amber-700 border-amber-200',
+          }[localStatus] || 'bg-slate-50 text-slate-700 border-slate-200'
+        }`}
+      >
+        {INTERNAL_STATUS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      {isChanged && (
+        <Btn className="primary w-full justify-center" style={{ fontSize: '10px', padding: '3px 8px' }} onClick={handleSave} disabled={isSaving}>
+          {isSaving ? 'Menyimpan...' : 'Simpan'}
+        </Btn>
+      )}
+      <ClaimBadge claim={claim} viewerOwns={!!viewerOwns} size="xs" />
+    </div>
+  );
+}
+
 export default function RupPage() {
-  const { rupList, keywords, setSelectedRupId, loadingRup, newRupIds, setShowKeywordManager, internalStatuses, hideRup, deleteImportedRup } = useAppContext();
-  const { isAdmin } = useAuth();
+  const { rupList, keywords, setSelectedRupId, loadingRup, newRupIds, setShowKeywordManager, internalStatuses, hideRup, deleteImportedRup, rupClaims, updateRupStatus, showToast } = useAppContext();
+  const { isAdmin, isGuest, unitKerja, canEditClaim } = useAuth();
   const [importedRows, setImportedRows] = useState([]);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
@@ -284,6 +352,13 @@ export default function RupPage() {
           case 'jadwal': va = a.daysUntilSelection ?? 999; vb = b.daysUntilSelection ?? 999; break;
           case 'pagu': va = a.pagu || 0; vb = b.pagu || 0; break;
           case 'portfolio': va = (a.recommendation || '').toLowerCase(); vb = (b.recommendation || '').toLowerCase(); break;
+          case 'status_internal': {
+            // Order by ranked status priority then alpha.
+            const order = { 'Menang': 1, 'Sudah Diikuti': 2, 'Akan Diikuti': 3, 'Dipantau': 4, 'Kalah': 5, 'Tidak Relevan': 6 };
+            va = order[rupClaims[String(a.kd_rup)]?.status_internal] || 99;
+            vb = order[rupClaims[String(b.kd_rup)]?.status_internal] || 99;
+            break;
+          }
           default: return 0;
         }
         if (va < vb) return -1 * dir;
@@ -292,7 +367,7 @@ export default function RupPage() {
       });
     }
     return result;
-  }, [mergedRup, portfolioFilter, levelFilter, provinsiFilter, debouncedSearch, keywordCount, keywordOnly, sortKey, sortDir, showIrrelevant, internalStatuses]);
+  }, [mergedRup, portfolioFilter, levelFilter, provinsiFilter, debouncedSearch, keywordCount, keywordOnly, sortKey, sortDir, showIrrelevant, internalStatuses, rupClaims]);
 
   const clearAll = () => {
     setPortfolioFilter('Semua');
@@ -430,12 +505,12 @@ export default function RupPage() {
               <table ref={tableRef} className="min-w-[760px] md:min-w-0 w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
                 <col className="w-[6%]" />
-                <col className="w-[30%]" />
-                <col className="w-[19%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
+                <col className="w-[28%]" />
+                <col className="w-[18%]" />
+                <col className="w-[11%]" />
+                <col className="w-[11%]" />
                 <col className="w-[10%]" />
-                <col className="w-[6%]" />
+                <col className="w-[12%]" />
                 <col className="w-[5%]" />
               </colgroup>
               <thead>
@@ -446,7 +521,7 @@ export default function RupPage() {
                   {renderSortTh('jenis', 'Jenis Pengadaan')}
                   {renderSortTh('jadwal', 'Jadwal Pemilihan')}
                   {renderSortTh('pagu', 'Pagu Anggaran')}
-                  {renderSortTh('portfolio', 'Portofolio')}
+                  {renderSortTh('status_internal', 'Status Internal')}
                   <th className="bg-slate-50 border-b border-slate-200"></th>
                 </tr>
               </thead>
@@ -502,10 +577,27 @@ export default function RupPage() {
                     <td className="px-3 py-3 align-top whitespace-nowrap">
                       <div className="font-extrabold text-sm">{formatRupiah(r.pagu)}</div>
                     </td>
-                    <td className="px-3 py-3 align-top"><Badge color={portfolioColor[r.recommendation]}>{r.recommendation}</Badge></td>
+                    <td className="px-3 py-3 align-top">
+                      {(() => {
+                        const claim = rupClaims[String(r.kd_rup)] || null;
+                        const viewerOwns = claim?.unit_kerja && claim.unit_kerja === unitKerja;
+                        const canEdit = canEditClaim(claim?.unit_kerja);
+                        return (
+                          <RupStatusCell
+                            rup={r}
+                            claim={claim}
+                            canEdit={canEdit}
+                            viewerOwns={viewerOwns}
+                            isGuest={isGuest}
+                            updateRupStatus={updateRupStatus}
+                            showToast={showToast}
+                          />
+                        );
+                      })()}
+                    </td>
                     <td className={`px-3 py-3 align-top ${isNew ? 'bg-cyan-50/95' : 'bg-white/95'}`}>
                       <div className="flex items-center gap-1">
-                        <Btn className="primary small" onClick={() => setSelectedRupId(r.id)}>
+                        <Btn className="ghost small" onClick={() => setSelectedRupId(r.id)}>
                           Detail<ChevronRight size={14} />
                         </Btn>
                         {isAdmin && (

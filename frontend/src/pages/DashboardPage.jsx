@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { FileText, Target, TrendingUp, Clock, BarChart2, X } from 'lucide-react';
+import { FileText, Target, TrendingUp, Clock, BarChart2, X, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { useAppContext } from '../store/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Card, Badge } from '../components/UI/index';
 import { KpiCard } from '../components/UI/index';
 import UrgentTenderPanel from '../components/Tender/UrgentPanel';
@@ -10,6 +11,7 @@ import KeywordManagerPanel from '../components/Tender/KeywordManager';
 import WinrateChart from '../components/Dashboard/WinrateChart';
 import { portfolioColor } from '../utils/constants';
 import { formatRupiah } from '../utils/helpers';
+import { UNIT_KERJA_BY_REGION, REGIONS, unitKerjaLabel } from '../utils/unitKerja';
 
 export default function DashboardPage() {
   const {
@@ -18,9 +20,34 @@ export default function DashboardPage() {
     setShowWinrateDetail, setShowPotensiChart, setShowUrgentPanel,
     setDashboardChartFilter,
     internalStatuses,
+    tenderClaims,
   } = useAppContext();
+  const { unitKerja: viewerUnit } = useAuth();
   const navigate = useNavigate();
   const [showPotensiSidebar, setShowPotensiSidebar] = useState(false);
+  // 'all' | 'mine' | <unit_kerja name>
+  const [winrateScope, setWinrateScope] = useState(viewerUnit ? 'mine' : 'all');
+
+  // Resolve scope -> set of unit_kerja names to include (null = all).
+  const winrateUnitFilter = useMemo(() => {
+    if (winrateScope === 'all') return null;
+    if (winrateScope === 'mine') return viewerUnit ? new Set([viewerUnit]) : null;
+    return new Set([winrateScope]);
+  }, [winrateScope, viewerUnit]);
+
+  const winrateTenders = useMemo(() => {
+    if (!winrateUnitFilter) return tenders;
+    return tenders.filter(t => {
+      const u = tenderClaims[t.id]?.unit_kerja;
+      return u && winrateUnitFilter.has(u);
+    });
+  }, [tenders, tenderClaims, winrateUnitFilter]);
+
+  const winrateScopeLabel = winrateScope === 'all'
+    ? 'Semua Cabang + Pusat'
+    : winrateScope === 'mine'
+    ? (viewerUnit ? unitKerjaLabel(viewerUnit) : 'Semua')
+    : unitKerjaLabel(winrateScope);
 
   const byPortfolio = useMemo(() =>
     ['FLP', 'SDA', 'FITI'].map(p => ({
@@ -53,14 +80,14 @@ export default function DashboardPage() {
 
   const maxInstansi = Math.max(...instansiRows.map(p => p.jumlah), 1);
   
-  // Calculate winrate from actual tender data with internal status
-  const followed = tenders.filter(t => 
-    t.internalStatus === 'Sudah Diikuti' || 
-    t.internalStatus === 'Menang' || 
+  // Calculate winrate from filtered tender data with internal status
+  const followed = winrateTenders.filter(t =>
+    t.internalStatus === 'Sudah Diikuti' ||
+    t.internalStatus === 'Menang' ||
     t.internalStatus === 'Kalah'
   ).length;
-  const won = tenders.filter(t => t.internalStatus === 'Menang').length;
-  const lost = tenders.filter(t => t.internalStatus === 'Kalah').length;
+  const won  = winrateTenders.filter(t => t.internalStatus === 'Menang').length;
+  const lost = winrateTenders.filter(t => t.internalStatus === 'Kalah').length;
   const winrate = followed > 0 ? Math.round((won / followed) * 100) : 0;
   
   // Generate winrate series from actual data (mock quarterly data for now)
@@ -237,7 +264,14 @@ export default function DashboardPage() {
               <span className="text-[10px] font-black text-red-600 uppercase tracking-wider">Live</span>
             </div>
           </div>
-          
+
+          {/* Micro-legend explaining dot colors. */}
+          <div className="flex items-center gap-3 mb-3 text-[10px] font-bold text-slate-500">
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Tender baru</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Deadline mendekat</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Sedang diikuti</span>
+          </div>
+
           <div className="flex flex-col gap-1">
             {recentActivity.map((item, i) => {
               const dotColor = item.color === 'red' ? 'bg-red-500' : item.color === 'green' ? 'bg-emerald-500' : 'bg-blue-500';
@@ -273,12 +307,34 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Winrate Chart via Recharts */}
-        <WinrateChart 
+        {/* Winrate Chart with embedded branch filter (single container). */}
+        <WinrateChart
           winrateRows={winrateRows}
           winrate={winrate}
           followed={followed}
           won={won}
+          scopeLabel={winrateScopeLabel}
+          filterSlot={
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
+              <Building2 size={14} className="text-blue-600" />
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">Filter cabang</span>
+              <select
+                value={winrateScope}
+                onChange={e => setWinrateScope(e.target.value)}
+                className="ml-auto text-xs font-bold border border-slate-200 rounded-lg px-3 py-1.5 bg-white"
+              >
+                {viewerUnit && <option value="mine">Cabang Anda — {unitKerjaLabel(viewerUnit)}</option>}
+                <option value="all">Semua Cabang + Pusat</option>
+                {REGIONS.map(region => (
+                  <optgroup key={region} label={`Wilayah ${region}`}>
+                    {UNIT_KERJA_BY_REGION[region].map(u => (
+                      <option key={u} value={u}>{unitKerjaLabel(u)}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          }
         />
       </div>
 

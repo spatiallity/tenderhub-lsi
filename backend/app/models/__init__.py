@@ -1,6 +1,6 @@
 from app.models.expert import Expert, ExpertProject, ExpertReview
 from app.models.keyword import Keyword
-from app.models.watchlist import TenderWatchlist, TenderCache
+from app.models.watchlist import TenderWatchlist, RupWatchlist, TenderCache
 
 __all__ = [
     "Expert",
@@ -8,5 +8,6 @@ __all__ = [
     "ExpertReview",
     "Keyword",
     "TenderWatchlist",
+    "RupWatchlist",
     "TenderCache",
 ]

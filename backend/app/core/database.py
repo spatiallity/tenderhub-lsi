@@ -65,3 +65,18 @@ async def create_tables():
     from app.models import expert, keyword, watchlist  # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Backfill new branch-claim columns on existing tender_watchlist rows.
+    if not is_sqlite:
+        async with engine.begin() as conn:
+            from sqlalchemy import text
+            for stmt in (
+                "ALTER TABLE tender_watchlist ADD COLUMN IF NOT EXISTS unit_kerja VARCHAR(100)",
+                "ALTER TABLE tender_watchlist ADD COLUMN IF NOT EXISTS unit_kerja_region VARCHAR(20)",
+                "ALTER TABLE tender_watchlist ADD COLUMN IF NOT EXISTS claimed_by UUID",
+                "ALTER TABLE tender_watchlist ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP",
+                "CREATE INDEX IF NOT EXISTS ix_tender_watchlist_unit_kerja ON tender_watchlist(unit_kerja)",
+            ):
+                try:
+                    await conn.execute(text(stmt))
+                except Exception as e:
+                    print(f"[create_tables] backfill skip ({stmt[:60]}...): {e}")

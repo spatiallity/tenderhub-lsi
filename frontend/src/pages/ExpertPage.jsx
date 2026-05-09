@@ -78,6 +78,12 @@ export default function ExpertPage() {
     return result;
   }, [experts, expertSearch, availFilter, portFilter, sortKey, sortDir]);
 
+  // Section 5: hide Rating column entirely if no expert has any review.
+  const hasAnyReviews = useMemo(
+    () => (experts || []).some(e => (e.reviews || []).length > 0),
+    [experts]
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <PageTitle
@@ -217,7 +223,7 @@ export default function ExpertPage() {
                 {renderSortTh('instansi', 'Instansi / Afiliasi', 'hidden xl:table-cell')}
                 {renderSortTh('keahlian', 'Keahlian (Tags)')}
                 {renderSortTh('availability', 'Ketersediaan')}
-                {renderSortTh('rating', 'Rating')}
+                {hasAnyReviews && renderSortTh('rating', 'Rating')}
                 {renderSortTh('history', 'Riwayat Terakhir', 'hidden 2xl:table-cell')}
                 <th className="bg-slate-50 border-b border-slate-200 sticky right-0 z-10"></th>
               </tr>
@@ -244,12 +250,14 @@ export default function ExpertPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3 align-top"><Badge color={availabilityColor[e.availability]}>{e.availability}</Badge></td>
-                  <td className="px-3 py-3 align-top">
-                    <div className="flex flex-col gap-1 mt-1">
-                      <Stars rating={(e.reviews || []).length ? e.rating : 0} />
-                      <div className="text-[10px] text-slate-500">{e.reviews?.length || 0} reviews</div>
-                    </div>
-                  </td>
+                  {hasAnyReviews && (
+                    <td className="px-3 py-3 align-top">
+                      <div className="flex flex-col gap-1 mt-1">
+                        <Stars rating={(e.reviews || []).length ? e.rating : 0} />
+                        <div className="text-[10px] text-slate-500">{e.reviews?.length || 0} reviews</div>
+                      </div>
+                    </td>
+                  )}
                   <td className="px-3 py-3 align-top min-w-[180px] hidden 2xl:table-cell">
                     {e.history && e.history.length > 0 ? (
                       <>

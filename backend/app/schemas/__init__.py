@@ -178,6 +178,9 @@ class WatchlistBase(BaseModel):
     assigned_expert_ids: List[int] = []
     subporto_rekomendasi: Optional[str] = None
     relevance_score: Optional[float] = None
+    unit_kerja: Optional[str] = None
+    unit_kerja_region: Optional[str] = None
+    claimed_by: Optional[str] = None
 
 
 class WatchlistCreate(WatchlistBase):
@@ -191,10 +194,46 @@ class WatchlistUpdate(BaseModel):
     assigned_expert_ids: Optional[List[int]] = None
     subporto_rekomendasi: Optional[str] = None
     relevance_score: Optional[float] = None
+    unit_kerja: Optional[str] = None
 
 
 class WatchlistOut(WatchlistBase):
     id: int
+    claimed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ─── RUP Watchlist Schemas ─────────────────────────────────────────────────────
+
+class RupWatchlistBase(BaseModel):
+    kd_rup: str
+    nama_paket: Optional[str] = None
+    nama_klpd: Optional[str] = None
+    pagu: Optional[float] = None
+    status_internal: str = "Dipantau"
+    catatan_internal: Optional[str] = None
+    unit_kerja: Optional[str] = None
+    unit_kerja_region: Optional[str] = None
+    claimed_by: Optional[str] = None
+
+
+class RupWatchlistCreate(RupWatchlistBase):
+    pass
+
+
+class RupWatchlistUpdate(BaseModel):
+    status_internal: Optional[str] = None
+    catatan_internal: Optional[str] = None
+    unit_kerja: Optional[str] = None
+
+
+class RupWatchlistOut(RupWatchlistBase):
+    id: int
+    claimed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

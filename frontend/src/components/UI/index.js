@@ -45,6 +45,7 @@ export { default as SidePanel } from './SidePanel';
 export { default as GlobalSearch } from './GlobalSearch';
 export { default as SkipToContent } from './SkipToContent';
 export { default as VirtualTable } from './VirtualTable';
+export { default as ClaimBadge } from './ClaimBadge';
 export { default as LazyImage, LazyBackgroundImage } from './LazyImage';
 export { default as LiveRegion, useLiveRegion } from './LiveRegion';
 

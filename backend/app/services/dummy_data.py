@@ -168,29 +168,71 @@ EXPERTS_RAW = [
     ]
 
 
-def _expand_rup_to_50(rows):
-    if len(rows) >= 50:
-        return rows[:50]
+def _expand_rup_to_100(rows):
+    """Top up RUP_RAW to ~100 entries using realistic Indonesian package + KLPD permutations."""
+    if len(rows) >= 100:
+        return rows[:100]
 
     expanded = [deepcopy(r) for r in rows]
     template = [deepcopy(r) for r in rows]
     next_id = max(r["id"] for r in expanded) + 1
     seq = 1
 
-    while len(expanded) < 50:
+    extra_klpd = [
+        ("Kementerian PUPR", "KEMENTERIAN", "Direktorat Bina Marga"),
+        ("Kementerian Perhubungan", "KEMENTERIAN", "Direktorat Lalu Lintas"),
+        ("Kementerian ESDM", "KEMENTERIAN", "Ditjen Migas"),
+        ("Pemprov Jawa Barat", "PROVINSI", "Dinas Bina Marga"),
+        ("Pemprov Sumatera Utara", "PROVINSI", "Dinas PUPR"),
+        ("DPMPTSP Kabupaten Sleman", "KABUPATEN", "Bidang Penanaman Modal"),
+        ("Dinas PUPR Provinsi Sulawesi Selatan", "PROVINSI", "Bidang Bina Marga"),
+        ("Pemkab Sleman", "KABUPATEN", "Dinas Lingkungan Hidup"),
+        ("Bappenas", "LEMBAGA", "Direktorat Perencanaan Wilayah"),
+        ("Pemkot Surabaya", "KABUPATEN", "Dinas Lingkungan Hidup"),
+    ]
+    extra_lokasi = [
+        ("Sumatera Selatan", "Kota Palembang"),
+        ("Kalimantan Timur", "Kota Balikpapan"),
+        ("Sulawesi Selatan", "Kota Makassar"),
+        ("Bali", "Kabupaten Badung"),
+        ("Banten", "Kota Cilegon"),
+        ("Jawa Tengah", "Kabupaten Cilacap"),
+        ("Riau", "Kota Pekanbaru"),
+        ("Kepulauan Riau", "Kota Batam"),
+        ("Jawa Barat", "Kota Bekasi"),
+        ("DKI Jakarta", "Kota Jakarta Pusat"),
+    ]
+
+    while len(expanded) < 100:
         for base in template:
-            if len(expanded) >= 50:
+            if len(expanded) >= 100:
                 break
             item = deepcopy(base)
             item["id"] = next_id
             item["datamart_id"] = f"RUP-2026-{next_id:04d}"
             item["kd_rup"] = str(70000000 + next_id)
             item["nama_paket"] = f"{base['nama_paket']} Batch {seq}"
-            item["nama_satker"] = f"{base['nama_satker']} Unit {seq}"
+            klpd, jenis_klpd, satker = extra_klpd[seq % len(extra_klpd)]
+            item["nama_klpd"] = klpd
+            item["jenis_klpd"] = jenis_klpd
+            item["nama_satker"] = f"{satker} Unit {seq}"
+            prov, kab = extra_lokasi[seq % len(extra_lokasi)]
+            item["provinsi"] = prov
+            item["kabupaten"] = kab
+            # Randomize pagu in 200jt..30M range, biased to 1-5M.
+            base_pagu = (seq * 137 % 30) * 1_000_000_000 + 200_000_000
+            item["pagu"] = base_pagu
+            item["tahun_anggaran"] = "2025" if seq % 3 == 0 else "2026"
+            metode_choices = ["Tender", "Seleksi", "Pengadaan Langsung", "Penunjukan Langsung"]
+            item["metode_pengadaan"] = metode_choices[seq % 4]
             expanded.append(item)
             next_id += 1
             seq += 1
     return expanded
+
+
+# Backwards-compat alias.
+_expand_rup_to_50 = _expand_rup_to_100
 
 
 def _expand_experts_to_100(rows):
@@ -220,6 +262,6 @@ def _expand_experts_to_100(rows):
     return expanded
 
 
-RUP_RAW = _expand_rup_to_50(RUP_RAW)
+RUP_RAW = _expand_rup_to_100(RUP_RAW)
 # DISABLED: Don't expand experts to prevent duplicates with (17), (18), etc.
 # EXPERTS_RAW = _expand_experts_to_100(EXPERTS_RAW)

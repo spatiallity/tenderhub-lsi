@@ -411,47 +411,6 @@ export default function TenderDetail({ tender }) {
         )}
       </div>
 
-      {/* Assign PIC */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-          Assign PIC Tender
-        </div>
-        {isGuest ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <div className="text-sm font-semibold text-amber-900">
-              PIC: <span className="font-extrabold">{picCandidates.find(p => String(p.id) === String(localPIC))?.nama || users.find(u => u.id === localPIC)?.nama || 'Belum ditugaskan'}</span>
-            </div>
-            <div className="text-xs text-amber-700 mt-1">
-              Mode Guest - Tidak dapat mengubah PIC
-            </div>
-          </div>
-        ) : (
-          <div className="flex gap-2 items-center">
-            <select 
-              value={localPIC} 
-              onChange={e => setLocalPIC(e.target.value)} 
-              disabled={isAssigningPIC}
-              className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">-- Pilih PIC Tender (PDOS-PJL / PDOS-PSD) --</option>
-              {picCandidates.map(p => (
-                <option key={p.id} value={p.id}>{p.nama}</option>
-              ))}
-              {picCandidates.length === 0 && (
-                <option disabled>Belum ada kontak PDOS-PJL/PSD. Import dulu.</option>
-              )}
-            </select>
-            <Btn 
-              className="primary small whitespace-nowrap"
-              onClick={handleSavePIC}
-              disabled={isAssigningPIC || localPIC === committedPIC}
-            >
-              <Save size={14} />{isAssigningPIC ? 'Menyimpan...' : 'Simpan'}
-            </Btn>
-          </div>
-        )}
-      </div>
-
       {/* Add shimmer animation styles */}
       <style>{`
         @keyframes shimmer {

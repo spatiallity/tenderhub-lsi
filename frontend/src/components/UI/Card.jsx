@@ -152,11 +152,11 @@ export const KpiCard = ({
         )}
       </div>
       {Icon && (
-        <div 
-          className={`w-[48px] h-[48px] rounded-xl flex items-center justify-center shrink-0 shadow-sm ${!bg ? colorStyles[color] : ''}`}
+        <div
+          className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center shrink-0 ${!bg ? colorStyles[color] : ''}`}
           style={iconStyle}
         >
-          <Icon size={24} />
+          <Icon size={16} />
         </div>
       )}
     </div>

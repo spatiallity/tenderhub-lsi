@@ -1,23 +1,28 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
-import { Users, UserPlus, Mail, Shield, ShieldCheck, ShieldAlert, Search, MoreVertical, Check, X, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Mail, Shield, ShieldCheck, ShieldAlert, Building2, Search, MoreVertical, Check, X, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import supabase from '../services/supabase';
 import { PageTitle, Card, Btn, Badge } from '../components/UI/index';
+import { UNIT_KERJA_BY_REGION, REGIONS, getRegion, unitKerjaLabel } from '../utils/unitKerja';
 
 const ROLE_CONFIG = {
-  admin: { label: 'Admin', color: 'red', icon: ShieldAlert, desc: 'Akses penuh + kelola pengguna' },
-  manager: { label: 'Manager', color: 'blue', icon: ShieldCheck, desc: 'Bisa edit status internal' },
-  user: { label: 'User', color: 'gray', icon: Shield, desc: 'Hanya bisa lihat & monitor' },
+  admin:   { label: 'Admin',   color: 'red',    icon: ShieldAlert, desc: 'Akses penuh + kelola pengguna' },
+  pusat:   { label: 'Pusat',   color: 'purple', icon: Building2,   desc: 'Akun SBU LSI Pusat — claim tender' },
+  cabang:  { label: 'Cabang',  color: 'teal',   icon: Building2,   desc: 'Akun cabang regional — claim tender' },
+  manager: { label: 'Manager', color: 'blue',   icon: ShieldCheck, desc: 'Bisa edit status internal (legacy)' },
+  user:    { label: 'User',    color: 'gray',   icon: Shield,      desc: 'Hanya bisa lihat & monitor' },
 };
 
-const ROLE_ORDER = ['admin', 'manager', 'user'];
+const ROLE_ORDER = ['admin', 'pusat', 'cabang', 'manager', 'user'];
 
 function RoleBadge({ role }) {
   const cfg = ROLE_CONFIG[role] ?? ROLE_CONFIG.user;
   const colorMap = {
-    red: 'bg-red-100 text-red-700 border-red-200',
-    blue: 'bg-blue-100 text-blue-700 border-blue-200',
-    gray: 'bg-slate-100 text-slate-600 border-slate-200',
+    red:    'bg-red-100 text-red-700 border-red-200',
+    blue:   'bg-blue-100 text-blue-700 border-blue-200',
+    gray:   'bg-slate-100 text-slate-600 border-slate-200',
+    purple: 'bg-violet-100 text-violet-700 border-violet-200',
+    teal:   'bg-teal-100 text-teal-700 border-teal-200',
   };
   const Icon = cfg.icon;
   return (
@@ -32,22 +37,27 @@ function InviteModal({ onClose, onSuccess }) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
-  const [role, setRole] = useState('user');
+  const [role, setRole] = useState('cabang');
+  const [unitKerja, setUnitKerja] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const needsUnit = role === 'cabang' || role === 'pusat';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (needsUnit && !unitKerja) {
+      setError('Pilih unit kerja untuk role Cabang atau Pusat.');
+      return;
+    }
     setLoading(true);
     try {
-      // Invite user via Supabase Admin (requires service role in real setup)
-      // For now: create profile entry, admin sets password separately
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim(),
-        password: Math.random().toString(36).slice(-12) + 'A1!', // temp password
+        password: Math.random().toString(36).slice(-12) + 'A1!',
         options: {
-          data: { name, title, role },
+          data: { name, title, role, unit_kerja: needsUnit ? unitKerja : null },
           emailRedirectTo: window.location.origin + '/login',
         },
       });
@@ -55,13 +65,14 @@ function InviteModal({ onClose, onSuccess }) {
       if (authError) throw authError;
 
       if (authData.user) {
-        // Upsert profile
         const { error: profileError } = await supabase.from('profiles').upsert({
           id: authData.user.id,
           email: email.trim(),
           name: name.trim(),
           title: title.trim(),
           role,
+          unit_kerja: needsUnit ? unitKerja : null,
+          unit_kerja_region: needsUnit ? getRegion(unitKerja) : null,
           is_active: true,
         });
         if (profileError) throw profileError;
@@ -150,6 +161,29 @@ function InviteModal({ onClose, onSuccess }) {
               })}
             </div>
           </div>
+
+          {needsUnit && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Unit Kerja <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={unitKerja}
+                onChange={e => setUnitKerja(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">Pilih unit kerja...</option>
+                {REGIONS.map(region => (
+                  <optgroup key={region} label={`Wilayah ${region}`}>
+                    {UNIT_KERJA_BY_REGION[region].map(u => (
+                      <option key={u} value={u}>{unitKerjaLabel(u)}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
@@ -332,6 +366,7 @@ export default function UserManagementPage() {
                 <th className="px-4 py-3 text-left text-[11px] font-extrabold text-slate-500 uppercase tracking-wide">Pengguna</th>
                 <th className="px-4 py-3 text-left text-[11px] font-extrabold text-slate-500 uppercase tracking-wide hidden md:table-cell">Email</th>
                 <th className="px-4 py-3 text-left text-[11px] font-extrabold text-slate-500 uppercase tracking-wide">Role</th>
+                <th className="px-4 py-3 text-left text-[11px] font-extrabold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Unit Kerja</th>
                 <th className="px-4 py-3 text-left text-[11px] font-extrabold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Status</th>
                 {isAdmin && (
                   <th className="px-4 py-3 text-right text-[11px] font-extrabold text-slate-500 uppercase tracking-wide">Aksi</th>
@@ -341,7 +376,7 @@ export default function UserManagementPage() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-12">
+                  <td colSpan={6} className="text-center py-12">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs text-slate-500">Memuat data pengguna...</span>
@@ -350,7 +385,7 @@ export default function UserManagementPage() {
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-12">
+                  <td colSpan={6} className="text-center py-12">
                     <Users size={32} className="mx-auto text-slate-300 mb-2" />
                     <p className="text-sm text-slate-500">
                       {search ? 'Tidak ada pengguna yang cocok.' : 'Belum ada pengguna terdaftar.'}
@@ -400,6 +435,20 @@ export default function UserManagementPage() {
                         </select>
                       ) : (
                         <RoleBadge role={p.role} />
+                      )}
+                    </td>
+
+                    {/* Unit Kerja */}
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      {p.unit_kerja ? (
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-700">{unitKerjaLabel(p.unit_kerja)}</span>
+                          {p.unit_kerja_region && (
+                            <span className="text-[10px] text-slate-500">Wilayah {p.unit_kerja_region}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
                       )}
                     </td>
 

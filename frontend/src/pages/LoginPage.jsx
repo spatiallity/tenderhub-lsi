@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, AlertCircle, Target, BarChart3, Users, Zap, UserCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import tenderhubLogo from '../assets/TenderHub_Logo.png';
 
 const FEATURES = [
   { icon: Target, label: 'Tender Intelligence', desc: 'Monitor ribuan tender secara real-time dengan scoring relevansi otomatis.' },
@@ -81,8 +82,8 @@ export default function LoginPage() {
 
         <div className="relative z-10 flex flex-col h-full p-12">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-16">
-  
+          <div className="flex items-center gap-4 mb-16">
+            <img src={tenderhubLogo} alt="TenderHub" className="h-20 w-auto object-contain bg-white/95 rounded-xl p-2 shadow-lg" />
             <div>
               <div className="text-xl font-black tracking-tight leading-none">
                 <span className="text-white">Tender</span>
@@ -135,23 +136,14 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2 mb-10">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md"
-              style={{ background: 'linear-gradient(135deg, #13B2AA, #0891b2)' }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="white" fillOpacity="0.2" stroke="white" strokeWidth="2"/>
-                <path d="M14 2V8H20M16 13H8M16 17H8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <div className="text-lg font-black tracking-tight">
-              <span className="text-blue-600">Tender</span>
-              <span style={{ color: '#13B2AA' }}>Hub</span>
-            </div>
+          <div className="lg:hidden flex items-center justify-center mb-10">
+            <img src={tenderhubLogo} alt="TenderHub" className="h-12 w-auto object-contain" />
           </div>
 
           {/* Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="mb-8">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <img src={tenderhubLogo} alt="TenderHub" className="h-24 w-auto mb-4 object-contain" />
               <h2 className="text-2xl font-black text-slate-900 mb-1">Selamat Datang</h2>
               <p className="text-sm text-slate-500">Masuk dengan akun SBU LSI Anda untuk melanjutkan.</p>
             </div>

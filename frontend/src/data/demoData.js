@@ -407,10 +407,10 @@ const FALLBACK_TENDERS_RAW = [
   },
   {
     id: 10,
-    nama: 'Inventarisasi ROW SUTT dan Verifikasi Aset Jaringan Transmisi Banten',
-    instansi: 'PT PLN (Persero) UIP Jawa Bagian Barat',
-    level: 'K/L',
-    lpse: 'https://eproc.pln.co.id',
+    nama: 'Inventarisasi Aset dan Pemetaan ROW Jaringan Distribusi Banten',
+    instansi: 'Dinas ESDM Provinsi Banten',
+    level: 'Provinsi',
+    lpse: 'https://lpse.bantenprov.go.id',
     hps: 6200000000,
     pagu: 6500000000,
     metode: 'Pascakualifikasi',
@@ -421,14 +421,14 @@ const FALLBACK_TENDERS_RAW = [
     followed: false,
     won: false,
     changes: { 5: 1 },
-    nama_satker: 'Unit Pelaksana Proyek Transmisi',
+    nama_satker: 'Bidang Energi dan Ketenagalistrikan',
     jenis_pengadaan: 'Jasa Konsultansi Badan Usaha',
-    jenis_klpd: 'BUMN',
+    jenis_klpd: 'PEMERINTAH PROVINSI',
     mtd_pemilihan: 'Tender',
     mtd_evaluasi: 'Harga Terendah Sistem Gugur',
     mtd_kualifikasi: 'Pasca Kualifikasi Satu File',
     kualifikasi_paket: 'Non Kecil',
-    sumber_dana: 'BUMN',
+    sumber_dana: 'APBD',
     kontrak_pembayaran: 'Harga Satuan',
     kd_tender: 731251,
     kd_rup: '60125010',
@@ -436,7 +436,7 @@ const FALLBACK_TENDERS_RAW = [
     tgl_pengumuman: '2026-04-05',
     lokasi_pekerjaan: 'Serang - Banten',
     nama_ppk: 'Raka Pradipta, S.T.',
-    nama_pokja: 'Pokja Transmisi',
+    nama_pokja: 'Pokja Pemilihan 02',
   },
   {
     id: 11,
@@ -506,29 +506,146 @@ const FALLBACK_TENDERS_RAW = [
   },
 ];
 
-// Generator function to create additional dummy tenders
+// Domain buckets — each pairs one or more instansi with realistic package names
+// so generator never produces "Kementerian Pendidikan: Survei Bandara".
+//
+// Each bucket: { kl, prov, packages: [{name, jenis, portfolio}] }
+//   kl   = Kementerian/Lembaga names
+//   prov = Dinas/Pemda names (city/province appended at runtime)
+const DOMAIN_BUCKETS = [
+  // Infrastruktur jalan & transportasi
+  {
+    kl: ['Kementerian PUPR', 'Kementerian Perhubungan'],
+    prov: ['Dinas PUPR', 'Dinas Perhubungan', 'Dinas Bina Marga'],
+    packages: [
+      { name: 'Pengawasan Pembangunan Jalan Nasional', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'DED Jembatan dan Jalan Lingkar', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Studi Kelayakan Pengembangan Pelabuhan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Kajian Sistem Transportasi Massal', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FLP' },
+      { name: 'Survei Topografi Trase Jalan Tol', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Pengawasan Konstruksi Jembatan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+    ],
+  },
+  // Sumber daya air & lingkungan
+  {
+    kl: ['Kementerian PUPR', 'Kementerian LHK'],
+    prov: ['Dinas PUPR', 'Dinas Lingkungan Hidup', 'Dinas Sumber Daya Air'],
+    packages: [
+      { name: 'Pengawasan Pembangunan Bendungan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'DED Sistem Irigasi Teknis', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Rehabilitasi DAS dan Monitoring Vegetasi', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Studi Pengelolaan Sumber Daya Air Terpadu', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Kajian Lingkungan Hidup Strategis Kawasan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FLP' },
+      { name: 'Inventarisasi Aset Jaringan Irigasi', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+    ],
+  },
+  // Energi & ketenagalistrikan
+  {
+    kl: ['Kementerian ESDM'],
+    prov: ['Dinas ESDM'],
+    packages: [
+      { name: 'Studi Kelayakan PLTS Komunal', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Pemetaan Potensi Energi Baru Terbarukan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'DED Jaringan Distribusi Listrik Pedesaan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Kajian Hilirisasi Mineral Strategis', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Inventarisasi Cadangan Migas Wilayah Kerja', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+    ],
+  },
+  // Investasi & ekonomi kawasan
+  {
+    kl: ['Kementerian Investasi/BKPM', 'Bappenas'],
+    prov: ['DPMPTSP', 'Bappeda'],
+    packages: [
+      { name: 'Penyusunan Investment Project Ready to Offer (IPRO)', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Peta Peluang Investasi Sektor Prioritas', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Roadmap Investasi Hilirisasi Industri', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Penyusunan Masterplan Kawasan Ekonomi Khusus', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Kajian Daya Saing Investasi Daerah', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+    ],
+  },
+  // Industri
+  {
+    kl: ['Kementerian Perindustrian'],
+    prov: ['Dinas Perindustrian'],
+    packages: [
+      { name: 'DED Kawasan Industri Terpadu', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Studi Kelayakan Pengembangan Sentra IKM', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Survei Topografi Lahan Kawasan Industri', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Penyusunan Rencana Induk Industri Daerah', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+    ],
+  },
+  // Kesehatan
+  {
+    kl: ['Kementerian Kesehatan', 'Badan Pangan Nasional'],
+    prov: ['Dinas Kesehatan'],
+    packages: [
+      { name: 'Survei Status Gizi Balita Wilayah', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Pendataan Sasaran Program Imunisasi Nasional', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Pemetaan Fasilitas Kesehatan Primer', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FLP' },
+      { name: 'Kajian Implementasi Jaminan Kesehatan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FLP' },
+      { name: 'Studi Kelayakan Pembangunan RSUD Tipe B', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Verifikasi Penerima Program Bantuan Gizi', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+    ],
+  },
+  // Pendidikan
+  {
+    kl: ['Kementerian Pendidikan'],
+    prov: ['Dinas Pendidikan'],
+    packages: [
+      { name: 'Pendataan Sarana dan Prasarana Sekolah Dasar', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Survei Kompetensi Guru dan Tenaga Kependidikan', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Kajian Pengembangan SMK Vokasi Strategis', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FLP' },
+      { name: 'Evaluasi Program Bantuan Operasional Sekolah', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Studi Kelayakan Pendirian Politeknik Daerah', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+    ],
+  },
+  // Pertanian
+  {
+    kl: ['Kementerian Pertanian'],
+    prov: ['Dinas Pertanian'],
+    packages: [
+      { name: 'Pendataan Komoditas Pangan Strategis', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Survei Lahan Pertanian Berkelanjutan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Kajian Hilirisasi Komoditas Perkebunan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Pemetaan Kesesuaian Lahan Pertanian', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+    ],
+  },
+  // Kelautan & perikanan
+  {
+    kl: ['Kementerian Kelautan dan Perikanan'],
+    prov: ['Dinas Kelautan dan Perikanan'],
+    packages: [
+      { name: 'Survei Bathimetri dan Sumber Daya Pesisir', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+      { name: 'Pendataan Nelayan Tradisional', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Studi Kelayakan Pelabuhan Perikanan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Kajian Pengelolaan Wilayah Pesisir Terpadu', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
+    ],
+  },
+  // Pariwisata
+  {
+    kl: ['Kementerian Pariwisata'],
+    prov: ['Dinas Pariwisata'],
+    packages: [
+      { name: 'Penyusunan Masterplan Destinasi Pariwisata', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Studi Daya Tarik Wisata Berkelanjutan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+      { name: 'Survei Profil Wisatawan Nusantara', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Kajian Pengembangan Desa Wisata', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
+    ],
+  },
+  // Koperasi & UKM
+  {
+    kl: ['Kementerian Koperasi dan UKM'],
+    prov: ['Dinas Koperasi dan UKM'],
+    packages: [
+      { name: 'Pendataan dan Profil Koperasi Aktif', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Survei Kebutuhan Pendampingan UMKM', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
+      { name: 'Kajian Penguatan Ekosistem UMKM Pangan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FLP' },
+    ],
+  },
+];
+
+// Generator function to create additional dummy tenders.
 const generateAdditionalTenders = (startId, count) => {
-  const tenderTemplates = [
-    { prefix: 'Survei dan Pemetaan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
-    { prefix: 'Kajian Kelayakan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
-    { prefix: 'Feasibility Study', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
-    { prefix: 'Penyusunan Masterplan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
-    { prefix: 'DED dan Supervisi', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
-    { prefix: 'Pendataan dan Verifikasi', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
-    { prefix: 'Evaluasi dan Monitoring', jenis: 'Jasa Lainnya', portfolio: 'FLP' },
-    { prefix: 'Inventarisasi Aset', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
-    { prefix: 'Pemetaan Risiko', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'SDA' },
-    { prefix: 'Studi Kelayakan', jenis: 'Jasa Konsultansi Badan Usaha', portfolio: 'FITI' },
-  ];
-
-  const subjects = [
-    'Kawasan Industri', 'Infrastruktur Jalan', 'Jaringan Transmisi', 'Sistem Drainase',
-    'Pelabuhan', 'Bandara', 'Terminal', 'Jembatan', 'Bendungan', 'Irigasi',
-    'Kawasan Ekonomi Khusus', 'Pariwisata', 'Energi Terbarukan', 'Rumah Sakit',
-    'Gedung Perkantoran', 'Pasar Rakyat', 'Perumahan', 'Pendidikan', 'Olahraga',
-    'Pertanian', 'Perikanan', 'Kehutanan', 'Pertambangan', 'Migas'
-  ];
-
   // Province -> list of plausible kota/kabupaten (so location stays internally consistent).
   const CITY_BY_PROV = {
     'Jawa Barat': ['Bandung', 'Bogor', 'Bekasi', 'Depok', 'Cirebon', 'Tasikmalaya'],
@@ -559,19 +676,6 @@ const generateAdditionalTenders = (startId, count) => {
   };
   const provinces = Object.keys(CITY_BY_PROV);
 
-  const instansiKL = [
-    'Kementerian PUPR', 'Kementerian Perhubungan', 'Kementerian ESDM',
-    'Kementerian Perindustrian', 'Kementerian Investasi/BKPM', 'Kementerian Kesehatan',
-    'Kementerian Pendidikan', 'Kementerian Pertanian', 'Kementerian Kelautan dan Perikanan',
-    'Kementerian LHK', 'Kementerian Koperasi dan UKM', 'Kementerian Pariwisata'
-  ];
-
-  const instansiProv = [
-    'Dinas PUPR', 'Dinas Perhubungan', 'Dinas Perindustrian', 'DPMPTSP',
-    'Bappeda', 'Dinas Kesehatan', 'Dinas Pendidikan', 'Dinas Pertanian',
-    'Dinas Kelautan dan Perikanan', 'Dinas Pariwisata'
-  ];
-
   const namaPPK = [
     'Ir. Ahmad Fauzan, M.T.', 'Bambang Hermanto, S.T., M.Eng.', 'Ir. Dewi Mulyani, M.T.',
     'Nadia Safitri, S.Sos., M.P.A.', 'Hendra Permana, S.E., M.M.', 'Raka Pradipta, S.T.',
@@ -585,7 +689,14 @@ const generateAdditionalTenders = (startId, count) => {
     'Pokja Perencanaan Daerah', 'Pokja Layanan Publik'
   ];
 
-  const internalStatuses = ['Dipantau', 'Akan Diikuti', 'Sudah Diikuti', 'Tidak Relevan'];
+  // Bias toward Dipantau so that "available" pool stays large after claim seed.
+  // Distribution: ~70% Dipantau, ~10% Akan, ~10% Sudah, ~10% Tidak Relevan.
+  const internalStatuses = [
+    'Dipantau','Dipantau','Dipantau','Dipantau','Dipantau','Dipantau','Dipantau',
+    'Akan Diikuti',
+    'Sudah Diikuti',
+    'Tidak Relevan',
+  ];
   const metodes = ['Prakualifikasi', 'Pascakualifikasi'];
   const levels = ['K/L', 'Provinsi', 'Kab/Kota'];
 
@@ -596,15 +707,17 @@ const generateAdditionalTenders = (startId, count) => {
   const tenders = [];
   for (let i = 0; i < count; i++) {
     const id = startId + i;
-    const template = tenderTemplates[i % tenderTemplates.length];
-    const subject = subjects[Math.floor(rand() * subjects.length)];
     const province = provinces[Math.floor(rand() * provinces.length)];
     const provinceCities = CITY_BY_PROV[province];
     const city = provinceCities[Math.floor(rand() * provinceCities.length)];
     const level = levels[Math.floor(rand() * levels.length)];
     const metode = metodes[Math.floor(rand() * metodes.length)];
     const maxStage = metode === 'Prakualifikasi' ? 21 : 12;
-    
+
+    // Pick a domain bucket and a package — guarantees nama_paket matches instansi.
+    const bucket = DOMAIN_BUCKETS[Math.floor(rand() * DOMAIN_BUCKETS.length)];
+    const pkg = bucket.packages[Math.floor(rand() * bucket.packages.length)];
+
     let currentStage = Math.floor(rand() * Math.min(10, maxStage)) + 1;
     let status = internalStatuses[Math.floor(rand() * internalStatuses.length)];
     let won = status === 'Sudah Diikuti' && rand() > 0.7;
@@ -613,47 +726,61 @@ const generateAdditionalTenders = (startId, count) => {
         currentStage = metode === 'Prakualifikasi' ? 20 : 11;
         status = 'Menang';
     }
-    
-    const hps = (Math.floor(rand() * 90) + 10) * 100000000; // 1M - 9M
-    const pagu = hps * (1 + rand() * 0.15); // 0-15% lebih tinggi
-    
-    const instansi = level === 'K/L' 
-      ? instansiKL[Math.floor(rand() * instansiKL.length)]
-      : `${instansiProv[Math.floor(rand() * instansiProv.length)]} Prov. ${province}`;
-      
-    // followed logic from earlier
+
+    const hps = (Math.floor(rand() * 90) + 10) * 100000000;
+    const pagu = hps * (1 + rand() * 0.15);
+
+    let instansi;
+    let jenisKlpd;
+    let nama_satker;
+    if (level === 'K/L') {
+      instansi = bucket.kl[Math.floor(rand() * bucket.kl.length)];
+      jenisKlpd = 'KEMENTERIAN';
+      nama_satker = 'Direktorat Perencanaan dan Pengembangan';
+    } else if (level === 'Provinsi') {
+      instansi = `${bucket.prov[Math.floor(rand() * bucket.prov.length)]} Prov. ${province}`;
+      jenisKlpd = 'PEMERINTAH PROVINSI';
+      nama_satker = 'Bidang Perencanaan Teknis';
+    } else {
+      instansi = `${bucket.prov[Math.floor(rand() * bucket.prov.length)]} Kab. ${city}`;
+      jenisKlpd = 'PEMERINTAH KAB/KOTA';
+      nama_satker = 'Bidang Perencanaan Teknis';
+    }
+
     const followed = status !== 'Tidak Relevan' && rand() > 0.5;
-    
+
     const changes = {};
     if (currentStage > 1 && rand() > 0.6) {
       const changeStage = Math.floor(rand() * currentStage) + 1;
       changes[changeStage] = Math.floor(rand() * 3) + 1;
     }
 
-    const monthOffset = Math.floor(rand() * 2); // 0-1 bulan yang lalu
+    const monthOffset = Math.floor(rand() * 2);
     const dayOffset = Math.floor(rand() * 28) + 1;
     const tglPengumuman = new Date(2026, 3 - monthOffset, dayOffset).toISOString().split('T')[0];
 
     tenders.push({
       id,
-      nama: `${template.prefix} ${subject} ${city}`,
+      nama: `${pkg.name} di ${city}`,
       instansi,
       level,
-      lpse: level === 'K/L' ? `https://spse.inaproc.id/${instansi.toLowerCase().replace(/\s+/g, '')}` : `https://spse.inaproc.id/${province.toLowerCase().replace(/\s+/g, '')}prov`,
+      lpse: level === 'K/L'
+        ? `https://spse.inaproc.id/${instansi.toLowerCase().replace(/\s+/g, '')}`
+        : `https://spse.inaproc.id/${province.toLowerCase().replace(/\s+/g, '')}prov`,
       hps: Math.round(hps),
       pagu: Math.round(pagu),
       metode,
       currentStage,
       provinsi: province,
-      portofolio: template.portfolio,
+      portofolio: pkg.portfolio,
       internalStatus: status,
       followed,
       won,
       changes,
-      nama_satker: level === 'K/L' ? 'Direktorat Perencanaan dan Pengembangan' : 'Bidang Perencanaan Teknis',
-      jenis_pengadaan: template.jenis,
-      jenis_klpd: level === 'K/L' ? 'KEMENTERIAN' : level === 'Provinsi' ? 'PEMERINTAH PROVINSI' : 'PEMERINTAH KAB/KOTA',
-      mtd_pemilihan: template.jenis.includes('Konsultansi') ? 'Seleksi' : 'Tender',
+      nama_satker,
+      jenis_pengadaan: pkg.jenis,
+      jenis_klpd: jenisKlpd,
+      mtd_pemilihan: pkg.jenis.includes('Konsultansi') ? 'Seleksi' : 'Tender',
       mtd_evaluasi: rand() > 0.5 ? 'Kualitas dan Biaya' : 'Pagu Anggaran',
       mtd_kualifikasi: metode === 'Prakualifikasi' ? 'Pra Kualifikasi Dua File' : 'Pasca Kualifikasi Satu File',
       kualifikasi_paket: hps > 5000000000 ? 'Besar' : 'Non Kecil',
@@ -671,10 +798,11 @@ const generateAdditionalTenders = (startId, count) => {
   return tenders;
 };
 
-// Combine original tenders with generated ones — 12 hand-curated + 18 generated = 30 total.
+// 13 hand-curated + 137 generated = 150 total. Distribution ~100 available
+// (Dipantau) once claim seed runs.
 const allTendersRaw = [
   ...FALLBACK_TENDERS_RAW,
-  ...generateAdditionalTenders(13, 18)
+  ...generateAdditionalTenders(13, 137)
 ];
 
 // Apply ensureStageDeadlines to all tenders

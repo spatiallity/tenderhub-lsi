@@ -9,6 +9,7 @@ import { useAppContext } from '../../store/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 import useKeyboardShortcut from '../../hooks/useKeyboardShortcut';
 import Header from './Header';
+import tenderhubLogo from '../../assets/TenderHub_Logo.png';
 import TenderDetail from '../Tender/TenderDetail';
 import RupDetail from '../UI/RupDetail';
 import ExpertDetail from '../Expert/ExpertDetail';
@@ -152,14 +153,12 @@ export default function AppShell() {
         <div className="flex flex-col h-full p-4">
           {/* Logo & Toggle */}
           <div className={`flex items-start justify-between mb-3 ${sidebarOpen ? '' : 'justify-center items-center flex-col'}`}>
-            <div className={`overflow-hidden transition-all duration-300 flex flex-col ${sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 hidden'}`}>
-              {/* TenderHub Title */}
-              <div>
-                <div className="text-[20px] font-black tracking-tight leading-tight">
-                  <span className="text-blue-600">Tender</span>
-                  <span style={{ color: '#13B2AA' }}>Hub</span>
-                </div>
-              </div>
+            <div className={`overflow-hidden transition-all duration-300 flex items-center gap-2 ${sidebarOpen ? 'opacity-100' : 'opacity-0 w-0 hidden'}`}>
+              <img
+                src={tenderhubLogo}
+                alt="TenderHub"
+                className="h-25 w-auto max-w-[180px] shrink-0 object-contain"
+              />
             </div>
             
             {/* Desktop Toggle */}
@@ -190,7 +189,7 @@ export default function AppShell() {
             {navItems.map((group, idx) => (
               <div key={idx} className="mb-1">
                 {group.section !== 'Utama' && sidebarOpen && (
-                  <div className="px-3 mb-1 mt-2 text-[10px] font-extrabold tracking-widest uppercase text-slate-400">
+                  <div className="px-3 mb-1.5 mt-3 text-[11px] font-black tracking-widest uppercase text-slate-700">
                     {group.section}
                   </div>
                 )}
@@ -234,15 +233,13 @@ export default function AppShell() {
             ))}
           </nav>
 
-          {/* Copyright Footer */}
-          <div className={`mt-auto pt-4 border-t border-slate-100 overflow-hidden transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
-            <div className="text-[9px] text-slate-500 leading-relaxed">
-              <div className="font-semibold mb-1">
-                SBU Layanan Publik, Sumber Daya Alam,<br />dan Investasi
-              </div>
-              <div className="font-medium">
-                PT SUCOFINDO (PERSERO) © 2026
-              </div>
+          {/* Copyright Footer — small, with hover tooltip for full descriptor. */}
+          <div className={`mt-auto pt-3 border-t border-slate-100 overflow-hidden transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
+            <div
+              className="text-[8px] text-slate-400 leading-tight font-medium cursor-help"
+              title="SBU Layanan Publik, Sumber Daya Alam, dan Investasi — PT SUCOFINDO (PERSERO)"
+            >
+              PT SUCOFINDO (PERSERO) © 2026
             </div>
           </div>
         </div>
@@ -267,18 +264,7 @@ export default function AppShell() {
             </button>
             
             {/* Mobile Logo */}
-            <div className="flex items-center gap-2">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#13B2AA" fillOpacity="0.1" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 2V8H20" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M16 13H8" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M16 17H8" stroke="#13B2AA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <div className="text-sm font-extrabold tracking-tight">
-                <span className="text-blue-600">Tender</span>
-                <span style={{ color: '#13B2AA' }}>Hub</span>
-              </div>
-            </div>
+            <img src={tenderhubLogo} alt="TenderHub" className="h-9 w-auto object-contain" />
             
             {/* Mobile Actions */}
             <div className="flex items-center gap-2">

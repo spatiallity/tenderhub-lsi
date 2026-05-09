@@ -5,7 +5,9 @@ import { useAuth } from '../contexts/AuthContext';
 
 const ACTION_COLOR = {
   INSERT: 'bg-green-100 text-green-800 border-green-200',
+  CREATE: 'bg-green-100 text-green-800 border-green-200',
   UPDATE: 'bg-amber-100 text-amber-800 border-amber-200',
+  EDIT:   'bg-amber-100 text-amber-800 border-amber-200',
   DELETE: 'bg-red-100 text-red-800 border-red-200',
 };
 

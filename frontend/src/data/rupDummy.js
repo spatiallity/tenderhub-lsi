@@ -247,10 +247,10 @@ const FALLBACK_RUP_RAW = [
     datamart_id: 'RUP-2026-0010',
     tahun_anggaran: '2026',
     kd_rup: '60124010',
-    nama_paket: 'Inventarisasi ROW SUTT dan Verifikasi Aset Jaringan Transmisi',
-    nama_klpd: 'PT PLN (Persero) UIP Jawa Bagian Barat',
-    jenis_klpd: 'BUMN',
-    nama_satker: 'Unit Pelaksana Proyek Transmisi',
+    nama_paket: 'Inventarisasi Aset dan Pemetaan ROW Jaringan Distribusi',
+    nama_klpd: 'Dinas ESDM Provinsi Banten',
+    jenis_klpd: 'PROVINSI',
+    nama_satker: 'Bidang Energi dan Ketenagalistrikan',
     pagu: 6500000000,
     metode_pengadaan: 'Tender',
     jenis_pengadaan: 'Jasa Konsultansi',
@@ -393,7 +393,8 @@ const generateAdditionalRUP = (startId, count) => {
     'Dinas Kelautan dan Perikanan', 'Dinas Pariwisata', 'Dinas Energi dan Sumber Daya Mineral'
   ];
 
-  const jenisKLPD = ['KEMENTERIAN', 'LEMBAGA', 'PROVINSI', 'BUMN'];
+  // Only Kementerian / Lembaga / Pemerintah Daerah. No BUMN / Swasta.
+  const jenisKLPD = ['KEMENTERIAN', 'LEMBAGA', 'PROVINSI', 'KABUPATEN'];
   const metodes = ['Seleksi', 'Tender', 'Penunjukan Langsung'];
   const statusPDN = ['PDN', 'Non-PDN'];
   const statusUKM = ['UKM', 'Non-UKM'];
@@ -412,8 +413,8 @@ const generateAdditionalRUP = (startId, count) => {
     
     const nama_klpd = jenis_klpd === 'KEMENTERIAN' || jenis_klpd === 'LEMBAGA'
       ? klpdKL[Math.floor(Math.random() * klpdKL.length)]
-      : jenis_klpd === 'BUMN'
-      ? `PT ${['PLN', 'Pertamina', 'Telkom', 'Waskita Karya', 'Adhi Karya'][Math.floor(Math.random() * 5)]} (Persero)`
+      : jenis_klpd === 'KABUPATEN'
+      ? `${klpdProv[Math.floor(Math.random() * klpdProv.length)]} Kab. ${city}`
       : `${klpdProv[Math.floor(Math.random() * klpdProv.length)]} Prov. ${province}`;
 
     // Generate dates
@@ -459,14 +460,15 @@ const generateAdditionalRUP = (startId, count) => {
       kabupaten: Math.random() > 0.5 ? `Kota ${city}` : `Kabupaten ${city}`,
       portofolio: template.portfolio,
       kualifikasi: pagu > 5000000000 ? 'Besar' : 'Non Kecil',
-      sumber_dana: jenis_klpd === 'KEMENTERIAN' || jenis_klpd === 'LEMBAGA' ? 'APBN' : jenis_klpd === 'BUMN' ? 'BUMN' : 'APBD',
+      sumber_dana: jenis_klpd === 'KEMENTERIAN' || jenis_klpd === 'LEMBAGA' ? 'APBN' : 'APBD',
     });
   }
   return rupList;
 };
 
-// Combine original RUP with generated ones — 12 hand-curated + 8 generated = 20 total.
+// 12 hand-curated + 138 generated = 150 total. Available pool stays ~100 after
+// geographic claim seed assigns the active-status subset.
 export const FALLBACK_RUP = [
   ...FALLBACK_RUP_RAW.slice(0, 12),
-  ...generateAdditionalRUP(113, 8)
+  ...generateAdditionalRUP(113, 138)
 ];

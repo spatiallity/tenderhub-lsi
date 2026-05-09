@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, FileSpreadsheet, MapPin, ChevronRight, Filter, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { useAppContext } from '../store/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Badge, CountdownBadge, PageTitle, Card, Btn } from '../components/UI/index';
+import { Badge, CountdownBadge, PageTitle, Card, Btn, ClaimBadge } from '../components/UI/index';
 import { portfolioColor, internalStatusColor, PROVINCES, INTERNAL_STATUS_OPTIONS } from '../utils/constants';
+import { unitKerjaLabel } from '../utils/unitKerja';
 import { formatRupiah, activeKeywordCount, exportTendersExcel } from '../utils/helpers';
 import { useDebounce } from '../hooks/useDebounce';
 import { useWatchlistRealtime } from '../hooks/useWatchlistRealtime';
@@ -20,7 +21,7 @@ const stageBadgeClass = {
   teal: 'bg-teal-50 text-teal-700 border-teal-200',
 };
 
-function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, isGuest }) {
+function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, isGuest, claim, canEdit, viewerOwns }) {
   const [localStatus, setLocalStatus] = useState(committedStatus || 'Dipantau');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -30,6 +31,7 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
   }, [committedStatus]);
 
   const isChanged = localStatus !== (committedStatus || 'Dipantau');
+  const lockedByClaim = !canEdit && claim?.unit_kerja;
 
   const stageName = (tender.currentStageName || '').toLowerCase();
   // "Menang" only after Pengumuman Pemenang stage is reached (or anything after it).
@@ -54,8 +56,8 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
     }
   };
 
-  // Guests cannot edit
-  if (isGuest) {
+  // Guests + non-owners can only view (read-only badge).
+  if (isGuest || lockedByClaim) {
     return (
       <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
         <span className={`w-full rounded-lg border px-2 py-1.5 text-[11px] font-bold text-center ${
@@ -70,6 +72,9 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
         }`}>
           {localStatus}
         </span>
+        {lockedByClaim && (
+          <ClaimBadge claim={claim} viewerOwns={false} readOnly size="xs" />
+        )}
       </div>
     );
   }
@@ -110,6 +115,8 @@ function StatusCell({ tender, committedStatus, updateTenderStatus, showToast, is
           {isSaving ? 'Menyimpan...' : 'Simpan'}
         </Btn>
       )}
+      {/* Owner badge — always shown so user knows their own claim is active. */}
+      <ClaimBadge claim={claim} viewerOwns={!!viewerOwns} size="xs" />
     </div>
   );
 }
@@ -118,7 +125,7 @@ export default function TenderPage() {
   // Subscribe to realtime watchlist changes
   useWatchlistRealtime();
 
-  const { isGuest, isAdmin } = useAuth();
+  const { isGuest, isAdmin, unitKerja, canEditClaim } = useAuth();
   const {
     tenders, keywords, loadingTenders,
     addKeyword, removeKeyword,
@@ -130,6 +137,8 @@ export default function TenderPage() {
     dashboardChartFilter,
     setDashboardChartFilter,
     showToast,
+    tenderClaims,
+    releaseTenderClaim,
   } = useAppContext();
 
   const [portfolioFilter, setPortfolioFilter] = useState('Semua');
@@ -548,19 +557,42 @@ export default function TenderPage() {
                         </div>
                       </td>
                       <td className="px-3 py-3 align-top">
-                        <StatusCell
-                          tender={t}
-                          committedStatus={internalStatuses[t.id]}
-                          updateTenderStatus={updateTenderStatus}
-                          showToast={showToast}
-                          isGuest={isGuest}
-                        />
+                        {(() => {
+                          const claim = tenderClaims[t.id] || null;
+                          const viewerOwns = claim?.unit_kerja && claim.unit_kerja === unitKerja;
+                          const canEdit = canEditClaim(claim?.unit_kerja);
+                          return (
+                            <StatusCell
+                              tender={t}
+                              committedStatus={internalStatuses[t.id]}
+                              updateTenderStatus={updateTenderStatus}
+                              showToast={showToast}
+                              isGuest={isGuest}
+                              claim={claim}
+                              canEdit={canEdit}
+                              viewerOwns={viewerOwns}
+                            />
+                          );
+                        })()}
                       </td>
                       <td className={`px-3 py-3 align-top sticky right-0 backdrop-blur-sm ${isNew ? 'bg-amber-50/95' : 'bg-white/95'}`}>
                         <div className="flex items-center gap-1">
-                          <Btn className="primary small" onClick={() => setSelectedTenderId(t.id)}>
+                          <Btn className="ghost small" onClick={() => setSelectedTenderId(t.id)}>
                             Detail<ChevronRight size={14} />
                           </Btn>
+                          {isAdmin && tenderClaims[t.id] && (
+                            <button
+                              type="button"
+                              title={`Lepas claim cabang ${unitKerjaLabel(tenderClaims[t.id].unit_kerja)}`}
+                              onClick={async () => {
+                                if (!confirm(`Lepas claim tender "${t.nama}" dari ${unitKerjaLabel(tenderClaims[t.id].unit_kerja)}?\nTender akan kembali tersedia untuk semua cabang.`)) return;
+                                await releaseTenderClaim(t.id);
+                              }}
+                              className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 text-[10px] font-bold"
+                            >
+                              Lepas
+                            </button>
+                          )}
                           {isAdmin && (
                             <button
                               type="button"

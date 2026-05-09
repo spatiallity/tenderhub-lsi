@@ -25,13 +25,13 @@ const CustomDot = (props) => {
   );
 };
 
-export default function WinrateChart({ winrateRows, winrate, followed, won }) {
+export default function WinrateChart({ winrateRows, winrate, followed, won, filterSlot, scopeLabel }) {
   const bestWinrate = winrateRows.reduce((best, row) => row.rate > best.rate ? row : best, winrateRows[0]);
-  
+
   return (
     <div className="bg-white rounded-[24px] border border-slate-100 p-6 shadow-sm flex flex-col">
       {/* Header */}
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex justify-between items-start mb-4">
         <div>
           <h2 className="text-[20px] font-bold text-slate-900 tracking-tight">Grafik Winrate</h2>
           <p className="text-slate-500 text-[13px] font-medium mt-1">Tender diikuti vs tender menang</p>
@@ -42,27 +42,26 @@ export default function WinrateChart({ winrateRows, winrate, followed, won }) {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-1 bg-blue-500 rounded-full relative">
-              <div className="absolute w-3 h-3 rounded-full bg-blue-500 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-white" />
-            </div>
-            <span className="text-[12px] font-semibold text-slate-600">Tender Diikuti</span>
+      {/* Filter slot — rendered by parent (branch picker). */}
+      {filterSlot && <div className="mb-4">{filterSlot}</div>}
+
+      {/* Toolbar — legend only, no non-functional dropdown. */}
+      <div className="flex items-center gap-6 mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-1 bg-blue-500 rounded-full relative">
+            <div className="absolute w-3 h-3 rounded-full bg-blue-500 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-white" />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-1 bg-emerald-500 rounded-full relative">
-              <div className="absolute w-3 h-3 rounded-full bg-emerald-500 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-white" />
-            </div>
-            <span className="text-[12px] font-semibold text-slate-600">Tender Menang</span>
+          <span className="text-[12px] font-semibold text-slate-600">Tender Diikuti</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-1 bg-emerald-500 rounded-full relative">
+            <div className="absolute w-3 h-3 rounded-full bg-emerald-500 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-white" />
           </div>
+          <span className="text-[12px] font-semibold text-slate-600">Tender Menang</span>
         </div>
-        
-        <div className="px-3 py-1.5 border border-slate-200 rounded-lg text-[12px] font-semibold text-slate-600 flex items-center gap-2 cursor-pointer hover:bg-slate-50">
-          % Winrate
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-        </div>
+        {scopeLabel && (
+          <span className="ml-auto text-[11px] text-slate-500 font-bold truncate max-w-[200px]" title={scopeLabel}>{scopeLabel}</span>
+        )}
       </div>
 
       {/* Chart */}
@@ -151,7 +150,7 @@ export default function WinrateChart({ winrateRows, winrate, followed, won }) {
           <div className="w-[1px] h-10 bg-slate-200 mx-2" />
           
           <div className="text-[12px] text-slate-500 font-medium max-w-[280px] leading-relaxed">
-            Menunjukkan performa akumulasi tender yang diikuti SBU LSI sepanjang periode 2025 - 2026.
+            Performa akumulasi tender {scopeLabel || 'SBU LSI'} sepanjang periode 2025 - 2026.
           </div>
         </div>
 

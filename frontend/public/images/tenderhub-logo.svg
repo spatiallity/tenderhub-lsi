@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" fill="none">
+  <defs>
+    <linearGradient id="logoGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#13B2AA"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="10" width="44" height="44" rx="10" fill="url(#logoGrad)"/>
+  <path d="M18 28 L42 28 M18 36 L34 36 M18 44 L42 44" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="42" cy="20" r="6" fill="#fff"/>
+  <text x="60" y="40" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="26" letter-spacing="-1">
+    <tspan fill="#2563eb">Tender</tspan><tspan fill="#13B2AA">Hub</tspan>
+  </text>
+  <text x="60" y="54" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="8" letter-spacing="2" fill="#64748b">PT SUCOFINDO · SBU LSI</text>
+</svg>

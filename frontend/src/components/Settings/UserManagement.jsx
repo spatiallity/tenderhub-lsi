@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users as UsersIcon, Plus, Pencil, Trash2, Save, X, Mail, User, Shield, Eye, EyeOff } from 'lucide-react';
+import { Users as UsersIcon, Plus, Pencil, Trash2, Save, X, Mail, User, Shield, Eye, EyeOff, Building2, Database } from 'lucide-react';
 import { Card, Btn, Badge } from '../UI/index';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import supabase from '../../services/supabase';
+import { UNIT_KERJA_BY_REGION, REGIONS, unitKerjaLabel, getRegion } from '../../utils/unitKerja';
+import { seedAllClaims } from '../../utils/seedClaims';
 
 export default function UserManagement({ showToast }) {
   const { isAdmin, isGuest } = useAuth();
@@ -17,22 +20,42 @@ export default function UserManagement({ showToast }) {
     password: '',
     name: '',
     title: '',
-    role: 'user'
+    role: 'cabang',
+    unit_kerja: '',
   });
-  
+
   const [editDraft, setEditDraft] = useState({
     name: '',
     title: '',
     role: '',
-    is_active: true
+    is_active: true,
+    unit_kerja: '',
   });
 
-  // Fetch users
+  const [seeding, setSeeding] = useState(false);
+  const [seedProgress, setSeedProgress] = useState(null);
+
+  const newNeedsUnit = newUserDraft.role === 'cabang' || newUserDraft.role === 'pusat';
+  const editNeedsUnit = editDraft.role === 'cabang' || editDraft.role === 'pusat';
+
+  // Fetch users — try backend first, fallback to direct Supabase profiles read.
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/users');
-      setUsers(response.data || []);
+      try {
+        const response = await api.get('/users');
+        setUsers(response.data || []);
+        return;
+      } catch (backendErr) {
+        // Backend offline — fallback to Supabase.
+        console.warn('[UserManagement] backend /users failed, falling back to Supabase:', backendErr.message);
+      }
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
       showToast('Gagal memuat daftar user', 'error');
@@ -55,47 +78,91 @@ export default function UserManagement({ showToast }) {
       showToast('Email, password, dan nama wajib diisi', 'error');
       return;
     }
+    if (newNeedsUnit && !newUserDraft.unit_kerja) {
+      showToast('Pilih unit kerja untuk role Cabang atau Pusat', 'error');
+      return;
+    }
 
     try {
-      console.log('🔵 Posting user...', newUserDraft);
-      const response = await api.post('/users', newUserDraft);
-      console.log('✅ User created:', response.data);
-      
-      // Reset form dan tutup
-      setNewUserDraft({ email: '', password: '', name: '', title: '', role: 'user' });
+      // Try backend first (uses Supabase service key, auto-confirms email).
+      let createdViaBackend = false;
+      try {
+        await api.post('/users', newUserDraft);
+        createdViaBackend = true;
+      } catch (backendErr) {
+        console.warn('[UserManagement] backend create failed, falling back to direct Supabase signUp:', backendErr.message);
+      }
+
+      // Fallback: Supabase signUp from browser. Email confirmation may be required.
+      if (!createdViaBackend) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: newUserDraft.email.trim(),
+          password: newUserDraft.password,
+          options: {
+            data: {
+              name: newUserDraft.name,
+              title: newUserDraft.title,
+              role: newUserDraft.role,
+              unit_kerja: newUserDraft.unit_kerja || null,
+            },
+            emailRedirectTo: window.location.origin + '/login',
+          },
+        });
+        if (authError) throw authError;
+
+        if (authData?.user?.id) {
+          const { error: profileError } = await supabase.from('profiles').upsert({
+            id: authData.user.id,
+            email: newUserDraft.email.trim(),
+            name: newUserDraft.name.trim(),
+            title: newUserDraft.title?.trim() || null,
+            role: newUserDraft.role,
+            unit_kerja: newNeedsUnit ? newUserDraft.unit_kerja : null,
+            unit_kerja_region: newNeedsUnit ? getRegion(newUserDraft.unit_kerja) : null,
+            is_active: true,
+          });
+          if (profileError) throw profileError;
+        }
+      }
+
+      setNewUserDraft({ email: '', password: '', name: '', title: '', role: 'cabang', unit_kerja: '' });
       setShowAddForm(false);
       setShowPassword(false);
-      
-      // Refresh list
-      console.log('🔵 Fetching users...');
       await fetchUsers();
-      console.log('✅ Users refreshed');
-      
-      // Show success notification
-      console.log('🔵 Showing toast...');
       showToast('User berhasil ditambahkan!', 'success');
-      console.log('✅ Toast shown');
     } catch (error) {
-      console.error('❌ Error adding user:', error);
-      showToast(error.response?.data?.detail || 'Gagal menambahkan user', 'error');
+      console.error('Error adding user:', error);
+      const msg = error?.response?.data?.detail
+        || error?.message
+        || 'Gagal menambahkan user';
+      showToast(msg, 'error');
     }
   };
 
-  // Update user
+  // Update user — backend first, fallback to Supabase profiles update.
   const handleUpdateUser = async (userId) => {
     try {
-      await api.patch(`/users/${userId}`, editDraft);
-      
-      // Reset editing state
+      try {
+        await api.patch(`/users/${userId}`, editDraft);
+      } catch (backendErr) {
+        console.warn('[UserManagement] backend patch failed, falling back to Supabase:', backendErr.message);
+        const updates = {
+          name: editDraft.name,
+          title: editDraft.title,
+          role: editDraft.role,
+          is_active: editDraft.is_active,
+          unit_kerja: editNeedsUnit ? editDraft.unit_kerja : null,
+          unit_kerja_region: editNeedsUnit ? getRegion(editDraft.unit_kerja) : null,
+          updated_at: new Date().toISOString(),
+        };
+        const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+        if (error) throw error;
+      }
       setEditingUserId(null);
-      
-      // Refresh list
       await fetchUsers();
-      
-      // Show success notification
-      showToast('✅ User berhasil diupdate!', 'success');
+      showToast('User berhasil diupdate!', 'success');
     } catch (error) {
-      showToast(error.response?.data?.detail || 'Gagal mengupdate user', 'error');
+      showToast(error?.response?.data?.detail || error?.message || 'Gagal mengupdate user', 'error');
     }
   };
 
@@ -106,15 +173,19 @@ export default function UserManagement({ showToast }) {
     }
 
     try {
-      await api.delete(`/users/${userId}`);
-      
-      // Refresh list
+      try {
+        await api.delete(`/users/${userId}`);
+      } catch (backendErr) {
+        console.warn('[UserManagement] backend delete failed, falling back to Supabase profile delete only:', backendErr.message);
+        // NOTE: Supabase JS can't delete auth.users from browser without admin key.
+        // Fallback only soft-disables the profile.
+        const { error } = await supabase.from('profiles').update({ is_active: false }).eq('id', userId);
+        if (error) throw error;
+      }
       await fetchUsers();
-      
-      // Show success notification
-      showToast('✅ User berhasil dihapus!', 'success');
+      showToast('User berhasil dihapus/dinonaktifkan!', 'success');
     } catch (error) {
-      showToast(error.response?.data?.detail || 'Gagal menghapus user', 'error');
+      showToast(error?.response?.data?.detail || error?.message || 'Gagal menghapus user', 'error');
     }
   };
 
@@ -125,8 +196,24 @@ export default function UserManagement({ showToast }) {
       name: user.name || '',
       title: user.title || '',
       role: user.role,
-      is_active: user.is_active
+      is_active: user.is_active,
+      unit_kerja: user.unit_kerja || '',
     });
+  };
+
+  const handleSeedClaims = async () => {
+    if (!confirm('Seed dummy claims ke Supabase?\nIni akan men-claim semua tender dengan status aktif (Akan/Sudah Diikuti, Menang, Kalah) ke unit kerja terdekat.')) return;
+    setSeeding(true);
+    setSeedProgress(null);
+    try {
+      const result = await seedAllClaims((p) => setSeedProgress(p));
+      showToast(`Seed selesai: ${result.tender.claimed} tender + ${result.rup.claimed} RUP claimed.`, 'success');
+    } catch (e) {
+      showToast(`Gagal seed: ${e.message}`, 'error');
+    } finally {
+      setSeeding(false);
+      setSeedProgress(null);
+    }
   };
 
   if (isGuest) {
@@ -173,12 +260,18 @@ export default function UserManagement({ showToast }) {
             Kelola akun user yang dapat mengakses sistem.
           </p>
         </div>
-        {!showAddForm && (
-          <Btn className="primary small" onClick={() => setShowAddForm(true)}>
-            <Plus size={14} />
-            Tambah User
+        <div className="flex items-center gap-2">
+          <Btn className="ghost small" onClick={handleSeedClaims} disabled={seeding} title="Generate dummy claim assignments — admin only, idempotent">
+            <Database size={14} />
+            {seeding ? (seedProgress ? `Seeding ${seedProgress.phase} ${seedProgress.done}/${seedProgress.total}...` : 'Seeding...') : 'Seed Dummy Claims'}
           </Btn>
-        )}
+          {!showAddForm && (
+            <Btn className="primary small" onClick={() => setShowAddForm(true)}>
+              <Plus size={14} />
+              Tambah User
+            </Btn>
+          )}
+        </div>
       </div>
 
       {/* Add User Form */}
@@ -189,7 +282,7 @@ export default function UserManagement({ showToast }) {
             <button
               onClick={() => {
                 setShowAddForm(false);
-                setNewUserDraft({ email: '', password: '', name: '', title: '', role: 'user' });
+                setNewUserDraft({ email: '', password: '', name: '', title: '', role: 'cabang', unit_kerja: '' });
               }}
               className="text-slate-400 hover:text-slate-600"
             >
@@ -268,14 +361,39 @@ export default function UserManagement({ showToast }) {
               </label>
               <select
                 value={newUserDraft.role}
-                onChange={e => setNewUserDraft(prev => ({ ...prev, role: e.target.value }))}
+                onChange={e => setNewUserDraft(prev => ({ ...prev, role: e.target.value, unit_kerja: '' }))}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
               >
-                <option value="user">User</option>
-                <option value="manager">Manager</option>
+                <option value="cabang">Cabang (kantor cabang)</option>
+                <option value="pusat">Pusat (SBU LSI)</option>
                 <option value="admin">Administrator</option>
+                <option value="manager">Manager (legacy)</option>
+                <option value="user">User (legacy)</option>
               </select>
             </div>
+
+            {newNeedsUnit && (
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Building2 size={12} className="text-slate-400" />
+                  Unit Kerja *
+                </label>
+                <select
+                  value={newUserDraft.unit_kerja}
+                  onChange={e => setNewUserDraft(prev => ({ ...prev, unit_kerja: e.target.value }))}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                >
+                  <option value="">— Pilih unit kerja —</option>
+                  {REGIONS.map(region => (
+                    <optgroup key={region} label={`Wilayah ${region}`}>
+                      {UNIT_KERJA_BY_REGION[region].map(u => (
+                        <option key={u} value={u}>{unitKerjaLabel(u)}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           
           <div className="flex justify-end gap-2 mt-3">
@@ -283,7 +401,7 @@ export default function UserManagement({ showToast }) {
               className="ghost small"
               onClick={() => {
                 setShowAddForm(false);
-                setNewUserDraft({ email: '', password: '', name: '', title: '', role: 'user' });
+                setNewUserDraft({ email: '', password: '', name: '', title: '', role: 'cabang', unit_kerja: '' });
               }}
             >
               Batal
@@ -315,6 +433,7 @@ export default function UserManagement({ showToast }) {
                   <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nama</th>
                   <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Jabatan</th>
                   <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Role</th>
+                  <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unit Kerja</th>
                   <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
                   <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center w-24">Aksi</th>
                 </tr>
@@ -353,17 +472,57 @@ export default function UserManagement({ showToast }) {
                       {editingUserId === user.id ? (
                         <select
                           value={editDraft.role}
-                          onChange={e => setEditDraft(prev => ({ ...prev, role: e.target.value }))}
+                          onChange={e => setEditDraft(prev => ({ ...prev, role: e.target.value, unit_kerja: (e.target.value === 'cabang' || e.target.value === 'pusat') ? prev.unit_kerja : '' }))}
                           className="border border-slate-300 rounded px-2 py-1 text-xs"
                         >
-                          <option value="user">User</option>
-                          <option value="manager">Manager</option>
+                          <option value="cabang">Cabang</option>
+                          <option value="pusat">Pusat</option>
                           <option value="admin">Admin</option>
+                          <option value="manager">Manager</option>
+                          <option value="user">User</option>
                         </select>
                       ) : (
-                        <Badge color={user.role === 'admin' ? 'blue' : user.role === 'manager' ? 'purple' : 'gray'} className="text-xs">
-                          {user.role === 'admin' ? 'Admin' : user.role === 'manager' ? 'Manager' : 'User'}
+                        <Badge
+                          color={
+                            user.role === 'admin' ? 'red'
+                            : user.role === 'pusat' ? 'purple'
+                            : user.role === 'cabang' ? 'teal'
+                            : user.role === 'manager' ? 'blue'
+                            : 'gray'
+                          }
+                          className="text-xs"
+                        >
+                          {user.role === 'admin' ? 'Admin'
+                            : user.role === 'pusat' ? 'Pusat'
+                            : user.role === 'cabang' ? 'Cabang'
+                            : user.role === 'manager' ? 'Manager'
+                            : 'User'}
                         </Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {editingUserId === user.id && editNeedsUnit ? (
+                        <select
+                          value={editDraft.unit_kerja}
+                          onChange={e => setEditDraft(prev => ({ ...prev, unit_kerja: e.target.value }))}
+                          className="border border-slate-300 rounded px-2 py-1 text-xs w-full"
+                        >
+                          <option value="">— pilih —</option>
+                          {REGIONS.map(region => (
+                            <optgroup key={region} label={`Wilayah ${region}`}>
+                              {UNIT_KERJA_BY_REGION[region].map(u => (
+                                <option key={u} value={u}>{unitKerjaLabel(u)}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      ) : user.unit_kerja ? (
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-700">{unitKerjaLabel(user.unit_kerja)}</span>
+                          {user.unit_kerja_region && <span className="text-[10px] text-slate-400">Wilayah {user.unit_kerja_region}</span>}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-center">

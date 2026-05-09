@@ -5,7 +5,10 @@ const AuthContext = createContext(null);
 
 // Guest user constants
 const GUEST_USER = { id: 'guest', email: 'guest@local' };
-const GUEST_PROFILE = { id: 'guest', name: 'Guest User', role: 'guest', is_active: true };
+const GUEST_PROFILE = { id: 'guest', name: 'Guest User', role: 'guest', is_active: true, unit_kerja: null };
+
+// Dev mode fake unit_kerja so the claim/badge UI is exercisable in `npm run dev`.
+const DEV_PROFILE = { id: 'dev-user', name: 'Developer', role: 'admin', is_active: true, unit_kerja: 'SBU LSI', unit_kerja_region: 'Pusat' };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -38,9 +41,8 @@ export const AuthProvider = ({ children }) => {
     if (isDevelopment) {
       console.log('[Auth] Development mode - auto-login as dev user');
       const devUser = { id: 'dev-user', email: 'dev@tenderhub.local' };
-      const devProfile = { id: 'dev-user', name: 'Developer', role: 'admin', is_active: true };
       setUser(devUser);
-      setProfile(devProfile);
+      setProfile(DEV_PROFILE);
       setLoading(false);
       return;
     }
@@ -128,12 +130,26 @@ export const AuthProvider = ({ children }) => {
 
   const isGuest = user?.id === 'guest';
   const role = profile?.role ?? 'user';
+  const unitKerja = profile?.unit_kerja ?? null;
+  const unitKerjaRegion = profile?.unit_kerja_region ?? null;
   const isAdmin = !isGuest && role === 'admin';
+  const isPusat = !isGuest && (role === 'pusat' || unitKerja === 'SBU LSI');
+  const isCabang = !isGuest && role === 'cabang';
   const isManager = !isGuest && (role === 'manager' || isAdmin);
-  const canEditInternalStatus = isManager;
+  // Branch users (cabang/pusat/admin/manager) can edit their owned tenders.
+  const canEditInternalStatus = !isGuest && (isAdmin || isManager || isCabang || isPusat);
   const canManageUsers = isAdmin;
   const canAddReview = !isGuest;
   const canAddHistory = !isGuest;
+
+  // Returns true if caller can mutate a watchlist row claimed by `claimUnit`.
+  // null/undefined claim = unclaimed → anyone with edit rights can claim.
+  const canEditClaim = (claimUnit) => {
+    if (isGuest) return false;
+    if (isAdmin) return true;
+    if (!claimUnit) return canEditInternalStatus;  // unclaimed → first claimer wins
+    return claimUnit === unitKerja;
+  };
 
   return (
     <AuthContext.Provider value={{
@@ -142,12 +158,17 @@ export const AuthProvider = ({ children }) => {
       loading,
       isGuest,
       role,
+      unitKerja,
+      unitKerjaRegion,
       isAdmin,
+      isPusat,
+      isCabang,
       isManager,
       canEditInternalStatus,
       canManageUsers,
       canAddReview,
       canAddHistory,
+      canEditClaim,
       signIn,
       signInAsGuest,
       signOut,

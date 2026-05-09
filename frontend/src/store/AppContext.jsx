@@ -3,6 +3,7 @@ import api from '../services/api';
 import supabase from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_KEYWORDS, DEFAULT_USERS, PROVINCES } from '../utils/constants';
+import { getRegion } from '../utils/unitKerja';
 import { calcRupMatch, enrichTender, activeKeywordCount } from '../utils/helpers';
 import { FALLBACK_RUP } from '../data/rupDummy';
 import { FALLBACK_TENDERS, FALLBACK_EXPERTS } from '../data/demoData';
@@ -32,7 +33,9 @@ const isInitialAnnouncementTender = (tender) => {
 };
 
 export const AppProvider = ({ children }) => {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, profile } = useAuth();
+  const callerUnitKerja = profile?.unit_kerja ?? null;
+  const callerRole = profile?.role ?? 'user';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toast = useToast();
 
@@ -50,6 +53,10 @@ export const AppProvider = ({ children }) => {
 
   // Internal state (like mockup)
   const [internalStatuses, setInternalStatuses] = useState({});
+  // tender claim ownership: { [tenderId]: { unit_kerja, unit_kerja_region } }
+  const [tenderClaims, setTenderClaims] = useState({});
+  // rup claim + status: { [rupId]: { unit_kerja, unit_kerja_region, status_internal, catatan_internal } }
+  const [rupClaims, setRupClaims] = useState({});
   const [tenderNotes, setTenderNotes] = useState({});
   const [noteSaved, setNoteSaved] = useState({});
   const [assignedPICs, setAssignedPICs] = useState({});
@@ -146,23 +153,25 @@ export const AppProvider = ({ children }) => {
         const notesMap = {};
 
         // Fetch watchlist from Supabase directly
+        const claimsMap = {};
         try {
           const { data: watchlistData, error } = await supabase
             .from('tender_watchlist')
-            .select('kd_tender, status_internal, assigned_pic, catatan_internal');
-
-          console.log('[loadTendersAndWatchlist] Watchlist data from Supabase:', watchlistData);
+            .select('kd_tender, status_internal, assigned_pic, catatan_internal, unit_kerja, unit_kerja_region');
 
           if (!error && watchlistData) {
             watchlistData.forEach(w => {
               const tenderId = w.kd_tender;
-              if (w.status_internal) {
-                statusMap[tenderId] = w.status_internal;
-                console.log(`[loadTendersAndWatchlist] Loaded status for tender ${tenderId}: ${w.status_internal}`);
-              }
+              if (w.status_internal) statusMap[tenderId] = w.status_internal;
               if (w.assigned_pic) picsMap[tenderId] = w.assigned_pic;
               if (w.catatan_internal) {
                 try { notesMap[tenderId] = JSON.parse(w.catatan_internal); } catch {}
+              }
+              if (w.unit_kerja) {
+                claimsMap[tenderId] = {
+                  unit_kerja: w.unit_kerja,
+                  unit_kerja_region: w.unit_kerja_region || getRegion(w.unit_kerja),
+                };
               }
             });
           } else if (error) {
@@ -171,6 +180,7 @@ export const AppProvider = ({ children }) => {
         } catch (watchlistErr) {
           console.error('Failed to load watchlist:', watchlistErr);
         }
+        setTenderClaims(claimsMap);
 
         // Fill defaults for tenders not in watchlist
         FALLBACK_TENDERS.forEach(t => {
@@ -219,9 +229,32 @@ export const AppProvider = ({ children }) => {
         setLoadingRup(false);
       }
     };
-    
+
     loadRup();
   }, []); // Run only once on mount
+
+  // Load RUP watchlist (claim + status) from Supabase.
+  useEffect(() => {
+    const loadRupClaims = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('rup_watchlist')
+          .select('kd_rup, status_internal, catatan_internal, unit_kerja, unit_kerja_region');
+        if (error) { console.warn('[rup_watchlist] load failed', error.message); return; }
+        const map = {};
+        (data || []).forEach(r => {
+          map[r.kd_rup] = {
+            status_internal: r.status_internal || 'Dipantau',
+            catatan_internal: r.catatan_internal || null,
+            unit_kerja: r.unit_kerja || null,
+            unit_kerja_region: r.unit_kerja_region || getRegion(r.unit_kerja),
+          };
+        });
+        setRupClaims(map);
+      } catch (e) { console.warn('[rup_watchlist] load exception', e); }
+    };
+    loadRupClaims();
+  }, []);
 
   useEffect(() => {
     api.get('/experts')
@@ -755,6 +788,12 @@ export const AppProvider = ({ children }) => {
         throw new Error(selectError.message);
       }
       
+      // Determine claim ownership. If no row exists yet and caller has a unit_kerja,
+      // they auto-claim it. Existing claim is left intact unless caller is admin
+      // explicitly reassigning via patch.unit_kerja.
+      const existingClaim = tenderClaims[tenderId]?.unit_kerja || null;
+      const claimOwner = patch.unit_kerja ?? existingClaim ?? callerUnitKerja ?? null;
+
       // Build payload with only valid fields from the database schema
       const basePayload = {
         kd_tender: parseInt(tenderId),
@@ -762,7 +801,11 @@ export const AppProvider = ({ children }) => {
         nama_paket: tender?.nama || tender?.nama_paket || null,
         hps: tender?.hps || null,
       };
-      
+      if (claimOwner) {
+        basePayload.unit_kerja = claimOwner;
+        basePayload.unit_kerja_region = getRegion(claimOwner);
+      }
+
       // Add optional fields from patch if they exist
       if (patch.assigned_pic !== undefined) basePayload.assigned_pic = patch.assigned_pic;
       if (patch.catatan_internal !== undefined) basePayload.catatan_internal = patch.catatan_internal;
@@ -814,15 +857,29 @@ export const AppProvider = ({ children }) => {
         }
         console.log('[ensureWatchlistEntry] Insert successful, data:', data);
       }
+      // Sync local claim cache if a new claim was made.
+      if (claimOwner && existingClaim !== claimOwner) {
+        setTenderClaims(prev => ({
+          ...prev,
+          [tenderId]: { unit_kerja: claimOwner, unit_kerja_region: getRegion(claimOwner) },
+        }));
+      }
     } catch (err) {
       console.error('[ensureWatchlistEntry] Failed:', err);
       throw err;
     }
-  }, [tenders, internalStatuses]);
+  }, [tenders, internalStatuses, tenderClaims, callerUnitKerja]);
 
   const updateTenderStatus = useCallback(async (tenderId, newStatus) => {
     if (!user || isGuest) {
       showToast('Anda harus login untuk menyimpan perubahan', 'warning');
+      return;
+    }
+
+    // Enforce: tender can be claimed by only one branch.
+    const existingClaim = tenderClaims[tenderId]?.unit_kerja || null;
+    if (existingClaim && callerRole !== 'admin' && existingClaim !== callerUnitKerja) {
+      showToast(`Tender ini di-claim oleh ${existingClaim}; Anda hanya bisa lihat.`, 'warning');
       return;
     }
 
@@ -860,7 +917,84 @@ export const AppProvider = ({ children }) => {
       setInternalStatuses(prev => ({ ...prev, [tenderId]: oldStatus }));
       showToast('Gagal menyimpan status ke database', 'error');
     }
-  }, [user, isGuest, tenders, internalStatuses, ensureWatchlistEntry, showToast]);
+  }, [user, isGuest, tenders, internalStatuses, ensureWatchlistEntry, showToast, tenderClaims, callerUnitKerja, callerRole]);
+
+  // Update RUP claim + status. Mirrors updateTenderStatus.
+  const updateRupStatus = useCallback(async (rupId, newStatus, rupRow) => {
+    if (!user || isGuest) {
+      showToast('Anda harus login untuk menyimpan perubahan', 'warning');
+      return;
+    }
+    const kdRup = String(rupRow?.kd_rup || rupId);
+    const existingClaim = rupClaims[kdRup]?.unit_kerja || null;
+    if (existingClaim && callerRole !== 'admin' && existingClaim !== callerUnitKerja) {
+      showToast(`RUP ini di-claim oleh ${existingClaim}; Anda hanya bisa lihat.`, 'warning');
+      return;
+    }
+    const claimOwner = existingClaim ?? callerUnitKerja ?? null;
+    const oldClaim = rupClaims[kdRup];
+
+    // Optimistic
+    setRupClaims(prev => ({
+      ...prev,
+      [kdRup]: {
+        ...(prev[kdRup] || {}),
+        status_internal: newStatus,
+        unit_kerja: claimOwner,
+        unit_kerja_region: claimOwner ? getRegion(claimOwner) : null,
+      },
+    }));
+
+    try {
+      const payload = {
+        kd_rup: kdRup,
+        nama_paket: rupRow?.nama_paket || null,
+        nama_klpd: rupRow?.nama_klpd || null,
+        pagu: rupRow?.pagu || null,
+        status_internal: newStatus,
+      };
+      if (claimOwner) {
+        payload.unit_kerja = claimOwner;
+        payload.unit_kerja_region = getRegion(claimOwner);
+      }
+      const { error } = await supabase
+        .from('rup_watchlist')
+        .upsert(payload, { onConflict: 'kd_rup' });
+      if (error) throw error;
+      showToast('Status RUP berhasil diperbarui');
+    } catch (err) {
+      console.error('[updateRupStatus] Failed:', err);
+      setRupClaims(prev => ({ ...prev, [kdRup]: oldClaim }));
+      showToast('Gagal menyimpan status RUP', 'error');
+    }
+  }, [user, isGuest, rupClaims, callerUnitKerja, callerRole, showToast]);
+
+  // Admin: release / reassign tender claim.
+  const releaseTenderClaim = useCallback(async (tenderId) => {
+    if (callerRole !== 'admin') { showToast('Admin only', 'warning'); return; }
+    try {
+      const { error } = await supabase
+        .from('tender_watchlist')
+        .update({ unit_kerja: null, unit_kerja_region: null, claimed_by: null, claimed_at: null })
+        .eq('kd_tender', parseInt(tenderId));
+      if (error) throw error;
+      setTenderClaims(prev => { const next = { ...prev }; delete next[tenderId]; return next; });
+      showToast('Claim cabang dilepas');
+    } catch (e) { showToast(`Gagal release: ${e.message}`, 'error'); }
+  }, [callerRole, showToast]);
+
+  const reassignTenderClaim = useCallback(async (tenderId, newUnit) => {
+    if (callerRole !== 'admin') { showToast('Admin only', 'warning'); return; }
+    try {
+      const { error } = await supabase
+        .from('tender_watchlist')
+        .update({ unit_kerja: newUnit, unit_kerja_region: getRegion(newUnit), claimed_at: new Date().toISOString() })
+        .eq('kd_tender', parseInt(tenderId));
+      if (error) throw error;
+      setTenderClaims(prev => ({ ...prev, [tenderId]: { unit_kerja: newUnit, unit_kerja_region: getRegion(newUnit) } }));
+      showToast(`Tender di-reassign ke ${newUnit}`);
+    } catch (e) { showToast(`Gagal reassign: ${e.message}`, 'error'); }
+  }, [callerRole, showToast]);
 
   const updateTenderPIC = useCallback(async (tenderId, userId) => {
     if (!user || isGuest) {
@@ -935,6 +1069,9 @@ export const AppProvider = ({ children }) => {
     keywords, setKeywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
     // Internal state
     internalStatuses, setInternalStatuses, updateTenderStatus,
+    tenderClaims, setTenderClaims,
+    rupClaims, setRupClaims, updateRupStatus,
+    releaseTenderClaim, reassignTenderClaim,
     tenderNotes, setTenderNotes, addTenderNote,
     noteSaved, setNoteSaved,
     assignedPICs, setAssignedPICs, updateTenderPIC,
@@ -971,7 +1108,8 @@ export const AppProvider = ({ children }) => {
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,
     keywords, addKeyword, removeKeyword, clearKeywords, updateKeyword,
-    internalStatuses, updateTenderStatus, tenderNotes, addTenderNote, noteSaved, assignedPICs, updateTenderPIC, expertCVs,
+    internalStatuses, updateTenderStatus, tenderClaims, rupClaims, updateRupStatus, releaseTenderClaim, reassignTenderClaim,
+    tenderNotes, addTenderNote, noteSaved, assignedPICs, updateTenderPIC, expertCVs,
     users, addUser, updateUser, deleteUser,
     notifications, coverage, hpsThreshold,
     selectedTenderId, selectedExpertId, selectedRupId,

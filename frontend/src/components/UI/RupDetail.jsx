@@ -27,7 +27,7 @@ export default function RupDetail({ rup }) {
 
 
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-3">
+        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-700 mb-3">
           Ringkasan RUP
         </div>
         <div className="flex flex-col">
@@ -41,15 +41,15 @@ export default function RupDetail({ rup }) {
             ['Lokasi', `${rup.kabupaten || ''}, ${rup.provinsi || ''}`],
           ].map(([label, value], i) => (
             <div key={label} className={`grid grid-cols-[130px_1fr] gap-2.5 py-2 ${i > 0 ? 'border-t border-slate-200' : ''}`}>
-              <div className="text-[11px] font-extrabold text-slate-500">{label}</div>
-              <div className="text-xs font-bold text-slate-800">{value}</div>
+              <div className="text-[11px] font-extrabold text-slate-700">{label}</div>
+              <div className="text-xs font-bold text-slate-900">{value}</div>
             </div>
           ))}
         </div>
       </div>
 
       <div>
-        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
+        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-700 mb-2">
           Uraian & Spesifikasi
         </div>
         <div className="text-[13px] leading-relaxed bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
@@ -59,7 +59,7 @@ export default function RupDetail({ rup }) {
       </div>
 
       <div className="mt-2">
-        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-3">
+        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-700 mb-3">
           Timeline Rencana Pengadaan
         </div>
         
@@ -155,7 +155,7 @@ export default function RupDetail({ rup }) {
       </div>
 
       <div className="mt-2">
-        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
+        <div className="text-[11px] font-extrabold uppercase tracking-widest text-slate-700 mb-2">
           Keyword Match
         </div>
         <div className="flex flex-wrap gap-1.5">

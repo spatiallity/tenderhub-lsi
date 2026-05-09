@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from supabase import create_client, Client
 from app.core.config import settings
+from app.core.unit_kerja import get_region
 
 router = APIRouter()
 
@@ -18,7 +19,8 @@ class CreateUserRequest(BaseModel):
     password: str
     name: str
     title: Optional[str] = ""
-    role: str = "user"  # user, manager, admin
+    role: str = "user"  # admin, pusat, cabang, manager, user
+    unit_kerja: Optional[str] = None
 
 
 class UpdateUserRequest(BaseModel):
@@ -26,6 +28,7 @@ class UpdateUserRequest(BaseModel):
     title: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    unit_kerja: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -36,6 +39,8 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     created_at: str
+    unit_kerja: Optional[str] = None
+    unit_kerja_region: Optional[str] = None
 
 
 @router.post("/users", response_model=UserResponse)
@@ -75,7 +80,9 @@ async def create_user(user_data: CreateUserRequest):
             "name": user_data.name,
             "title": user_data.title,
             "role": user_data.role,
-            "is_active": True
+            "is_active": True,
+            "unit_kerja": user_data.unit_kerja,
+            "unit_kerja_region": get_region(user_data.unit_kerja) if user_data.unit_kerja else None,
         }
         
         print(f"🔵 Creating profile: {profile_data}")
@@ -97,7 +104,9 @@ async def create_user(user_data: CreateUserRequest):
             title=user_data.title,
             role=user_data.role,
             is_active=True,
-            created_at=created_at_str
+            created_at=created_at_str,
+            unit_kerja=user_data.unit_kerja,
+            unit_kerja_region=get_region(user_data.unit_kerja) if user_data.unit_kerja else None,
         )
         
     except Exception as e:
@@ -128,7 +137,9 @@ async def list_users():
                 title=profile.get("title"),
                 role=profile.get("role", "user"),
                 is_active=profile.get("is_active", True),
-                created_at=profile.get("created_at", "")
+                created_at=profile.get("created_at", ""),
+                unit_kerja=profile.get("unit_kerja"),
+                unit_kerja_region=profile.get("unit_kerja_region"),
             ))
         
         return users
@@ -155,7 +166,10 @@ async def update_user(user_id: str, user_data: UpdateUserRequest):
             update_data["role"] = user_data.role
         if user_data.is_active is not None:
             update_data["is_active"] = user_data.is_active
-        
+        if user_data.unit_kerja is not None:
+            update_data["unit_kerja"] = user_data.unit_kerja
+            update_data["unit_kerja_region"] = get_region(user_data.unit_kerja) if user_data.unit_kerja else None
+
         if not update_data:
             raise HTTPException(status_code=400, detail="No data to update")
         
