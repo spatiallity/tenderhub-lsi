@@ -3,3 +3,8 @@ TEMPLATE_CV_EXPERT.docx filter=lfs diff=lfs merge=lfs -text
 *.docx filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
 *.xlsx filter=lfs diff=lfs merge=lfs -text
+
+# Frontend logo MUST be a raw blob — Vercel build does not pull LFS
+# without manual config, so the deployed bundle would otherwise serve
+# the LFS pointer text and the logo would 404.
+frontend/src/assets/TenderHub_Logo.png -filter -diff -merge text=auto
