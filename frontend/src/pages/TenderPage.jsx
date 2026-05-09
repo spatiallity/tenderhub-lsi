@@ -189,10 +189,10 @@ export default function TenderPage() {
   const renderSortTh = (k, label, className = '') => (
     <th
       key={k}
-      className={`bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 whitespace-nowrap cursor-pointer hover:text-slate-700 hover:bg-slate-100 transition-colors select-none text-center ${className}`}
+      className={`bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wider px-3 py-3 border-b border-slate-200 cursor-pointer hover:text-slate-700 hover:bg-slate-100 transition-colors select-none text-center ${className}`}
       onClick={() => toggleSort(k)}
     >
-      <span className="inline-flex items-center justify-center gap-1">
+      <span className="inline-flex items-center justify-center gap-1 leading-tight">
         {label}
         {sortKey === k ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={10} className="opacity-30" />}
       </span>
@@ -485,13 +485,13 @@ export default function TenderPage() {
                 requestAnimationFrame(() => { isSyncingRef.current = false; });
               }}
             >
-              <table ref={tableRef} className="min-w-[1180px] xl:min-w-[1320px] w-full table-fixed text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[980px] xl:min-w-[1120px] w-full table-fixed text-left border-collapse text-[12px]">
               <colgroup>
-                <col className="w-[68px] xl:w-[78px]" />     {/* Kode Tender — narrow */}
-                <col className="w-[230px] xl:w-[260px]" />   {/* Nama Paket */}
+                <col className="w-[48px] xl:w-[54px]" />     {/* Kode Tender — narrow */}
+                <col className="w-[160px] xl:w-[185px]" />   {/* Nama Paket */}
                 <col className="hidden xl:table-column xl:w-[140px]" /> {/* Instansi/Satker — narrower */}
                 <col className="hidden" />                    {/* Jenis KLPD (hidden) */}
-                <col className="w-[110px] xl:w-[120px]" />   {/* Pagu/HPS */}
+                <col className="w-[72px] xl:w-[82px]" />     {/* Pagu/HPS */}
                 <col className="hidden" />                    {/* Sub-Portofolio (hidden) */}
                 <col className="hidden" />                    {/* Sumber Dana (hidden) */}
                 <col className="w-[140px] xl:w-[160px]" />   {/* Status Tahap */}
