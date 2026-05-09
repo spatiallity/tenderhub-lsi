@@ -17,34 +17,57 @@ export default function CvDownloadMenu({ expert }) {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
+  const fetchAndSave = async (url, accept, filename) => {
+    const res = await fetch(url, { method: 'GET', headers: { Accept: accept } });
+    if (!res.ok) {
+      const txt = await res.text();
+      const err = new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+      err.status = res.status;
+      throw err;
+    }
+    const blob = await res.blob();
+    const objUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(objUrl);
+  };
+
   const download = async (fmt) => {
     if (!expert?.id) return;
     setBusy(fmt);
     setOpen(false);
     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    const safeName = (expert.nama || 'expert').replace(/\s+/g, '_');
+    const date = new Date().toISOString().split('T')[0];
     const url = fmt === 'pdf'
       ? `${apiBase}/cv/${expert.id}/cv/pdf`
       : `${apiBase}/cv/${expert.id}/cv`;
     try {
-      const res = await fetch(url, { method: 'GET', headers: { Accept: MIME[fmt] } });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
-      }
-      const blob = await res.blob();
-      const objUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objUrl;
-      const safeName = (expert.nama || 'expert').replace(/\s+/g, '_');
-      const date = new Date().toISOString().split('T')[0];
-      a.download = `CV_${safeName}_${date}.${fmt}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(objUrl);
+      await fetchAndSave(url, MIME[fmt], `CV_${safeName}_${date}.${fmt}`);
     } catch (err) {
       console.error('[CvDownloadMenu] download failed', err);
-      alert(`Gagal download CV (${fmt.toUpperCase()}): ${err.message}`);
+      // 503 / 502 / 504 = HF Space crashed or sleeping. PDF needs LibreOffice on
+      // the backend; fall back to DOCX if user asked for PDF.
+      const isUpstreamDown = [502, 503, 504].includes(err.status);
+      if (fmt === 'pdf' && isUpstreamDown) {
+        try {
+          const docxUrl = `${apiBase}/cv/${expert.id}/cv`;
+          await fetchAndSave(docxUrl, MIME.docx, `CV_${safeName}_${date}.docx`);
+          alert('Server PDF sedang down (HuggingFace Space error 503). Otomatis download DOCX sebagai gantinya.');
+          setBusy(null);
+          return;
+        } catch (fallbackErr) {
+          console.error('[CvDownloadMenu] DOCX fallback failed', fallbackErr);
+        }
+      }
+      const friendly = isUpstreamDown
+        ? `Server CV sedang down (HTTP ${err.status}). Coba lagi beberapa menit lagi atau restart HuggingFace Space.`
+        : `Gagal download CV (${fmt.toUpperCase()}): ${err.message}`;
+      alert(friendly);
     } finally {
       setBusy(null);
     }

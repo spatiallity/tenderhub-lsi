@@ -47,6 +47,8 @@ export const AppProvider = ({ children }) => {
   const [tendersRaw, setTendersRaw] = useState([]);
   const [rupRaw, setRupRaw] = useState([]);
   const [expertsRaw, setExpertsRaw] = useState([]);
+  // Real names from contact_persons table — used to replace dummy reviewer names.
+  const [contactNames, setContactNames] = useState([]);
   const [loadingTenders, setLoadingTenders] = useState(true);
   const [loadingRup, setLoadingRup] = useState(true);
   const [loadingExperts, setLoadingExperts] = useState(true);
@@ -233,6 +235,21 @@ export const AppProvider = ({ children }) => {
     loadRup();
   }, []); // Run only once on mount
 
+  // Load real names from contact_persons (used as expert reviewers).
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('contact_persons')
+          .select('nama')
+          .order('nama', { ascending: true });
+        if (error) { console.warn('[contact_persons] load failed', error.message); return; }
+        const names = (data || []).map(c => c.nama).filter(Boolean);
+        if (names.length) setContactNames(names);
+      } catch (e) { console.warn('[contact_persons] load exception', e); }
+    })();
+  }, []);
+
   // Load RUP watchlist (claim + status) from Supabase.
   useEffect(() => {
     const loadRupClaims = async () => {
@@ -381,9 +398,22 @@ export const AppProvider = ({ children }) => {
     [tenders]
   );
 
+  // Override dummy reviewer names with real names from contact_persons.
+  // Deterministic: review.id (or fallback hash) modulo contact list.
+  const expertsWithRealReviewers = useMemo(() => {
+    if (!contactNames.length) return expertsRaw;
+    return expertsRaw.map(e => ({
+      ...e,
+      reviews: (e.reviews || []).map((r, idx) => ({
+        ...r,
+        reviewer: contactNames[((r.id || idx) >>> 0) % contactNames.length],
+      })),
+    }));
+  }, [expertsRaw, contactNames]);
+
   // Selected items
   const selectedTender = useMemo(() => tenders.find(t => t.id === selectedTenderId), [tenders, selectedTenderId]);
-  const selectedExpert = useMemo(() => expertsRaw.find(e => e.id === selectedExpertId), [expertsRaw, selectedExpertId]);
+  const selectedExpert = useMemo(() => expertsWithRealReviewers.find(e => e.id === selectedExpertId), [expertsWithRealReviewers, selectedExpertId]);
   const selectedRup = useMemo(() => rupPlans.find(r => r.id === selectedRupId), [rupPlans, selectedRupId]);
 
   const openedTenderSet = useMemo(() => new Set(openedTenderIds.map(String)), [openedTenderIds]);
@@ -1061,7 +1091,7 @@ export const AppProvider = ({ children }) => {
     tenders, rupPlans, expertsRaw, setExpertsRaw,
     refetchTenders,
     rupList: rupPlans,
-    experts: expertsRaw,
+    experts: expertsWithRealReviewers,
     loadingTenders, loadingRup, loadingExperts,
     // Derived
     keywordCount, totalPotensi, relevantCount, urgentCount,
@@ -1103,7 +1133,7 @@ export const AppProvider = ({ children }) => {
     historyDraft, setHistoryDraft, addHistory, deleteExpertHistory, updateExpertProject,
   }), [
     sidebarCollapsed, toast, showToast,
-    tenders, rupPlans, expertsRaw,
+    tenders, rupPlans, expertsRaw, expertsWithRealReviewers,
     refetchTenders,
     loadingTenders, loadingRup, loadingExperts,
     keywordCount, totalPotensi, relevantCount, urgentCount,

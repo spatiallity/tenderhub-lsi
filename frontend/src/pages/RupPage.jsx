@@ -454,7 +454,17 @@ export default function RupPage() {
               ref={tableScrollRef}
               className="overflow-x-auto pb-2"
             >
-              <table ref={tableRef} className="w-full table-auto text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[1100px] xl:min-w-[1240px] w-full table-fixed text-left border-collapse text-[12px]">
+              <colgroup>
+                <col className="w-[70px] xl:w-[78px]" />     {/* Kode RUP — narrow */}
+                <col className="w-[260px] xl:w-[300px]" />   {/* Paket */}
+                <col className="w-[160px] xl:w-[180px]" />   {/* Satker / K/L/PD — narrower */}
+                <col className="w-[110px] xl:w-[120px]" />   {/* Jenis */}
+                <col className="w-[120px] xl:w-[130px]" />   {/* Jadwal */}
+                <col className="w-[110px] xl:w-[120px]" />   {/* Pagu */}
+                <col className="w-[120px] xl:w-[130px]" />   {/* Status Internal */}
+                <col className="w-[80px] xl:w-[90px]" />     {/* Aksi */}
+              </colgroup>
               <thead>
                 <tr>
                   {renderSortTh('kd_rup', 'Kode RUP')}

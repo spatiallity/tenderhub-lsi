@@ -415,7 +415,20 @@ export default function TenderPage() {
               ref={tableScrollRef}
               className="overflow-x-auto pb-2 max-w-full"
             >
-              <table ref={tableRef} className="w-full table-auto text-left border-collapse text-[12px]">
+              <table ref={tableRef} className="min-w-[1180px] xl:min-w-[1320px] w-full table-fixed text-left border-collapse text-[12px]">
+              <colgroup>
+                <col className="w-[68px] xl:w-[78px]" />     {/* Kode Tender — narrow */}
+                <col className="w-[230px] xl:w-[260px]" />   {/* Nama Paket */}
+                <col className="hidden xl:table-column xl:w-[140px]" /> {/* Instansi/Satker — narrower */}
+                <col className="hidden" />                    {/* Jenis KLPD (hidden) */}
+                <col className="w-[110px] xl:w-[120px]" />   {/* Pagu/HPS */}
+                <col className="hidden" />                    {/* Sub-Portofolio (hidden) */}
+                <col className="hidden" />                    {/* Sumber Dana (hidden) */}
+                <col className="w-[140px] xl:w-[160px]" />   {/* Status Tahap */}
+                <col className="w-[120px] xl:w-[136px]" />   {/* Deadline */}
+                <col className="w-[108px] xl:w-[120px]" />   {/* Status Internal */}
+                <col className="w-[80px] xl:w-[90px]" />     {/* Aksi */}
+              </colgroup>
               <thead>
                 <tr>
                   {renderSortTh('kd_tender', 'Kode Tender')}
