@@ -129,7 +129,7 @@ export default function LoginPage() {
             <div className="mb-6 flex flex-col items-center text-center">
               <img src={tenderhubLogo} alt="TenderHub" className="h-40 w-auto mb-4 object-contain" />
               <h2 className="text-xl font-black text-slate-900 mb-0.5">Selamat Datang</h2>
-              <p className="text-xs text-slate-500">Masuk dengan akun SBU LSI Anda untuk melanjutkan.</p>
+              <p className="text-xs text-slate-500">Masuk dengan akun Anda untuk melanjutkan.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
